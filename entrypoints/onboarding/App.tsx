@@ -1,13 +1,23 @@
 import { useId } from 'react';
 import { Page } from '../../components/common/Page';
 import { t } from '../../lib/i18n';
+import { useSiteAccess, type SiteAccessRequestState } from '../../lib/site-access/use-site-access';
 
 // TODO(Phase 3): move to lib/config once it exposes provider constants.
 const GROQ_PRIVACY_URL = 'https://groq.com/privacy-policy/';
 
+const SITE_ACCESS_STATUS = {
+  pending: 'toolbarSiteAccessPending',
+  granted: 'toolbarSiteAccessGranted',
+  denied: 'toolbarSiteAccessDenied',
+  skipped: 'toolbarSiteAccessSkipped',
+  error: 'toolbarSiteAccessError',
+} as const satisfies Record<Exclude<SiteAccessRequestState, 'idle'>, string>;
+
 export function App() {
   const disclosureId = useId();
   const siteAccessId = useId();
+  const siteAccess = useSiteAccess();
 
   return (
     <Page title={t('onboardingTitle')}>
@@ -45,22 +55,23 @@ export function App() {
           <button
             type="button"
             className="button button--primary"
-            onClick={() => {
-              // TODO(Phase 3): request optional host permissions from this user gesture (D-02, FR-009).
-            }}
+            disabled={siteAccess.requestState === 'pending'}
+            onClick={siteAccess.grant}
           >
             {t('siteAccessGrant')}
           </button>
           <button
             type="button"
             className="button"
-            onClick={() => {
-              // TODO(Phase 3): record that site access was declined; right-click stays available (FR-018).
-            }}
+            // TODO(Phase 3): persist that site access was declined (the choice is not stored yet).
+            onClick={siteAccess.skip}
           >
             {t('siteAccessSkip')}
           </button>
         </div>
+        {siteAccess.requestState === 'idle' ? null : (
+          <p role="status">{t(SITE_ACCESS_STATUS[siteAccess.requestState])}</p>
+        )}
       </section>
     </Page>
   );

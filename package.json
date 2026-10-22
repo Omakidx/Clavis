@@ -21,12 +21,14 @@
     "check": "npm run typecheck && npm run lint && npm run format:check && npm run test",
     "postinstall": "wxt prepare",
     "size": "node scripts/check-bundle-size.mjs",
-    "audit:zip": "node scripts/audit-zip.mjs",
+    "audit:zip": "node scripts/audit-zip.mjs --strict",
     "test:e2e": "playwright test",
     "e2e:install": "playwright install chromium",
     "ci": "npm run check && npm run build && npm run size && npm run zip && npm run audit:zip && node scripts/selftest.mjs && node scripts/scan-secrets.mjs"
   },
   "dependencies": {
+    "pdfjs-dist": "6.4.299",
+    "preact": "^11.0.1",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
     "zod": "^4.6.7"
@@ -45,7 +47,9 @@
     "eslint-plugin-react-hooks": "^7.1.1",
     "globals": "^17.13.0",
     "jsdom": "^30.1.3",
+    "pdf-lib": "^1.17.1",
     "prettier": "^3.9.10",
+    "tsx": "^4.23.15",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.72.0",
     "vitest": "^5.0.5",

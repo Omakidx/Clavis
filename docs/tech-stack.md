@@ -12,8 +12,8 @@
 | Extension framework | **WXT** | Multiple entrypoints, MV3 manifest generation, build/zip workflow | Removes manifest/build boilerplate; supports React and TS |
 | Language | **TypeScript, strict mode** | Compile-time correctness | Shared request contracts for content, PDF and background |
 | UI | **React** | Onboarding, settings, reader, side panel, explanation card | Reusable compositional UI |
-| On-page toolbar | React chunk loaded lazily, or **Preact** if Spike B measurements require it (D-08) | Selection toolbar on websites | Keeps always-loaded page weight minimal |
-| Selection observer | **Plain TypeScript**, no framework | Always-loaded content script on granted sites | Smallest possible footprint |
+| On-page toolbar | **Preact**, bundled in the observer (D-08, decided by Spike B) | Selection toolbar on websites | Measured 60 ms first-toolbar p95 vs ~230 ms for lazily loaded React |
+| Selection observer | **Plain TypeScript** + the Preact toolbar | Always-loaded content script on granted sites | 11.8 KB gzip total |
 | CSS | **Tailwind CSS** + CSS variables | Styling and responsive design | Efficient and themeable; scope on-page styles via Shadow DOM |
 | UI primitives | **Radix UI or shadcn/ui (selectively)** | Dialogs, tabs, popovers and a11y patterns | Avoid custom keyboard/focus logic for every control |
 | Icons | **Lucide React** | Lightweight consistent iconography | Tree-shakeable components |
@@ -40,7 +40,7 @@
 - Set `engines.node` after installation and test it in CI; include `.nvmrc` if helpful.
 - Use one package manager throughout; don't mix npm/pnpm/yarn lockfiles.
 - Commit lockfile. Pin/lock major-sensitive dependencies such as PDF.js, WXT, React, Zod and browser-testing tools.
-- Define `minimum_chrome_version` based on **actual APIs used**. Known floors: `chrome.sidePanel` 114+, `chrome.offscreen` 109+, `chrome.storage.session` and `setAccessLevel` 102+, `scripting.registerContentScripts` 96+. Newer methods may have higher minimums. Test and document a final minimum.
+- Define `minimum_chrome_version` based on **actual APIs used**. **Chosen: 147 (D-18)**, set by pdfjs-dist 6.4.299's unguarded use of `Math.sumPrecise` (also `Uint8Array.fromBase64` 140, `Promise.try` 128, `URL.parse` 126); `matchOriginAsFallback` needs 119. Re-check whenever PDF.js is upgraded. Other floors: `chrome.sidePanel` 114+, `sidePanel.open()` 116+, `runtime.getContexts` 116+, `chrome.offscreen` 109+, `chrome.storage.session` and `setAccessLevel` 102+, `scripting.registerContentScripts` 96+. Newer methods may have higher minimums. Test and document a final minimum.
 - Review dependencies/licenses each release, particularly PDF.js bundled worker and `cmaps` assets.
 - Do not dynamically fetch JS/worker modules from CDN at runtime; bundle all executable extension code.
 
@@ -95,7 +95,7 @@ npm install --save-dev vitest @testing-library/react @testing-library/user-event
 
 **Do not add a third-party PDF UI framework.** `pdfjs-dist` already ships the viewer components (`pdfjs-dist/web/pdf_viewer.mjs` and `pdf_viewer.css`) that provide virtualization, text layer, zoom and find; build only the React shell around them (D-06).
 
-Add `preact` only if Spike B selects it for the on-page toolbar (D-08).
+`preact` is used for the on-page toolbar (D-08).
 
 ### Libraries deliberately not required in v1
 
@@ -259,11 +259,11 @@ Chrome TTS: <https://developer.chrome.com/docs/extensions/reference/api/tts>
 
 1. User provides a `File` via picker or drag-drop.
 2. Read it as an `ArrayBuffer`; enforce file size and error limits.
-3. Call `getDocument({ data, isEvalSupported: false })` with the **locally bundled** worker.
+3. Call `getDocument({ data, useWorkerFetch: true, useWasm, ... })` with the **locally bundled** worker (`isEvalSupported` no longer exists in 6.x; `useWasm` follows a runtime probe, and the CSP allows wasm per D-17).
 4. Create an `EventBus`, a `PDFLinkService` and a `PDFFindController`, then a `PDFViewer` bound to the reader's container element; call `pdfViewer.setDocument(doc)` and `linkService.setDocument(doc)`.
 5. Drive page navigation, zoom/fit-width (`currentScaleValue = 'page-width'`), page count and find from the React shell through the viewer API and `EventBus` events (`pagechanging`, `scalechanging`, `pagesloaded`).
 6. Observe selections in the viewer's text layer and build a `SelectionSnapshot` with the page number; use the shared Listen/Explain contract.
-7. On close or file change: `pdfViewer.setDocument(null)`, `doc.destroy()`, release object URLs.
+7. On close or file change: `pdfViewer.setDocument(null)`, `loadingTask.destroy()`, release object URLs.
 
 **Do not implement** raw PDF parsing, font encodings, page virtualization or OCR in v1. Import `pdf_viewer.css`, bundle fonts/cmaps assets when required, and keep the worker, core and viewer components on the exact same PDF.js version.
 

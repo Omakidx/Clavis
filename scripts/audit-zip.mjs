@@ -2,7 +2,12 @@
 // Release ZIP audit (docs/architecture.md section 11 item 6; FR-075, FR-076, FR-077).
 // Usage: node scripts/audit-zip.mjs [--zip <file>] [--strict]
 // Default target: newest .output/*-chrome.zip. Exit 0 = clean, 1 = violations, 2 = bad input.
-// --strict turns warnings into failures.
+// --strict turns warnings into failures (the npm script "audit:zip" always passes it).
+//
+// Limitation: remote-code detection is regex based on literal URLs ("https://...", "//..."). A URL
+// built at run time (string concatenation, template parts, data read from storage or the network)
+// is invisible here. The MV3 CSP (script-src 'self' 'wasm-unsafe-eval') is the runtime backstop, and
+// the expected CSP is enforced exactly, so remote scripts cannot execute even if one slips past.
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -52,7 +57,28 @@ const FORBIDDEN_NAME = [
   [/(^|\/)\.git(?:\/|ignore$|attributes$|config$)/i, 'git metadata'],
   [/(^|\/)node_modules\//i, 'node_modules directory'],
   [/(^|\/)\.DS_Store$/i, 'OS metadata file'],
+  // The PDF.js scripting sandbox (an embedded JS engine for PDF forms) must never ship.
+  [/quickjs|pdf\.sandbox/i, 'PDF.js scripting sandbox'],
 ];
+
+// Manifest keys that widen the attack surface. Absent is the default; they pass only when
+// expected-permissions.json carries an identical value for the key.
+const RISKY_KEYS = [
+  'web_accessible_resources',
+  'externally_connectable',
+  'sandbox',
+  'oauth2',
+  'key',
+  'update_url',
+  'chrome_url_overrides',
+];
+
+const stable = (value) =>
+  JSON.stringify(value, (_key, v) =>
+    v && typeof v === 'object' && !Array.isArray(v)
+      ? Object.fromEntries(Object.entries(v).sort(([a], [b]) => a.localeCompare(b)))
+      : v,
+  );
 
 // Content patterns that fail the audit. The matched text is never printed in full.
 const SECRET_PATTERNS = [
@@ -147,10 +173,59 @@ function main() {
         fail('permissions', `${key}: unexpected "${item}" (not in expected-permissions.json)`);
       for (const item of missing) fail('permissions', `${key}: expected "${item}" is missing`);
     }
+
+    // Top-level key allowlist: anything not listed in expected-permissions.json fails.
+    const allowedKeys = new Set(expected.allowedManifestKeys ?? []);
+    for (const key of Object.keys(manifest)) {
+      if (key === 'content_scripts') continue; // reported above with its own message
+      if (RISKY_KEYS.includes(key)) {
+        if (!(key in expected)) {
+          fail('manifest', `risky manifest key "${key}" is present but not expected`);
+        } else if (stable(manifest[key]) !== stable(expected[key])) {
+          fail(
+            'manifest',
+            `"${key}" differs from expected-permissions.json: ${stable(manifest[key])}`,
+          );
+        } else if (
+          key === 'web_accessible_resources' &&
+          !(
+            Array.isArray(manifest[key]) &&
+            manifest[key].every((entry) => entry && entry.use_dynamic_url === true)
+          )
+        ) {
+          fail('manifest', 'every web_accessible_resources entry must set use_dynamic_url: true');
+        }
+      } else if (!allowedKeys.has(key)) {
+        fail('manifest', `unexpected manifest key "${key}" (not in allowedManifestKeys)`);
+      }
+    }
+    // Values pinned in one place so a change is a visible diff to expected-permissions.json.
+    for (const key of ['minimum_chrome_version', 'commands']) {
+      if (!(key in expected)) continue;
+      if (!(key in manifest)) {
+        fail('manifest', `"${key}" is missing (expected ${stable(expected[key])})`);
+      } else if (stable(manifest[key]) !== stable(expected[key])) {
+        fail(
+          'manifest',
+          `"${key}" differs from expected-permissions.json: ${stable(manifest[key])} (expected ${stable(expected[key])})`,
+        );
+      }
+    }
+
     const csp = manifest.content_security_policy;
     const cspText = typeof csp === 'string' ? csp : JSON.stringify(csp ?? {});
+    // The only approved loosening is 'wasm-unsafe-eval' for PDF.js decoders (D-17); the CSP must
+    // match expected-permissions.json exactly, and nothing else may weaken it.
+    const expectedCsp = JSON.stringify(expected.content_security_policy ?? {});
+    if (cspText !== expectedCsp) {
+      fail(
+        'manifest',
+        `content_security_policy differs from expected-permissions.json: ${cspText}`,
+      );
+    }
+    const cspWithoutWasm = cspText.replaceAll("'wasm-unsafe-eval'", '');
     if (
-      /unsafe-eval|unsafe-inline|https?:\/\//i.test(cspText) ||
+      /unsafe-eval|unsafe-inline|https?:\/\//i.test(cspWithoutWasm) ||
       /localhost|127\.0\.0\.1/.test(cspText)
     ) {
       fail(
@@ -187,7 +262,9 @@ function main() {
     if (
       entry.size > 0 &&
       !TEXT_EXT.test(entry.name) &&
-      !/\.(?:woff2?|png|jpe?g|gif|ico|wasm|bin|pdf)$/i.test(entry.name)
+      !/\.(?:woff2?|png|jpe?g|gif|ico|wasm|bin|pdf)$/i.test(entry.name) &&
+      // PDF.js runtime data (D-06): CMaps, standard fonts, ICC profiles and licence files.
+      !/^pdfjs\/(?:.+\.(?:bcmap|pfb|ttf|icc)|.*LICENSE[^/]*)$/i.test(entry.name)
     ) {
       warn('files', `unrecognised file type shipped: ${entry.name}`);
     }
@@ -239,15 +316,24 @@ function main() {
     }
 
     if (isScript) {
+      // `(?:https?:)?//` matches both absolute and protocol-relative remote URLs.
       const remotePatterns = [
-        [/\bimport\s*\(\s*["'`]https?:\/\//g, 'remote dynamic import()'],
-        [/\bfrom\s*["']https?:\/\//g, 'remote static import'],
-        [/\bimportScripts\s*\([^)]*https?:\/\//g, 'importScripts() of a remote URL'],
-        [/\bnew\s+(?:Shared)?Worker\s*\(\s*["'`]https?:\/\//g, 'Worker created from a remote URL'],
+        [/\bimport\s*\(\s*["'`](?:https?:)?\/\//g, 'remote dynamic import()'],
+        [/\bfrom\s*["'](?:https?:)?\/\//g, 'remote static import'],
+        [/\bimportScripts\s*\([^)]*["'`](?:https?:)?\/\//g, 'importScripts() of a remote URL'],
         [
-          /\.src\s*=\s*["'`]https?:\/\/[^"'`]*\.js\b/g,
+          /\bnew\s+(?:Shared)?Worker\s*\(\s*(?:new\s+URL\s*\(\s*)?["'`](?:https?:)?\/\//g,
+          'Worker created from a remote URL',
+        ],
+        [
+          /\.src\s*=\s*["'`](?:https?:)?\/\/[^"'`]*\.js\b/g,
           'script element pointed at a remote .js URL',
         ],
+        [
+          /\bWebAssembly\s*\.\s*(?:instantiateStreaming|compileStreaming)\s*\([^;]{0,200}?\bfetch\s*\(\s*["'`](?:https?:)?\/\//g,
+          'WebAssembly streaming compile of a remote URL',
+        ],
+        [/\bfetch\s*\(\s*["'`](?:https?:)?\/\/[^"'`]*\.wasm\b/g, 'fetch of a remote .wasm module'],
       ];
       for (const [pattern, label] of remotePatterns) {
         for (const match of text.matchAll(pattern)) {
@@ -301,6 +387,8 @@ function main() {
     for (const key of ['permissions', 'host_permissions', 'optional_host_permissions']) {
       console.log(`  ${key}: ${JSON.stringify(manifest[key] ?? [])}`);
     }
+    console.log(`  minimum_chrome_version: ${manifest.minimum_chrome_version}`);
+    console.log(`  manifest keys: ${Object.keys(manifest).join(', ')}`);
     console.log(`  content_scripts: ${'content_scripts' in manifest ? 'PRESENT' : 'absent'}\n`);
   }
   section('FAILURES', failures);

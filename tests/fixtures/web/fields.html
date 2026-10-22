@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Editable and hidden content</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 1rem;
+        font:
+          18px/1.6 system-ui,
+          sans-serif;
+      }
+      #hidden {
+        display: none;
+      }
+      #invisible {
+        visibility: hidden;
+      }
+      input,
+      textarea,
+      [contenteditable] {
+        display: block;
+        width: 28rem;
+        margin: 0.5rem 0;
+        font: inherit;
+      }
+    </style>
+  </head>
+  <body>
+    <p id="normal">Normal paragraph that should show the toolbar when selected.</p>
+    <input id="text" type="text" value="secret input words here" />
+    <input id="password" type="password" value="hunter2hunter2" />
+    <textarea id="area" rows="2">textarea words here too</textarea>
+    <div id="editable" contenteditable="true">editable words that must not trigger</div>
+    <p id="hidden">display none text</p>
+    <p id="invisible">visibility hidden text</p>
+  </body>
+</html>

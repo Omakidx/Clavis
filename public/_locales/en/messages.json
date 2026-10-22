@@ -7,6 +7,26 @@
     "message": "Understand and pronounce selected text in webpages and PDFs.",
     "description": "Short extension description shown on the extensions page. Chrome limits this to 132 characters."
   },
+  "speechNoVoice": {
+    "message": "Clavis can't read this aloud because no voice is available on this computer. Install a text-to-speech voice for your system, restart Chrome and try again.",
+    "description": "Error shown when Listen is pressed but neither the browser's text-to-speech nor the fallback has any voice (FR-023). Listen is the name of a toolbar button. Spike D draft copy; Phase 6 refines it per operating system."
+  },
+  "speechNoVoiceForLanguage": {
+    "message": "None of the voices on this computer match the chosen language, so Clavis won't read this aloud with the wrong accent.",
+    "description": "Error shown when voices exist but none speak the requested language (FR-024), instead of silently using a mismatched voice."
+  },
+  "speechStartFailed": {
+    "message": "This computer has a voice, but it did not start speaking. Check your system sound and speech settings, then try again.",
+    "description": "Error shown when a voice was found but never produced audio within the start timeout (FR-023); avoids a fake playing state."
+  },
+  "speechInvalidRequest": {
+    "message": "Clavis can't read this text aloud. Select a shorter piece of text and try again.",
+    "description": "Error shown when the text to speak is empty, too long or otherwise rejected before any voice is used."
+  },
+  "speechCancelled": {
+    "message": "Reading was stopped.",
+    "description": "Status shown when a Listen request is replaced by a newer one or stopped before audio started."
+  },
   "disclosureTitle": {
     "message": "Your reading stays on your device until you ask",
     "description": "Heading of the data disclosure on the onboarding page (FR-002). Approved copy; do not weaken."
@@ -87,6 +107,78 @@
     "message": "Settings",
     "description": "Popup button that opens the extension's settings page."
   },
+  "popupInjectButton": {
+    "message": "Explain on this page",
+    "description": "Popup button shown when website access was not granted. Runs Clavis once on the current tab so the user can explain the text they selected there (FR-018)."
+  },
+  "popupInjectHint": {
+    "message": "Select some text on the page first, then choose this button.",
+    "description": "Hint under the popup button that runs Clavis on the current tab without website access."
+  },
+  "popupInjectNoSelection": {
+    "message": "No text is selected on the page. Select some text and try again.",
+    "description": "Popup message shown when Clavis ran on the current tab but nothing usable was selected."
+  },
+  "popupInjectRestricted": {
+    "message": "Clavis can't run on this kind of page. Try it on a regular website.",
+    "description": "Popup message shown when the current tab is a browser-internal or store page where extensions are not allowed to run."
+  },
+  "popupInjectNoAccess": {
+    "message": "Chrome did not give Clavis access to this tab. Close this popup, then click the Clavis icon again, or right-click the selected text and choose Explain with Clavis.",
+    "description": "Popup message shown when Chrome refused to let Clavis run on the current tab because the one-time tab access (activeTab) was not granted."
+  },
+  "popupInjectFailed": {
+    "message": "Clavis couldn't run on this page. Reload the page and try again.",
+    "description": "Popup message shown when running Clavis on the current tab failed for any other reason."
+  },
+  "toolbarGroupLabel": {
+    "message": "Clavis actions for the selected text",
+    "description": "Accessible name of the small toolbar that appears next to selected text on a web page."
+  },
+  "toolbarListen": {
+    "message": "Listen",
+    "description": "Toolbar button that reads the selected text aloud. Listen is also the name used in the privacy disclosure."
+  },
+  "toolbarExplain": {
+    "message": "Explain",
+    "description": "Toolbar button that explains the selected text. Explain is also the name used in the privacy disclosure."
+  },
+  "toolbarCardPlaceholder": {
+    "message": "The explanation will appear here.",
+    "description": "Temporary placeholder inside the toolbar card, shown after Listen or Explain is chosen. Replaced by real content in a later phase."
+  },
+  "toolbarOverLimit": {
+    "message": "This selection is long. Only the first 2,000 characters would be used.",
+    "description": "Note in the toolbar card when the selected text is longer than the 2,000 character limit."
+  },
+  "toolbarCommandExplain": {
+    "message": "Explain the selected text",
+    "description": "Name of the keyboard shortcut (chrome://extensions/shortcuts) that shows the Clavis toolbar for the current selection and moves keyboard focus into it. Works with or without website access."
+  },
+  "toolbarContextMenuTitle": {
+    "message": "Explain with Clavis",
+    "description": "Right-click menu item on selected text. Works on the current tab even if website access was not granted (FR-018)."
+  },
+  "toolbarSiteAccessPending": {
+    "message": "Waiting for your answer in Chrome's permission prompt…",
+    "description": "Status on the onboarding page while Chrome shows the website access permission prompt."
+  },
+  "toolbarSiteAccessGranted": {
+    "message": "Website access is on. Clavis will show its toolbar when you select text on a page.",
+    "description": "Status on the onboarding page after the user granted website access."
+  },
+  "toolbarSiteAccessDenied": {
+    "message": "Website access stayed off. You can still right-click selected text and choose Explain with Clavis.",
+    "description": "Status on the onboarding page after the user declined the Chrome permission prompt."
+  },
+  "toolbarSiteAccessSkipped": {
+    "message": "Okay. Right-click selected text and choose Explain with Clavis, or turn on website access later in Settings.",
+    "description": "Status on the onboarding page after the user chose not to enable website access now."
+  },
+  "toolbarSiteAccessError": {
+    "message": "Chrome could not show the permission prompt. Try again.",
+    "description": "Status on the onboarding page when requesting website access failed unexpectedly."
+  },
   "onboardingTitle": {
     "message": "Welcome to Clavis",
     "description": "Main heading and tab title of the onboarding page shown once after installation."
@@ -106,5 +198,179 @@
   "readerPlaceholder": {
     "message": "The PDF reader will be available in a later phase.",
     "description": "Placeholder text on the PDF reader page while the reader is not built yet."
+  },
+  "readerOpen": {
+    "message": "Open PDF",
+    "description": "Reader toolbar button that opens a file picker for a local PDF."
+  },
+  "readerClose": {
+    "message": "Close PDF",
+    "description": "Reader toolbar button that closes the current PDF and frees its memory."
+  },
+  "readerEmptyHint": {
+    "message": "Choose a PDF from this computer, or drop one here. The file stays on your device.",
+    "description": "Reader empty-state text shown before any PDF is open; also the drag-and-drop target label."
+  },
+  "readerDropActive": {
+    "message": "Drop the PDF to open it",
+    "description": "Reader drop zone text while a file is being dragged over the page."
+  },
+  "readerLoading": {
+    "message": "Opening $FILE$…",
+    "description": "Reader status while a PDF is loading. $FILE$ is the file name.",
+    "placeholders": { "FILE": { "content": "$1" } }
+  },
+  "readerViewerLabel": {
+    "message": "PDF pages",
+    "description": "Accessible name of the scrolling region that holds the PDF pages."
+  },
+  "readerPageLabel": {
+    "message": "Page",
+    "description": "Accessible name of the current-page number input in the reader toolbar."
+  },
+  "readerPageOf": {
+    "message": "of $TOTAL$",
+    "description": "Shown after the page number input. $TOTAL$ is the number of pages in the PDF.",
+    "placeholders": { "TOTAL": { "content": "$1" } }
+  },
+  "readerPrevPage": {
+    "message": "Previous page",
+    "description": "Accessible name of the reader toolbar button that goes to the previous page."
+  },
+  "readerNextPage": {
+    "message": "Next page",
+    "description": "Accessible name of the reader toolbar button that goes to the next page."
+  },
+  "readerZoomOut": {
+    "message": "Zoom out",
+    "description": "Accessible name of the reader toolbar button that makes pages smaller."
+  },
+  "readerZoomIn": {
+    "message": "Zoom in",
+    "description": "Accessible name of the reader toolbar button that makes pages larger."
+  },
+  "readerZoomLabel": {
+    "message": "Zoom level",
+    "description": "Accessible name of the reader zoom drop-down."
+  },
+  "readerFitWidth": {
+    "message": "Fit width",
+    "description": "Reader zoom option and button that scales pages to the width of the window."
+  },
+  "readerZoomPercent": {
+    "message": "$PERCENT$%",
+    "description": "A zoom level as a percentage, for example 125%. $PERCENT$ is a whole number.",
+    "placeholders": { "PERCENT": { "content": "$1" } }
+  },
+  "readerFindLabel": {
+    "message": "Find in document",
+    "description": "Accessible name and placeholder of the reader's find-in-document text box."
+  },
+  "readerFindPrev": {
+    "message": "Previous match",
+    "description": "Accessible name of the button that jumps to the previous find result."
+  },
+  "readerFindNext": {
+    "message": "Next match",
+    "description": "Accessible name of the button that jumps to the next find result."
+  },
+  "readerFindCount": {
+    "message": "$CURRENT$ of $TOTAL$",
+    "description": "Find progress, for example 2 of 5. $CURRENT$ is the highlighted match, $TOTAL$ the number of matches.",
+    "placeholders": { "CURRENT": { "content": "$1" }, "TOTAL": { "content": "$2" } }
+  },
+  "readerFindNotFound": {
+    "message": "No matches",
+    "description": "Shown when find-in-document finds nothing."
+  },
+  "readerFindPending": {
+    "message": "Searching…",
+    "description": "Shown while find-in-document is still searching."
+  },
+  "readerErrorCorrupt": {
+    "message": "This PDF is damaged and can't be opened. Try another copy of the file.",
+    "description": "Reader error shown when the PDF structure is invalid, truncated or empty."
+  },
+  "readerErrorPermission": {
+    "message": "Chrome couldn't read this file. Check that it still exists and that you can open it, then try again.",
+    "description": "Reader error shown when the browser is not allowed to read the chosen file."
+  },
+  "readerErrorTooLarge": {
+    "message": "This PDF is larger than $MAX$ MB, which is the most Clavis can open. Try a smaller file.",
+    "description": "Reader error for files over the size limit. $MAX$ is the limit in megabytes.",
+    "placeholders": { "MAX": { "content": "$1" } }
+  },
+  "readerErrorTooManyPages": {
+    "message": "This PDF has more than $MAX$ pages, which is the most Clavis can open. Try a shorter file.",
+    "description": "Reader error for documents over the page-count limit. $MAX$ is the limit.",
+    "placeholders": { "MAX": { "content": "$1" } }
+  },
+  "readerErrorUnsupported": {
+    "message": "Clavis can't read this file. Choose a different PDF.",
+    "description": "Reader error shown when the file is not a PDF or uses a feature the reader does not support."
+  },
+  "readerImageOnly": {
+    "message": "This PDF appears image-only. Its pages are pictures without text, so text can't be selected. Text recognition (OCR) isn't available in this version.",
+    "description": "Reader notice for scanned PDFs without a text layer (requirements section 7: PDF scanned only)."
+  },
+  "readerPasswordTitle": {
+    "message": "Password required",
+    "description": "Heading of the prompt shown when a PDF is encrypted."
+  },
+  "readerPasswordPrompt": {
+    "message": "$FILE$ is protected. Enter its password to open it.",
+    "description": "Explains the password prompt. $FILE$ is the file name.",
+    "placeholders": { "FILE": { "content": "$1" } }
+  },
+  "readerPasswordLabel": {
+    "message": "PDF password",
+    "description": "Accessible name of the PDF password input."
+  },
+  "readerPasswordIncorrect": {
+    "message": "That password isn't correct. Try again.",
+    "description": "Shown after a wrong PDF password was entered."
+  },
+  "readerPasswordSubmit": {
+    "message": "Open",
+    "description": "Button that submits the PDF password."
+  },
+  "readerPasswordCancel": {
+    "message": "Cancel",
+    "description": "Button that dismisses the PDF password prompt without opening the file."
+  },
+  "readerLinkConfirmTitle": {
+    "message": "Open this link?",
+    "description": "Heading of the confirmation shown before an external link in a PDF opens."
+  },
+  "readerLinkConfirmBody": {
+    "message": "This PDF links to $URL$. Only open links you trust.",
+    "description": "Asks the user to confirm opening an external link. $URL$ is the link address.",
+    "placeholders": { "URL": { "content": "$1" } }
+  },
+  "readerLinkOpen": {
+    "message": "Open link",
+    "description": "Button that confirms opening an external link from a PDF in a new tab."
+  },
+  "readerLinkCancel": {
+    "message": "Cancel",
+    "description": "Button that cancels opening an external link from a PDF."
+  },
+  "readerSelectionTitle": {
+    "message": "Last selection (developer panel)",
+    "description": "Heading of the small developer panel that shows the latest text selection captured from the PDF."
+  },
+  "readerSelectionNone": {
+    "message": "Nothing selected in the PDF text.",
+    "description": "Developer panel text when no PDF text is selected."
+  },
+  "readerSelectionPage": {
+    "message": "Page $PAGE$",
+    "description": "Developer panel label for the page a selection starts on. $PAGE$ is a page number.",
+    "placeholders": { "PAGE": { "content": "$1" } }
+  },
+  "readerSelectionTruncated": {
+    "message": "Cut to the first $MAX$ characters.",
+    "description": "Developer panel note when a selection was longer than the limit. $MAX$ is the character limit.",
+    "placeholders": { "MAX": { "content": "$1" } }
   }
 }

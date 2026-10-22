@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Hidden text around a selection</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 2rem;
+        font:
+          18px/1.6 system-ui,
+          sans-serif;
+      }
+      .abs {
+        position: absolute;
+      }
+    </style>
+  </head>
+  <body>
+    <p id="p">
+      Visible before.
+      <span style="opacity: 0">S_OPACITY</span>
+      <span style="opacity: 0"><i>S_OPACITY_CHILD</i></span>
+      <span style="visibility: hidden">S_VISIBILITY</span>
+      <span style="display: none">S_DISPLAY</span>
+      <span style="font-size: 0">S_FONT_SIZE</span>
+      <span style="color: transparent">S_TRANSPARENT</span>
+      <span style="color: rgba(10, 20, 30, 0)">S_RGBA_ZERO</span>
+      <span class="abs" style="clip: rect(0, 0, 0, 0)">S_CLIP</span>
+      <span class="abs" style="clip-path: inset(100%)">S_CLIP_PATH</span>
+      <span class="abs" style="left: -9999px">S_OFFSCREEN_LEFT</span>
+      <span class="abs" style="top: -9999px">S_OFFSCREEN_TOP</span>
+      <span style="display: inline-block; width: 10px; overflow: hidden; text-indent: -9999px"
+        >S_TEXT_INDENT</span
+      >
+      <span class="abs" style="width: 1px; height: 1px; overflow: hidden"
+        >S_SCREEN_READER_ONLY</span
+      >
+      <span style="display: inline-block; content-visibility: hidden">S_CONTENT_VISIBILITY</span>
+      <span style="display: inline-block; width: 30px; overflow: hidden; white-space: nowrap"
+        ><span style="margin-left: 400px">S_CLIPPED_BY_OVERFLOW</span></span
+      >
+      <span style="opacity: 1">KEEP_VISIBLE</span>
+      <b id="target">target</b>
+      AFTER_START after visible.
+    </p>
+    <div style="height: 200px; overflow: auto; width: 300px" id="scroller">
+      <p>Scroller first line.</p>
+      <p style="margin-top: 600px">KEEP_SCROLLED_OUT <b id="inside">inside</b></p>
+    </div>
+  </body>
+</html>

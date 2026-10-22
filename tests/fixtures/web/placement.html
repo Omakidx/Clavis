@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Viewport corners</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        font:
+          18px/1.4 system-ui,
+          sans-serif;
+        overflow: hidden;
+      }
+      .corner {
+        position: fixed;
+        padding: 2px;
+        background: #ffe;
+      }
+      #tl {
+        top: 0;
+        left: 0;
+      }
+      #tr {
+        top: 0;
+        right: 0;
+      }
+      #bl {
+        bottom: 0;
+        left: 0;
+      }
+      #br {
+        bottom: 0;
+        right: 0;
+      }
+      #mid {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%) rotate(-8deg);
+      }
+    </style>
+  </head>
+  <body>
+    <span class="corner" id="tl">topleft</span>
+    <span class="corner" id="tr">topright</span>
+    <span class="corner" id="bl">bottomleft</span>
+    <span class="corner" id="br">bottomright</span>
+    <span id="mid">rotated middle</span>
+  </body>
+</html>

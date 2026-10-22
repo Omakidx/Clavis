@@ -1,0 +1,1082 @@
+[
+  {
+    "file": "text-1page.pdf",
+    "description": "One US Letter page, Helvetica (not embedded), four 16pt sentences on separate lines.",
+    "pages": 1,
+    "bytes": 1755,
+    "sha256": "fefaac61bad1438486fd02f53438208a0defe8ca8da7a99772cfedc6a4655ded",
+    "sentences": [
+      {
+        "page": 1,
+        "text": "The quick brown fox jumps over the lazy dog.",
+        "x": 72,
+        "y": 680,
+        "size": 16,
+        "width": 318.86400000000003
+      },
+      {
+        "page": 1,
+        "text": "Pack my box with five dozen liquor jugs.",
+        "x": 72,
+        "y": 652,
+        "size": 16,
+        "width": 281.104
+      },
+      {
+        "page": 1,
+        "text": "Sphinx of black quartz, judge my vow.",
+        "x": 72,
+        "y": 624,
+        "size": 16,
+        "width": 266.72
+      },
+      {
+        "page": 1,
+        "text": "How vexingly quick daft zebras jump.",
+        "x": 72,
+        "y": 596,
+        "size": 16,
+        "width": 260.8
+      },
+      {
+        "page": 1,
+        "text": "Short closing line at the bottom.",
+        "x": 72,
+        "y": 120,
+        "size": 12,
+        "width": 168.564
+      }
+    ]
+  },
+  {
+    "file": "text-100pages.pdf",
+    "description": "100 US Letter pages, numbered paragraphs; the word \"xylophone\" occurs only on page 73.",
+    "pages": 100,
+    "bytes": 103755,
+    "sha256": "c2aad9a9b4113f4bbc5b81054dc55b44c49a15f342694950e147cdd1b918f6ff",
+    "sentences": [
+      {
+        "page": 1,
+        "text": "Paragraph 1.1: numbered fixture sentence 1 on page 1.",
+        "x": 72,
+        "y": 690,
+        "size": 12,
+        "width": 293.28000000000003
+      },
+      {
+        "page": 2,
+        "text": "Paragraph 2.1: numbered fixture sentence 1 on page 2.",
+        "x": 72,
+        "y": 690,
+        "size": 12,
+        "width": 293.28000000000003
+      },
+      {
+        "page": 3,
+        "text": "Paragraph 3.1: numbered fixture sentence 1 on page 3.",
+        "x": 72,
+        "y": 690,
+        "size": 12,
+        "width": 293.28000000000003
+      },
+      {
+        "page": 4,
+        "text": "Paragraph 4.1: numbered fixture sentence 1 on page 4.",
+        "x": 72,
+        "y": 690,
+        "size": 12,
+        "width": 293.28000000000003
+      },
+      {
+        "page": 5,
+        "text": "Paragraph 5.1: numbered fixture sentence 1 on page 5.",
+        "x": 72,
+        "y": 690,
+        "size": 12,
+        "width": 293.28000000000003
+      },
+      {
+        "page": 6,
+        "text": "Paragraph 6.1: numbered fixture sentence 1 on page 6.",
+        "x": 72,
+        "y": 690,
+        "size": 12,
+        "width": 293.28000000000003
+      },
+      {
+        "page": 7,
+        "text": "Paragraph 7.1: numbered fixture sentence 1 on page 7.",
+        "x": 72,
+        "y": 690,
+        "size": 12,
+        "width": 293.28000000000003
+      },
+      {
+        "page": 8,
+        "text": "Paragraph 8.1: numbered fixture sentence 1 on page 8.",
+        "x": 72,
+        "y": 690,
+        "size": 12,
+        "width": 293.28000000000003
+      },
+      {
+        "page": 9,
+        "text": "Paragraph 9.1: numbered fixture sentence 1 on page 9.",
+        "x": 72,
+        "y": 690,
+        "size": 12,
+        "width": 293.28000000000003
+      },
+      {
+        "page": 10,
+        "text": "Paragraph 10.1: numbered fixture sentence 1 on page 10.",
+        "x": 72,
+        "y": 690,
+        "size": 12,
+        "width": 306.624
+      },
+      {
+        "page": 11,
+        "text": "Paragraph 11.1: numbered fixture sentence 1 on page 11.",
+        "x": 72,
+        "y": 690,
+        "size": 12,
+        "width": 306.624
+      },
+      {
+        "page": 12,
+        "text": "Paragraph 12.1: numbered fixture sentence 1 on page 12.",
+        "x": 72,
+        "y": 690,
+        "size": 12,
+        "width": 306.624
+      },
+      {
+        "page": 13,
+        "text": "Paragraph 13.1: numbered fixture sentence 1 on page 13.",
+        "x": 72,
+        "y": 690,
+        "size": 12,
+        "width": 306.624
+      },
+      {
+        "page": 14,
+        "text": "Paragraph 14.1: numbered fixture sentence 1 on page 14.",
+        "x": 72,
+        "y": 690,
+        "size": 12,
+        "width": 306.624
+      },
+      {
+        "page": 15,
+        "text": "Paragraph 15.1: numbered fixture sentence 1 on page 15.",
+        "x": 72,
+        "y": 690,
+        "size": 12,
+        "width": 306.624
+      },
+      {
+        "page": 16,
+        "text": "Paragraph 16.1: numbered fixture sentence 1 on page 16.",
+        "x": 72,
+        "y": 690,
+        "size": 12,
+        "width": 306.624
+      },
+      {
+        "page": 17,
+        "text": "Paragraph 17.1: numbered fixture sentence 1 on page 17.",
+        "x": 72,
+        "y": 690,
+        "size": 12,
+        "width": 306.624
+      },
+      {
+        "page": 18,
+        "text": "Paragraph 18.1: numbered fixture sentence 1 on page 18.",
+        "x": 72,
+        "y": 690,
+        "size": 12,
+        "width": 306.624
+      },
+      {
+        "page": 19,
+        "text": "Paragraph 19.1: numbered fixture sentence 1 on page 19.",
+        "x": 72,
+        "y": 690,
+        "size": 12,
+        "width": 306.624
+      },
+      {
+        "page": 20,
+        "text": "Paragraph 20.1: numbered fixture sentence 1 on page 20.",
+        "x": 72,
+        "y": 690,
+        "size": 12,
+        "width": 306.624
+      },
+      {
+        "page": 21,
+        "text": "Paragraph 21.1: numbered fixture sentence 1 on page 21.",
+        "x": 72,
+        "y": 690,
+        "size": 12,
+        "width": 306.624
+      },
+      {
+        "page": 22,
+        "text": "Paragraph 22.1: numbered fixture sentence 1 on page 22.",
+        "x": 72,
+        "y": 690,
+        "size": 12,
+        "width": 306.624
+      },
+      {
+        "page": 23,
+        "text": "Paragraph 23.1: numbered fixture sentence 1 on page 23.",
+        "x": 72,
+        "y": 690,
+        "size": 12,
+        "width": 306.624
+      },
+      {
+        "page": 24,
+        "text": "Paragraph 24.1: numbered fixture sentence 1 on page 24.",
+        "x": 72,
+        "y": 690,
+        "size": 12,
+        "width": 306.624
+      },
+      {
+        "page": 25,
+        "text": "Paragraph 25.1: numbered fixture sentence 1 on page 25.",
+        "x": 72,
+        "y": 690,
+        "size": 12,
+        "width": 306.624
+      },
+      {
+        "page": 26,
+        "text": "Paragraph 26.1: numbered fixture sentence 1 on page 26.",
+        "x": 72,
+        "y": 690,
+        "size": 12,
+        "width": 306.624
+      },
+      {
+        "page": 27,
+        "text": "Paragraph 27.1: numbered fixture sentence 1 on page 27.",
+        "x": 72,
+        "y": 690,
+        "size": 12,
+        "width": 306.624
+      },
+      {
+        "page": 28,
+        "text": "Paragraph 28.1: numbered fixture sentence 1 on page 28.",
+        "x": 72,
+        "y": 690,
+        "size": 12,
+        "width": 306.624
+      },
+      {
+        "page": 29,
+        "text": "Paragraph 29.1: numbered fixture sentence 1 on page 29.",
+        "x": 72,
+        "y": 690,
+        "size": 12,
+        "width": 306.624
+      },
+      {
+        "page": 30,
+        "text": "Paragraph 30.1: numbered fixture sentence 1 on page 30.",
+        "x": 72,
+        "y": 690,
+        "size": 12,
+        "width": 306.624
+      },
+      {
+        "page": 31,
+        "text": "Paragraph 31.1: numbered fixture sentence 1 on page 31.",
+        "x": 72,
+        "y": 690,
+        "size": 12,
+        "width": 306.624
+      },
+      {
+        "page": 32,
+        "text": "Paragraph 32.1: numbered fixture sentence 1 on page 32.",
+        "x": 72,
+        "y": 690,
+        "size": 12,
+        "width": 306.624
+      },
+      {
+        "page": 33,
+        "text": "Paragraph 33.1: numbered fixture sentence 1 on page 33.",
+        "x": 72,
+        "y": 690,
+        "size": 12,
+        "width": 306.624
+      },
+      {
+        "page": 34,
+        "text": "Paragraph 34.1: numbered fixture sentence 1 on page 34.",
+        "x": 72,
+        "y": 690,
+        "size": 12,
+        "width": 306.624
+      },
+      {
+        "page": 35,
+        "text": "Paragraph 35.1: numbered fixture sentence 1 on page 35.",
+        "x": 72,
+        "y": 690,
+        "size": 12,
+        "width": 306.624
+      },
+      {
+        "page": 36,
+        "text": "Paragraph 36.1: numbered fixture sentence 1 on page 36.",
+        "x": 72,
+        "y": 690,
+        "size": 12,
+        "width": 306.624
+      },
+      {
+        "page": 37,
+        "text": "Paragraph 37.1: numbered fixture sentence 1 on page 37.",
+        "x": 72,
+        "y": 690,
+        "size": 12,
+        "width": 306.624
+      },
+      {
+        "page": 38,
+        "text": "Paragraph 38.1: numbered fixture sentence 1 on page 38.",
+        "x": 72,
+        "y": 690,
+        "size": 12,
+        "width": 306.624
+      },
+      {
+        "page": 39,
+        "text": "Paragraph 39.1: numbered fixture sentence 1 on page 39.",
+        "x": 72,
+        "y": 690,
+        "size": 12,
+        "width": 306.624
+      },
+      {
+        "page": 40,
+        "text": "Paragraph 40.1: numbered fixture sentence 1 on page 40.",
+        "x": 72,
+        "y": 690,
+        "size": 12,
+        "width": 306.624
+      },
+      {
+        "page": 41,
+        "text": "Paragraph 41.1: numbered fixture sentence 1 on page 41.",
+        "x": 72,
+        "y": 690,
+        "size": 12,
+        "width": 306.624
+      },
+      {
+        "page": 42,
+        "text": "Paragraph 42.1: numbered fixture sentence 1 on page 42.",
+        "x": 72,
+        "y": 690,
+        "size": 12,
+        "width": 306.624
+      },
+      {
+        "page": 43,
+        "text": "Paragraph 43.1: numbered fixture sentence 1 on page 43.",
+        "x": 72,
+        "y": 690,
+        "size": 12,
+        "width": 306.624
+      },
+      {
+        "page": 44,
+        "text": "Paragraph 44.1: numbered fixture sentence 1 on page 44.",
+        "x": 72,
+        "y": 690,
+        "size": 12,
+        "width": 306.624
+      },
+      {
+        "page": 45,
+        "text": "Paragraph 45.1: numbered fixture sentence 1 on page 45.",
+        "x": 72,
+        "y": 690,
+        "size": 12,
+        "width": 306.624
+      },
+      {
+        "page": 46,
+        "text": "Paragraph 46.1: numbered fixture sentence 1 on page 46.",
+        "x": 72,
+        "y": 690,
+        "size": 12,
+        "width": 306.624
+      },
+      {
+        "page": 47,
+        "text": "Paragraph 47.1: numbered fixture sentence 1 on page 47.",
+        "x": 72,
+        "y": 690,
+        "size": 12,
+        "width": 306.624
+      },
+      {
+        "page": 48,
+        "text": "Paragraph 48.1: numbered fixture sentence 1 on page 48.",
+        "x": 72,
+        "y": 690,
+        "size": 12,
+        "width": 306.624
+      },
+      {
+        "page": 49,
+        "text": "Paragraph 49.1: numbered fixture sentence 1 on page 49.",
+        "x": 72,
+        "y": 690,
+        "size": 12,
+        "width": 306.624
+      },
+      {
+        "page": 50,
+        "text": "Paragraph 50.1: numbered fixture sentence 1 on page 50.",
+        "x": 72,
+        "y": 690,
+        "size": 12,
+        "width": 306.624
+      },
+      {
+        "page": 51,
+        "text": "Paragraph 51.1: numbered fixture sentence 1 on page 51.",
+        "x": 72,
+        "y": 690,
+        "size": 12,
+        "width": 306.624
+      },
+      {
+        "page": 52,
+        "text": "Paragraph 52.1: numbered fixture sentence 1 on page 52.",
+        "x": 72,
+        "y": 690,
+        "size": 12,
+        "width": 306.624
+      },
+      {
+        "page": 53,
+        "text": "Paragraph 53.1: numbered fixture sentence 1 on page 53.",
+        "x": 72,
+        "y": 690,
+        "size": 12,
+        "width": 306.624
+      },
+      {
+        "page": 54,
+        "text": "Paragraph 54.1: numbered fixture sentence 1 on page 54.",
+        "x": 72,
+        "y": 690,
+        "size": 12,
+        "width": 306.624
+      },
+      {
+        "page": 55,
+        "text": "Paragraph 55.1: numbered fixture sentence 1 on page 55.",
+        "x": 72,
+        "y": 690,
+        "size": 12,
+        "width": 306.624
+      },
+      {
+        "page": 56,
+        "text": "Paragraph 56.1: numbered fixture sentence 1 on page 56.",
+        "x": 72,
+        "y": 690,
+        "size": 12,
+        "width": 306.624
+      },
+      {
+        "page": 57,
+        "text": "Paragraph 57.1: numbered fixture sentence 1 on page 57.",
+        "x": 72,
+        "y": 690,
+        "size": 12,
+        "width": 306.624
+      },
+      {
+        "page": 58,
+        "text": "Paragraph 58.1: numbered fixture sentence 1 on page 58.",
+        "x": 72,
+        "y": 690,
+        "size": 12,
+        "width": 306.624
+      },
+      {
+        "page": 59,
+        "text": "Paragraph 59.1: numbered fixture sentence 1 on page 59.",
+        "x": 72,
+        "y": 690,
+        "size": 12,
+        "width": 306.624
+      },
+      {
+        "page": 60,
+        "text": "Paragraph 60.1: numbered fixture sentence 1 on page 60.",
+        "x": 72,
+        "y": 690,
+        "size": 12,
+        "width": 306.624
+      },
+      {
+        "page": 61,
+        "text": "Paragraph 61.1: numbered fixture sentence 1 on page 61.",
+        "x": 72,
+        "y": 690,
+        "size": 12,
+        "width": 306.624
+      },
+      {
+        "page": 62,
+        "text": "Paragraph 62.1: numbered fixture sentence 1 on page 62.",
+        "x": 72,
+        "y": 690,
+        "size": 12,
+        "width": 306.624
+      },
+      {
+        "page": 63,
+        "text": "Paragraph 63.1: numbered fixture sentence 1 on page 63.",
+        "x": 72,
+        "y": 690,
+        "size": 12,
+        "width": 306.624
+      },
+      {
+        "page": 64,
+        "text": "Paragraph 64.1: numbered fixture sentence 1 on page 64.",
+        "x": 72,
+        "y": 690,
+        "size": 12,
+        "width": 306.624
+      },
+      {
+        "page": 65,
+        "text": "Paragraph 65.1: numbered fixture sentence 1 on page 65.",
+        "x": 72,
+        "y": 690,
+        "size": 12,
+        "width": 306.624
+      },
+      {
+        "page": 66,
+        "text": "Paragraph 66.1: numbered fixture sentence 1 on page 66.",
+        "x": 72,
+        "y": 690,
+        "size": 12,
+        "width": 306.624
+      },
+      {
+        "page": 67,
+        "text": "Paragraph 67.1: numbered fixture sentence 1 on page 67.",
+        "x": 72,
+        "y": 690,
+        "size": 12,
+        "width": 306.624
+      },
+      {
+        "page": 68,
+        "text": "Paragraph 68.1: numbered fixture sentence 1 on page 68.",
+        "x": 72,
+        "y": 690,
+        "size": 12,
+        "width": 306.624
+      },
+      {
+        "page": 69,
+        "text": "Paragraph 69.1: numbered fixture sentence 1 on page 69.",
+        "x": 72,
+        "y": 690,
+        "size": 12,
+        "width": 306.624
+      },
+      {
+        "page": 70,
+        "text": "Paragraph 70.1: numbered fixture sentence 1 on page 70.",
+        "x": 72,
+        "y": 690,
+        "size": 12,
+        "width": 306.624
+      },
+      {
+        "page": 71,
+        "text": "Paragraph 71.1: numbered fixture sentence 1 on page 71.",
+        "x": 72,
+        "y": 690,
+        "size": 12,
+        "width": 306.624
+      },
+      {
+        "page": 72,
+        "text": "Paragraph 72.1: numbered fixture sentence 1 on page 72.",
+        "x": 72,
+        "y": 690,
+        "size": 12,
+        "width": 306.624
+      },
+      {
+        "page": 73,
+        "text": "Paragraph 73.1: numbered fixture sentence 1 on page 73.",
+        "x": 72,
+        "y": 690,
+        "size": 12,
+        "width": 306.624
+      },
+      {
+        "page": 74,
+        "text": "Paragraph 74.1: numbered fixture sentence 1 on page 74.",
+        "x": 72,
+        "y": 690,
+        "size": 12,
+        "width": 306.624
+      },
+      {
+        "page": 75,
+        "text": "Paragraph 75.1: numbered fixture sentence 1 on page 75.",
+        "x": 72,
+        "y": 690,
+        "size": 12,
+        "width": 306.624
+      },
+      {
+        "page": 76,
+        "text": "Paragraph 76.1: numbered fixture sentence 1 on page 76.",
+        "x": 72,
+        "y": 690,
+        "size": 12,
+        "width": 306.624
+      },
+      {
+        "page": 77,
+        "text": "Paragraph 77.1: numbered fixture sentence 1 on page 77.",
+        "x": 72,
+        "y": 690,
+        "size": 12,
+        "width": 306.624
+      },
+      {
+        "page": 78,
+        "text": "Paragraph 78.1: numbered fixture sentence 1 on page 78.",
+        "x": 72,
+        "y": 690,
+        "size": 12,
+        "width": 306.624
+      },
+      {
+        "page": 79,
+        "text": "Paragraph 79.1: numbered fixture sentence 1 on page 79.",
+        "x": 72,
+        "y": 690,
+        "size": 12,
+        "width": 306.624
+      },
+      {
+        "page": 80,
+        "text": "Paragraph 80.1: numbered fixture sentence 1 on page 80.",
+        "x": 72,
+        "y": 690,
+        "size": 12,
+        "width": 306.624
+      },
+      {
+        "page": 81,
+        "text": "Paragraph 81.1: numbered fixture sentence 1 on page 81.",
+        "x": 72,
+        "y": 690,
+        "size": 12,
+        "width": 306.624
+      },
+      {
+        "page": 82,
+        "text": "Paragraph 82.1: numbered fixture sentence 1 on page 82.",
+        "x": 72,
+        "y": 690,
+        "size": 12,
+        "width": 306.624
+      },
+      {
+        "page": 83,
+        "text": "Paragraph 83.1: numbered fixture sentence 1 on page 83.",
+        "x": 72,
+        "y": 690,
+        "size": 12,
+        "width": 306.624
+      },
+      {
+        "page": 84,
+        "text": "Paragraph 84.1: numbered fixture sentence 1 on page 84.",
+        "x": 72,
+        "y": 690,
+        "size": 12,
+        "width": 306.624
+      },
+      {
+        "page": 85,
+        "text": "Paragraph 85.1: numbered fixture sentence 1 on page 85.",
+        "x": 72,
+        "y": 690,
+        "size": 12,
+        "width": 306.624
+      },
+      {
+        "page": 86,
+        "text": "Paragraph 86.1: numbered fixture sentence 1 on page 86.",
+        "x": 72,
+        "y": 690,
+        "size": 12,
+        "width": 306.624
+      },
+      {
+        "page": 87,
+        "text": "Paragraph 87.1: numbered fixture sentence 1 on page 87.",
+        "x": 72,
+        "y": 690,
+        "size": 12,
+        "width": 306.624
+      },
+      {
+        "page": 88,
+        "text": "Paragraph 88.1: numbered fixture sentence 1 on page 88.",
+        "x": 72,
+        "y": 690,
+        "size": 12,
+        "width": 306.624
+      },
+      {
+        "page": 89,
+        "text": "Paragraph 89.1: numbered fixture sentence 1 on page 89.",
+        "x": 72,
+        "y": 690,
+        "size": 12,
+        "width": 306.624
+      },
+      {
+        "page": 90,
+        "text": "Paragraph 90.1: numbered fixture sentence 1 on page 90.",
+        "x": 72,
+        "y": 690,
+        "size": 12,
+        "width": 306.624
+      },
+      {
+        "page": 91,
+        "text": "Paragraph 91.1: numbered fixture sentence 1 on page 91.",
+        "x": 72,
+        "y": 690,
+        "size": 12,
+        "width": 306.624
+      },
+      {
+        "page": 92,
+        "text": "Paragraph 92.1: numbered fixture sentence 1 on page 92.",
+        "x": 72,
+        "y": 690,
+        "size": 12,
+        "width": 306.624
+      },
+      {
+        "page": 93,
+        "text": "Paragraph 93.1: numbered fixture sentence 1 on page 93.",
+        "x": 72,
+        "y": 690,
+        "size": 12,
+        "width": 306.624
+      },
+      {
+        "page": 94,
+        "text": "Paragraph 94.1: numbered fixture sentence 1 on page 94.",
+        "x": 72,
+        "y": 690,
+        "size": 12,
+        "width": 306.624
+      },
+      {
+        "page": 95,
+        "text": "Paragraph 95.1: numbered fixture sentence 1 on page 95.",
+        "x": 72,
+        "y": 690,
+        "size": 12,
+        "width": 306.624
+      },
+      {
+        "page": 96,
+        "text": "Paragraph 96.1: numbered fixture sentence 1 on page 96.",
+        "x": 72,
+        "y": 690,
+        "size": 12,
+        "width": 306.624
+      },
+      {
+        "page": 97,
+        "text": "Paragraph 97.1: numbered fixture sentence 1 on page 97.",
+        "x": 72,
+        "y": 690,
+        "size": 12,
+        "width": 306.624
+      },
+      {
+        "page": 98,
+        "text": "Paragraph 98.1: numbered fixture sentence 1 on page 98.",
+        "x": 72,
+        "y": 690,
+        "size": 12,
+        "width": 306.624
+      },
+      {
+        "page": 99,
+        "text": "Paragraph 99.1: numbered fixture sentence 1 on page 99.",
+        "x": 72,
+        "y": 690,
+        "size": 12,
+        "width": 306.624
+      },
+      {
+        "page": 100,
+        "text": "Paragraph 100.1: numbered fixture sentence 1 on page 100.",
+        "x": 72,
+        "y": 690,
+        "size": 12,
+        "width": 319.968
+      }
+    ]
+  },
+  {
+    "file": "multi-column.pdf",
+    "description": "Two text columns drawn column by column (left column first, then right).",
+    "pages": 1,
+    "bytes": 1906,
+    "sha256": "17f6bfeb726858fe85286fcd5953f67a536698c0004e08cb907bdd88c17b591a",
+    "sentences": [
+      {
+        "page": 1,
+        "text": "Left column line 1.",
+        "x": 72,
+        "y": 690,
+        "size": 13,
+        "width": 105.49499999999999
+      },
+      {
+        "page": 1,
+        "text": "Right column line 1.",
+        "x": 330,
+        "y": 690,
+        "size": 13,
+        "width": 114.15299999999999
+      },
+      {
+        "page": 1,
+        "text": "Left column line 2.",
+        "x": 72,
+        "y": 666,
+        "size": 13,
+        "width": 105.49499999999999
+      },
+      {
+        "page": 1,
+        "text": "Right column line 2.",
+        "x": 330,
+        "y": 666,
+        "size": 13,
+        "width": 114.15299999999999
+      },
+      {
+        "page": 1,
+        "text": "Left column line 3.",
+        "x": 72,
+        "y": 642,
+        "size": 13,
+        "width": 105.49499999999999
+      },
+      {
+        "page": 1,
+        "text": "Right column line 3.",
+        "x": 330,
+        "y": 642,
+        "size": 13,
+        "width": 114.15299999999999
+      },
+      {
+        "page": 1,
+        "text": "Left column line 4.",
+        "x": 72,
+        "y": 618,
+        "size": 13,
+        "width": 105.49499999999999
+      },
+      {
+        "page": 1,
+        "text": "Right column line 4.",
+        "x": 330,
+        "y": 618,
+        "size": 13,
+        "width": 114.15299999999999
+      },
+      {
+        "page": 1,
+        "text": "Left column line 5.",
+        "x": 72,
+        "y": 594,
+        "size": 13,
+        "width": 105.49499999999999
+      },
+      {
+        "page": 1,
+        "text": "Right column line 5.",
+        "x": 330,
+        "y": 594,
+        "size": 13,
+        "width": 114.15299999999999
+      },
+      {
+        "page": 1,
+        "text": "Left column line 6.",
+        "x": 72,
+        "y": 570,
+        "size": 13,
+        "width": 105.49499999999999
+      },
+      {
+        "page": 1,
+        "text": "Right column line 6.",
+        "x": 330,
+        "y": 570,
+        "size": 13,
+        "width": 114.15299999999999
+      }
+    ]
+  },
+  {
+    "file": "links.pdf",
+    "description": "Two pages: an external https link (needs confirmation) and an internal GoTo link to page 2.",
+    "pages": 2,
+    "bytes": 2235,
+    "sha256": "ad09a2f816b19cf36bcc569f83a30cf59c219b83bd82453c76537a6a348b41d6",
+    "sentences": [
+      {
+        "page": 1,
+        "text": "Visit the example website for details.",
+        "x": 72,
+        "y": 700,
+        "size": 16,
+        "width": 257.408
+      },
+      {
+        "page": 1,
+        "text": "Jump to the second page.",
+        "x": 72,
+        "y": 660,
+        "size": 16,
+        "width": 183.552
+      },
+      {
+        "page": 2,
+        "text": "You arrived on page two.",
+        "x": 72,
+        "y": 700,
+        "size": 16,
+        "width": 174.672
+      }
+    ]
+  },
+  {
+    "file": "rotated-page.pdf",
+    "description": "One page with /Rotate 90; content drawn upright in unrotated user space.",
+    "pages": 1,
+    "bytes": 1566,
+    "sha256": "802ff54cd4e651050160ef0092bbe03bc69907a8aae601e9c248ef6e684da798",
+    "sentences": [
+      {
+        "page": 1,
+        "text": "This page is rotated by ninety degrees.",
+        "x": 72,
+        "y": 680,
+        "size": 16,
+        "width": 274.976
+      },
+      {
+        "page": 1,
+        "text": "Selection must still follow the text layer.",
+        "x": 72,
+        "y": 650,
+        "size": 16,
+        "width": 275.36
+      },
+      {
+        "page": 1,
+        "text": "A third line keeps the rotation test honest.",
+        "x": 72,
+        "y": 620,
+        "size": 16,
+        "width": 294.064
+      }
+    ]
+  },
+  {
+    "file": "image-only.pdf",
+    "description": "Three pages that each contain one embedded raster image and no text operators (a \"scan\").",
+    "pages": 3,
+    "bytes": 5548,
+    "sha256": "ba8b5d0c1d9f4343f078757ef98d07d3437a728f97945689764caa9e19785ce0",
+    "sentences": []
+  },
+  {
+    "file": "icc-image.pdf",
+    "description": "One page with a 32x32 CMYK image in an ICCBased colour space (CC0 profile from pdfjs-dist); exercises the qcms wasm path.",
+    "pages": 1,
+    "bytes": 10766,
+    "sha256": "e21c842a380a6e153fd76f735efb72c12f7c70e9cdc845ecd3e71c2547916bff",
+    "sentences": [
+      {
+        "page": 1,
+        "text": "ICC based CMYK image below.",
+        "x": 72,
+        "y": 700,
+        "size": 16,
+        "width": 223.76
+      }
+    ]
+  },
+  {
+    "file": "corrupt.pdf",
+    "description": "Valid PDF header followed by truncated body and seeded random bytes (no xref/trailer).",
+    "pages": 0,
+    "bytes": 608,
+    "sha256": "1ec42c5e2dbba68d5731e0eb504bcfc5cfb8eadaf583c952443489c6db7f3534",
+    "sentences": []
+  },
+  {
+    "file": "encrypted.pdf",
+    "description": "One page, standard security handler V1/R2 (RC4-40). Open password is in manifest \"password\".",
+    "pages": 1,
+    "bytes": 982,
+    "sha256": "ea9a18ca0430f8d9d88314381621d5127595c254ee466a25a5326d519eb6974a",
+    "sentences": [
+      {
+        "page": 1,
+        "text": "This secret sentence needs the correct password to read.",
+        "x": 72,
+        "y": 700,
+        "size": 16,
+        "width": 0
+      }
+    ],
+    "password": "clavis-test"
+  }
+]

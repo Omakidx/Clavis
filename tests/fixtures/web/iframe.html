@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Iframes</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 1rem;
+        font:
+          18px/1.6 system-ui,
+          sans-serif;
+      }
+      iframe {
+        display: block;
+        border: 0;
+        width: 100%;
+        max-width: 40rem;
+        height: 220px;
+        margin: 1rem 0;
+        outline: 1px solid #ccc;
+      }
+    </style>
+  </head>
+  <body>
+    <p id="top">Top-level paragraph above the frames, with the word anchor in it.</p>
+    <iframe id="same" title="same origin" src="/iframe-inner.html"></iframe>
+    <iframe id="cross" title="cross origin" src="__CROSS_ORIGIN__/iframe-inner.html"></iframe>
+    <iframe
+      id="srcdoc"
+      title="srcdoc"
+      srcdoc="<p style='font:18px system-ui;margin:1rem'>Inline srcdoc frame text with the word lantern in it.</p>"
+    ></iframe>
+  </body>
+</html>

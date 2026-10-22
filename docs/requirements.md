@@ -3,7 +3,7 @@
 **Status:** Implementation-ready specification (v1 baseline)  
 **Version:** 1.1-draft · **Last reviewed:** 2026-10-22  
 **Platform:** Google Chrome, Manifest V3, desktop first  
-**Product owner decisions:** Groq only for v1; user provides key; no mandatory accounts or first-party backend; custom PDF.js reader; native pronunciation for words **and** sentences. Further resolved decisions D-01 … D-16 are in [§11](#11-product-decisions).
+**Product owner decisions:** Groq only for v1; user provides key; no mandatory accounts or first-party backend; custom PDF.js reader; native pronunciation for words **and** sentences. Further resolved decisions D-01 … D-18 are in [§11](#11-product-decisions).
 
 ## 1. Problem, audience and success criteria
 
@@ -318,7 +318,7 @@ The team can test **Linux only** by hand. Other platforms get automated coverage
 | Linux, latest Chrome Stable, **without** `speech-dispatcher` | Manual | No-voice message and the offscreen `speechSynthesis` fallback (D-07) |
 | Windows, latest Chrome Stable | Automated E2E on CI runners (non-voice flows) | Install, site access, selection, Explain with mocked Groq, PDF reader |
 | macOS, latest Chrome Stable | Automated E2E on CI runners (non-voice flows) | Same as Windows |
-| Minimum supported Chrome (tentatively 116, see §11) | Automated smoke test with a pinned [Chrome for Testing](https://googlechromelabs.github.io/chrome-for-testing/) build | APIs used exist at the declared `minimum_chrome_version` |
+| Minimum supported Chrome (147, D-18) | Automated smoke test with a pinned [Chrome for Testing](https://googlechromelabs.github.io/chrome-for-testing/) build | APIs used exist at the declared `minimum_chrome_version` |
 | ChromeOS | Not tested | No claims made |
 
 **Voice on Windows/macOS** is unverified until a person checks it. Before the listing is made **public** (trusted-tester distribution is fine earlier), at least one manual pass of the release smoke test must run on Windows or macOS, for example by a trusted tester. Until then, the listing and UI must not claim specific voices or accents on those systems.
@@ -356,7 +356,7 @@ The team can test **Linux only** by hand. Other platforms get automated coverage
 | D-05 | **Core + lazy tabs:** Explain makes one request returning contextual meaning, definition and 2 examples. Roots, Related words and Simplify (Must) and Grammar, Translate (Should) each make one request only when their tab is opened, cached in memory for that selection | Fewer requests on free-tier rate limits, faster first answer, fewer prompts to regression-test at launch | FR-030 … FR-038; architecture §4, §6 |
 | D-06 | **PDF reader uses PDF.js viewer components** (`pdfjs-dist/web/pdf_viewer`: `PDFViewer`, `EventBus`, `PDFLinkService`, `PDFFindController`) inside a React shell | Provides virtualization, aligned text layer, zoom and find out of the box; cuts Phase 7 effort substantially | FR-051 … FR-059; architecture §8 |
 | D-07 | **Voice:** `chrome.tts` first; Web Speech fallback in an **offscreen document** (and directly in the reader page), adopted only if Spike D proves it works per OS | Offscreen documents are the MV3 way to use DOM audio APIs from the background; Linux often lacks `chrome.tts` voices | FR-020 … FR-025; architecture §7 |
-| D-08 | **Content-script budget:** a framework-free selection observer is the only always-loaded code; toolbar/card UI loads on the first qualifying selection. Spike B chooses between a lazily loaded React chunk and Preact by measurement | Keeps page weight low and meets the 150 ms toolbar target | Tech stack §6; architecture §5 |
+| D-08 | **Content-script budget:** a framework-free selection observer is the only always-loaded code. **Outcome of Spike B: option (c)** — a Preact toolbar bundled in the observer (11.8 KB gzip); the explanation card loads on the first Explain | React's parse/evaluate cost, not the loading mechanism, dominated: lazy React (a/b) measured ~230 ms first-toolbar p95 and 69 KB gzip, over both budgets; (c) measured 60 ms p95 at normal CPU ([spike-b-toolbar.md](decisions/spike-b-toolbar.md)) | Tech stack §6; architecture §5 |
 | D-09 | **Model defaults set from Spike A measurements.** Candidates: `openai/gpt-oss-20b` (quick), `openai/gpt-oss-120b` (deep); these are reasoning models, so test `reasoning_effort` and the completion-token budget, and compare at least one fast non-reasoning model available to the account | Reasoning tokens add latency and consume `max_completion_tokens` | Architecture §6; tech stack §7 |
 | D-10 | **Model output is plain text only**; no Markdown rendering in v1 | Removes a sanitizer dependency and an XSS surface | FR-041 |
 | D-11 | **UI strings go through `chrome.i18n`** from day one; v1 ships English | Avoids a later string-extraction refactor | NFR localization |
@@ -364,6 +364,8 @@ The team can test **Linux only** by hand. Other platforms get automated coverage
 | D-13 | **License: MIT** | Simple and permissive; compatible with PDF.js (Apache-2.0), whose license and notices must still ship with the bundled files | `LICENSE`; third-party notices in Phase 10 |
 | D-14 | **Platform matrix:** Linux tested by hand; Windows/macOS covered by automated E2E only; voice claims limited to verified systems; one manual Windows/macOS pass required before public listing | Only Linux hardware is available | [§9 Platform matrix](#platform-matrix-d-14); release gates |
 | D-15 | **Privacy policy hosted on GitHub Pages**; text drafted in `docs/privacy-policy.md` | Free, versioned with the repo | Needs a GitHub repo with Pages enabled (public repo, or a plan that allows Pages on private repos) before Phase 10 |
+| D-17 | **CSP allows WebAssembly on extension pages:** `script-src 'self' 'wasm-unsafe-eval'; object-src 'self'` | PDF.js needs wasm for ICC/CMYK colour, JPEG 2000 and JBIG2; the default MV3 CSP blocks it ([spike-c-pdf.md](decisions/spike-c-pdf.md)). `eval` stays blocked; no remote code | Manifest; ZIP audit requires this exact CSP |
+| D-18 | **Minimum Chrome version 147** | pdfjs-dist 6 uses `Math.sumPrecise` (Chrome 147) without a fallback; other floors: `Uint8Array` base64 140, `Promise.try` 128, `URL.parse` 126, `matchOriginAsFallback` 119 (MDN browser-compat-data 8.1.7). The alternative, PDF.js's polyfilled legacy build, is larger | Manifest; platform matrix; ZIP audit |
 | D-16 | **Disclosure copy approved** as written in [§4.1](#approved-disclosure-copy-fr-002-fr-009-fr-071) | Defines exactly what users see before anything is sent to Groq | Onboarding, first Explain, settings |
 
 ### Still open
@@ -373,10 +375,9 @@ The team can test **Linux only** by hand. Other platforms get automated coverage
 | Publisher display name and support email | Phase 10 (store submission) | Placeholders until then; the privacy policy draft uses `[PUBLISHER]` / `[SUPPORT_EMAIL]` |
 | Logo and store artwork | Phase 10 | Placeholder icons are fine through Phase 9 |
 | GitHub repository + Pages URL for the privacy policy | Before Phase 10 | No remote exists yet (D-15) |
-| Minimum Chrome version | End of Phase 2 | **Tentatively 116** (`sidePanel` 114+, `sidePanel.open()` 116+, offscreen 109+); confirm against APIs actually used |
-| Voice fallback adoption per OS | End of Phase 2 | Spike D (D-07) |
-| Default models | End of Phase 2 | Spike A (D-09) |
-| Content UI technology | End of Phase 2 | Spike B (D-08) |
+| Voice fallback adoption per OS | Needs the user's manual check | Spike D found 0 voices in both engines on this Linux machine; keep the offscreen fallback and `offscreen` permission only if it finds voices `chrome.tts` misses ([spike-d-voices.md](decisions/spike-d-voices.md)) |
+| Default models | Needs the user's run of the comparison script | Spike A (D-09); command in [spike-a-groq.md](decisions/spike-a-groq.md) |
+| Explanation card technology and budget | Phase 5 | A React card cannot fit the 60 KB lazy-UI budget: author it in Preact or load React only on the first Explain via background injection, and set its own budget |
 | Windows/macOS manual tester | Before public listing | D-14 |
 
 ## References

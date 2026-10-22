@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Scroll container</title>
+    <style>
+      html,
+      body {
+        height: 100%;
+        margin: 0;
+        overflow: hidden;
+        font:
+          18px/1.6 system-ui,
+          sans-serif;
+      }
+      .layout {
+        display: flex;
+        height: 100%;
+      }
+      nav {
+        width: 12rem;
+        background: #eef;
+        padding: 1rem;
+      }
+      .scroller {
+        flex: 1;
+        align-self: flex-start;
+        max-height: 360px;
+        overflow: auto;
+        padding: 1rem 2rem;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="layout">
+      <nav>Sidebar navigation text that is not context.</nav>
+      <div class="scroller" id="scroller">
+        <p>
+          Item 1: the page itself never scrolls here; only this container does, which is common in
+          web apps and documentation viewers.
+        </p>
+        <p>
+          Item 2: selecting text in a scroll container and then scrolling the container must move or
+          hide the toolbar with the text.
+        </p>
+        <p>
+          Item 3: harbour lights flicker across the water as ferries cross between the two islands
+          at dusk.
+        </p>
+        <p>
+          Item 4: lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor
+          incididunt ut labore.
+        </p>
+        <p>
+          Item 5: ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip
+          ex ea commodo.
+        </p>
+        <p>
+          Item 6: duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu
+          fugiat nulla pariatur.
+        </p>
+        <p>
+          Item 7: excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt
+          mollit anim.
+        </p>
+        <p>
+          Item 8: the lighthouse keeper recorded the weather every hour in a leather-bound ledger.
+        </p>
+        <p>
+          Item 9: at the bottom of the container, the last paragraph waits to be scrolled into view.
+        </p>
+        <p>Item 10: padding paragraph to guarantee overflow on any reasonable viewport height.</p>
+        <p>Item 11: padding paragraph to guarantee overflow on any reasonable viewport height.</p>
+        <p>Item 12: padding paragraph to guarantee overflow on any reasonable viewport height.</p>
+      </div>
+    </div>
+  </body>
+</html>

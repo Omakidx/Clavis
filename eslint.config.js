@@ -7,6 +7,7 @@ export default tseslint.config(
   {
     ignores: [
       '.output/**',
+      '.output-*/**',
       '.wxt/**',
       'node_modules/**',
       'coverage/**',

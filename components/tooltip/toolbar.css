@@ -1,0 +1,98 @@
+:host {
+  all: initial;
+}
+
+.panel {
+  position: fixed;
+  left: 0;
+  top: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-width: min(22rem, calc(100vw - 16px));
+  font:
+    14px/1.4 system-ui,
+    -apple-system,
+    'Segoe UI',
+    Roboto,
+    sans-serif;
+  color: #1b1f24;
+  pointer-events: auto;
+}
+
+.panel[hidden] {
+  display: none;
+}
+
+.toolbar {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  width: max-content;
+  background: #1b1f24;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgb(0 0 0 / 35%);
+}
+
+.button {
+  min-width: 44px;
+  min-height: 32px;
+  padding: 4px 12px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: #ffffff;
+  font: inherit;
+  cursor: pointer;
+}
+
+.button:hover {
+  background: #38414c;
+}
+
+.button:focus-visible {
+  outline: 2px solid #8db3ff;
+  outline-offset: 1px;
+}
+
+.card {
+  padding: 10px 12px;
+  background: #ffffff;
+  border: 1px solid #d0d7de;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgb(0 0 0 / 25%);
+}
+
+.card p {
+  margin: 0;
+}
+
+.card__text {
+  margin-top: 4px;
+  overflow-wrap: anywhere;
+  user-select: text;
+}
+
+.card__note {
+  color: #4a5360;
+}
+
+@media (prefers-color-scheme: dark) {
+  .toolbar {
+    background: #e8ecf1;
+  }
+  .button {
+    color: #14181d;
+  }
+  .button:hover {
+    background: #c3ccd6;
+  }
+  .card {
+    background: #1d232b;
+    border-color: #38414c;
+    color: #e8ecf1;
+  }
+  .card__note {
+    color: #a8b3c0;
+  }
+}

@@ -1,0 +1,193 @@
+/* Layout for the PDF reader shell. Tokens come from components/common/page.css. */
+
+.reader {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  height: 100dvh;
+  background: var(--bg);
+  color: var(--fg);
+}
+
+.reader[data-dragging='true'] .reader__stage {
+  outline: 3px dashed var(--accent);
+  outline-offset: -6px;
+}
+
+.reader__header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.reader__title {
+  margin: 0;
+  font-size: 1.125rem;
+  line-height: 1.25;
+}
+
+.reader-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+
+.reader-toolbar__group {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.reader-toolbar__page {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+}
+
+.reader-toolbar__find-status {
+  min-width: 6rem;
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+
+.reader-input {
+  min-height: 40px;
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--fg);
+  font: inherit;
+}
+
+.reader-input--page {
+  width: 4.5rem;
+}
+
+.reader-input--find {
+  width: 12rem;
+}
+
+.reader .button:disabled,
+.reader .reader-input:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.reader__stage {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+/* PDF.js requires the scroll container to be absolutely positioned. */
+.reader__viewer-container {
+  position: absolute;
+  inset: 0;
+  overflow: auto;
+  background: var(--surface);
+}
+
+.reader__overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: var(--bg);
+}
+
+.reader__overlay--modal {
+  background: rgb(0 0 0 / 0.45);
+}
+
+.reader-message {
+  max-width: 36rem;
+  margin: 0;
+  text-align: center;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+.reader-message--error {
+  color: #b42318;
+}
+
+@media (prefers-color-scheme: dark) {
+  .reader-message--error {
+    color: #ff9b91;
+  }
+}
+
+.reader-banner {
+  margin: 0;
+  padding: 8px 16px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  color: var(--fg);
+}
+
+.reader-dialog {
+  max-width: 28rem;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+}
+
+.reader-dialog h2 {
+  margin: 0 0 8px;
+  font-size: 1.125rem;
+}
+
+.reader-dialog p {
+  overflow-wrap: anywhere;
+}
+
+.reader-dialog__field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 12px;
+}
+
+.reader-selection {
+  flex: 0 0 auto;
+  max-height: 9rem;
+  overflow: auto;
+  padding: 8px 16px;
+  border-top: 1px solid var(--border);
+  font-size: 0.875rem;
+}
+
+.reader-selection h2 {
+  margin: 0 0 4px;
+  font-size: 0.875rem;
+}
+
+.reader-selection p {
+  margin: 0 0 4px;
+  overflow-wrap: anywhere;
+}
+
+.reader-selection__text {
+  white-space: pre-wrap;
+}
+
+/*
+ * Class-name collisions with the shared components/common/page.css, which this page imports for
+ * design tokens and `.button`: PDF.js also names every page div `.page`, and sizes it assuming
+ * `box-sizing: content-box` and no padding (its 9px border sits outside the scaled width). The
+ * shared `.page { padding: 24px 16px }` and `* { box-sizing: border-box }` rules would otherwise
+ * shrink the canvas and shift the text layer. Scoped reset for viewer pages only.
+ */
+.reader .pdfViewer .page {
+  box-sizing: content-box;
+  padding: 0;
+}

@@ -1,9 +1,9 @@
 # Execution phases — Clavis
 
-**Document status:** v1 end-to-end implementation playbook (rev. 1.1 — decisions D-01 … D-16)  
+**Document status:** v1 end-to-end implementation playbook (rev. 1.1 — decisions D-01 … D-18)  
 **Baseline:** 2026-10-22 · **Goal:** deliver a privacy-conscious, production-ready Chrome MV3 extension with Groq BYOK, word/sentence pronunciation, contextual explanations, and a custom PDF reader.
 
-> Use this as the project's **build checklist and milestone tracker**. Feature IDs correspond to [requirements.md](requirements.md); implementation boundaries are in [architecture.md](architecture.md); approved tools are in [tech-stack.md](tech-stack.md). Product decisions D-01 … D-16 are in [requirements.md §11](requirements.md#11-product-decisions).
+> Use this as the project's **build checklist and milestone tracker**. Feature IDs correspond to [requirements.md](requirements.md); implementation boundaries are in [architecture.md](architecture.md); approved tools are in [tech-stack.md](tech-stack.md). Product decisions D-01 … D-18 are in [requirements.md §11](requirements.md#11-product-decisions).
 
 ## 0. Delivery philosophy and estimates
 
@@ -35,9 +35,9 @@ flowchart TD
 
 | Phase | Approx. effort | Exit gate |
 | --- | --- | --- |
-| 0 — Specification & risks | Done 2026-10-22 | Scope frozen, decisions D-01 … D-16 logged |
+| 0 — Specification & risks | Done 2026-10-22 | Scope frozen, decisions D-01 … D-18 logged |
 | 1 — Scaffold & CI | Done 2026-10-22 | Unpacked extension loads; lint/test/build pipeline works |
-| 2 — Feasibility spikes | 2–4 days | Groq call + model comparison, permission flow + toolbar latency, PDF viewer text layer and TTS capability proven |
+| 2 — Feasibility spikes | Engineering done 2026-10-22; awaiting user runs | Groq call + model comparison, permission flow + toolbar latency, PDF viewer text layer and TTS capability proven |
 | 3 — Onboarding & BYOK | 2–4 days | Site access, valid/invalid keys, trusted storage and settings covered |
 | 4 — Web highlight toolbar | 3–5 days | Reliable selection/position/dismiss/keyboard behavior on both injection paths |
 | 5 — AI explanation | 3–4 days | Core request + Must tabs function with typed responses |
@@ -65,10 +65,10 @@ Effort counts are overlapping planning estimates, not additive deadlines; use th
 - [x] Explanation scope: core request + lazy tabs; grammar/translate are Should (D-05).
 - [x] Establish supported content boundaries (≤2,000 selected characters; ≤1,000 context characters initially) and the over-limit behavior.
 - [x] Define the exact disclosure text a user sees before the first selected text/context is sent to Groq — [approved copy](requirements.md#approved-disclosure-copy-fr-002-fr-009-fr-071) (D-16).
-- [x] Select the target Chrome versions/OS testing matrix — Linux by hand, Windows/macOS automated, minimum Chrome tentatively 116 ([platform matrix](requirements.md#platform-matrix-d-14), D-14).
+- [x] Select the target Chrome versions/OS testing matrix — Linux by hand, Windows/macOS automated, minimum Chrome tentatively 116, later set to 147 by D-18 ([platform matrix](requirements.md#platform-matrix-d-14), D-14).
 - [x] Record legal/privacy decisions and remaining open items — MIT license (D-13, `LICENSE` added), privacy policy on GitHub Pages with a [draft](privacy-policy.md) (D-15); publisher, support email and logo deferred to Phase 10 ([still open](requirements.md#still-open)).
 
-**Deliverables (done 2026-10-22):** approved scope and decisions D-01 … D-16 ([requirements.md §11](requirements.md#11-product-decisions)); ADRs A-001 … A-013 ([architecture.md §1](architecture.md#1-architectural-decisions-adrs)); requirement checklist, prioritized backlog and risk register ([backlog.md](backlog.md)); privacy policy draft ([privacy-policy.md](privacy-policy.md)).  
+**Deliverables (done 2026-10-22):** approved scope and decisions D-01 … D-18 ([requirements.md §11](requirements.md#11-product-decisions)); ADRs A-001 … A-013 ([architecture.md §1](architecture.md#1-architectural-decisions-adrs)); requirement checklist, prioritized backlog and risk register ([backlog.md](backlog.md)); privacy policy draft ([privacy-policy.md](privacy-policy.md)).  
 **Gate:** No launch-time features are ambiguous or promised beyond demonstrated browser capabilities. **Passed** — remaining unknowns are either Phase 2 spike outputs with defined decision criteria or Phase 10 publishing details.
 
 ## Phase 1 — Repository, WXT scaffold and developer tooling
@@ -95,7 +95,7 @@ Effort counts are overlapping planning estimates, not additive deadlines; use th
 
 - Phase 3: register the content script at runtime with the real `OPTIONAL_SITE_ORIGINS` patterns (the entrypoint uses `matches: []`, because WXT copies runtime-script matches into `host_permissions`); storage-reading message routes must await the background's `setAccessLevel` promise; check message senders in the router; define the `GET_AI_STATUS` reply contract.
 - Phase 5: adjust optional fields in mode output schemas for Groq strict JSON-schema mode (or use JSON mode); retune output length bounds after Spike A.
-- Phase 9: add the minimum-Chrome smoke test against a pinned Chrome for Testing 116 build (D-14).
+- Phase 9: add the minimum-Chrome smoke test against a pinned Chrome for Testing 147 build (D-14, D-18), including the content-script storage-denial check.
 - Before Phase 10: first real CI run once a GitHub remote exists; confirm the Groq privacy-policy URL used in onboarding.
 
 **Deliverables (done 2026-10-22):** loading MV3 extension with popup, onboarding, options and reader pages; generated manifest matching [architecture.md §3](architecture.md#3-extension-entry-points-and-message-routes); CI pipeline.  
@@ -105,46 +105,56 @@ Effort counts are overlapping planning estimates, not additive deadlines; use th
 
 **Goal:** prove technical assumptions that could cause rework.
 
-### Spike A: Groq BYOK from trusted extension context
+### Spike A: Groq BYOK from trusted extension context — [findings](decisions/spike-a-groq.md)
 
-- [ ] Get a test key from <https://console.groq.com/keys> (never commit it).
-- [ ] Add minimal `https://api.groq.com/*` host permission for extension background fetch (this also exempts the fetch from CORS).
-- [ ] Verify authenticated model-list/connection and `chat/completions` requests from background service worker **in a packaged extension**.
-- [ ] Confirm which models accept `response_format` JSON schema / JSON mode and `reasoning_effort`; record capability differences.
-- [ ] **Model comparison (D-09):** run the `core` prompt on the semantic regression fixtures against `openai/gpt-oss-20b`, `openai/gpt-oss-120b` and at least one fast non-reasoning model available to the account. Record p50/p95 latency, completion tokens (including reasoning), JSON validity rate and answer quality. Choose the quick/deep defaults and per-mode `max_completion_tokens`.
-- [ ] Confirm model IDs and free limits against live provider data.
-- [ ] Test 401/403/404/429 paths (use mocks for rate-limit scenarios if needed).
+- [ ] **User:** get a test key from <https://console.groq.com/keys> (never commit or paste it in chat).
+- [x] `https://api.groq.com/*` host permission; the packaged worker reaches Groq (401 for a fake key on `/models` and `/chat/completions`). Groq currently allows any origin, so the permission is defence in depth.
+- [ ] **User:** verify authenticated model list and `chat/completions` with a real key — done by the comparison script below.
+- [x] Capability table: `reasoning_effort` only for gpt-oss; strict `json_schema` for documented models, automatic fallback to `json_object` on a 400 (from Groq docs; to be confirmed by the user's run).
+- [ ] **User — model comparison (D-09):** `GROQ_API_KEY=… npx tsx scripts/spikes/groq-compare.ts --runs 3 --max-requests 75`, then review the summary and record the decision in the findings doc.
+- [ ] Confirm model IDs and free limits against live provider data (the user's run).
+- [x] 400/401/403/404/408/429/5xx/network/timeout/invalid-JSON paths unit-tested with mocks (48 tests).
 
-### Spike B: Site access, selection + tooltip
+### Spike B: Site access, selection + tooltip — [findings](decisions/spike-b-toolbar.md)
 
-- [ ] Declare `optional_host_permissions` for http/https; request them from a button on an extension page; on grant, `registerContentScripts`; on revoke, unregister. Confirm the install prompt shows no all-sites warning.
-- [ ] Verify the declined path: context menu **Explain with Clavis** and toolbar-icon click inject into the current tab via `activeTab`.
-- [ ] Capture selected text on at least 5 webpage fixtures with different layouts, including an iframe.
-- [ ] Check placement at viewport corners, nested inline text, scroll containers and zoom.
-- [ ] Render a Shadow DOM toolbar and retain selection snapshot after button click.
-- [ ] **UI loading (D-08):** implement the toolbar with the candidate loading options in [architecture.md §5](architecture.md#5-end-to-end-selection-flow); measure observer size, UI chunk size and first-selection p95 latency on a mid-range machine; pick one and record the numbers.
-- [ ] Test Chrome restricted pages and don't attempt injection where unsupported.
+- [x] Optional http/https access requested from the onboarding button; grant registers, revoke and Chrome's Site-access switch unregister/re-register — verified with Chrome's real prompt under xvfb. No all-sites warning at install (`hasAllHosts: false`).
+- [x] Declined path: context menu **Explain with Clavis** and the popup's **Explain on this page** button inject into the current tab via `activeTab`. The toolbar icon opens the popup (it has `default_popup`), so the fallback lives there. Keyboard shortcut Alt+Shift+E added.
+- [x] Selection on 9 fixtures (article, nested inline, scroll container, fixed header, RTL, same-origin/cross-origin/srcdoc iframes), by mouse and keyboard.
+- [x] Placement at viewport corners, 320 px viewport, rotated text. Real browser zoom not tested.
+- [x] Shadow DOM toolbar in the top layer; snapshot survives a page that clears the selection on mousedown.
+- [x] **UI loading (D-08):** option (c), bundled Preact toolbar — 60 ms first-toolbar p95 vs ~230 ms for lazy React; observer 11.8 KB gzip.
+- [x] Restricted pages (chrome://, Web Store) handled without errors.
+- [ ] **User:** confirm the permission prompt and toolbar once in your own Chrome (steps in the findings doc).
 
-### Spike C: PDF.js viewer components
+### Spike C: PDF.js viewer components — [findings](decisions/spike-c-pdf.md)
 
-- [ ] Open a local text-based PDF in the extension reader using `PDFViewer` + `EventBus` + `PDFLinkService` + `PDFFindController` and the bundled worker (D-06).
-- [ ] Confirm aligned selectable text layer at 100%, 125% and 175%, and fit-width.
-- [ ] Capture selected sentence, with page metadata and exact selected string.
-- [ ] Open a 100-page PDF and confirm only nearby pages hold canvases while scrolling.
-- [ ] Confirm find-in-document works through `PDFFindController`.
-- [ ] Attempt a scan-only PDF and show that OCR is not available in v1.
-- [ ] Test offline operation, a corrupt PDF and a password-protected PDF.
+- [x] Local PDF opens in the reader with `PDFViewer` + `EventBus` + `PDFLinkService` + `PDFFindController` and the bundled worker, fully offline, no network requests.
+- [x] Text layer aligned within 3 px at 100%, 125%, 175% and fit-width, including a rotated page.
+- [x] Exact selected sentence and page number captured and validated as a `SelectionSnapshot`.
+- [x] 100-page PDF: at most 10 page canvases alive (PDF.js LRU cache), ~33 MB canvas peak.
+- [x] Find-in-document navigates to a term on page 73.
+- [x] Image-only, corrupt, empty, non-PDF and password-protected (RC4) fixtures show the right states.
+- [x] WebAssembly needs a CSP change → adopted (D-17).
+- [ ] Not covered: embedded fonts, CJK text, AES encryption, JPEG 2000/JBIG2 images — manual check before FR-051/052 are declared done (Phase 7).
 
-### Spike D: Voices
+### Spike D: Voices — [findings](decisions/spike-d-voices.md)
 
-- [ ] Query `chrome.tts.getVoices()` and speak word and full sentence on each available OS.
-- [ ] Exercise Stop/Replay and both rate presets.
-- [ ] On Linux (the dev machine), record whether `chrome.tts` has any voice.
-- [ ] **Fallback (D-07):** create an offscreen document (`AUDIO_PLAYBACK`), speak via `speechSynthesis`, relay start/end/error events; also test `speechSynthesis` directly in the reader page. Record per OS whether audio is actually produced.
-- [ ] Decide per OS whether the fallback is adopted; add the `offscreen` permission only if it is.
+- [x] `SpeechService` with `chrome.tts` first, offscreen `speechSynthesis` second, honest `NO_VOICE` last; Stop, rate presets, new-speak-cancels-previous (121 unit tests).
+- [x] Linux dev machine (no speech-dispatcher): `chrome.tts` 0 voices, offscreen `speechSynthesis` 0 voices, reader-page `speechSynthesis` 0 voices → `NO_VOICE` for word and sentence, never a fake playing state.
+- [x] Offscreen document lifecycle works (create, reuse, idle close at 20 s).
+- [ ] **User:** in your own Chrome, check voice counts per engine and listen to word/sentence/slow playback; optionally install `speech-dispatcher espeak-ng` and repeat. Then decide D-07: keep the offscreen fallback and `offscreen` permission only if it finds voices `chrome.tts` misses.
 
-**Deliverables:** Minimal spike pages, findings recorded in `docs/decisions/` (model comparison table, UI loading measurements, voice matrix), corrected acceptance scope.  
-**Gate:** All four spikes have a demonstrable working or consciously downgraded implementation path. **Do not proceed with risky promises unresolved.**
+**Deliverables (2026-10-22):** spike implementations in `lib/ai`, `lib/site-access`, `lib/selection`, `components/tooltip`, `lib/pdf`, `components/reader`, `lib/speech`, `entrypoints/offscreen`; findings in `docs/decisions/`; decisions D-08, D-17 and D-18; [security review](decisions/phase-2-security-review.md) fixes.  
+**Gate:** All four spikes have a demonstrable working or consciously downgraded implementation path. **Engineering passed 2026-10-22** (`npm run ci`, full E2E suite). **Closes when the user's runs settle D-09 (models) and D-07 (voice fallback).**
+
+**Phase 2 follow-ups:**
+
+- Phase 3 (security review rules): key routes `await whenStorageLockedDown()` and fail closed on `false`; accept `SET_/TEST_/REMOVE_API_KEY` only from the exact `/options.html` and `/onboarding.html` paths, never from the reader or offscreen pages; one in-flight AI request and a rate limit per tab; every extension-page listener validates type and sender and ignores unowned messages; never send the key in a `runtime.sendMessage` broadcast; scope `TTS_STOP` to the sender's tab.
+- Phase 3: fold the per-module message listeners (site access, speech) into one router with per-route sender checks; add `INVALID_REQUEST`, `TTS_EVENT` and reply shapes to `lib/contracts`; inject into already-open tabs after a grant (or prompt a reload); persist the declined choice; implement per-site disable with `updateContentScripts` `excludeMatches` (the observer can't read locked-down storage).
+- Phase 4: remove the spike's variant switch (`lib/selection/loaders.ts`, `variant.ts`, React renderer, `content-ui.content.ts`) and keep the bundled Preact toolbar; message for cross-origin iframes under `activeTab`; page shadow roots and modal `<dialog>` handling.
+- Phase 5: explanation card in Preact or React-on-first-Explain with its own budget; cache per-model `json_schema` support; consider a dedicated `BAD_REQUEST` error code (400 currently maps to `MODEL_UNAVAILABLE`).
+- Phase 6: spinner/timeout for the first no-voice answer (up to ~3 s); OS-specific no-voice hint; drop `SPEECH_DIAGNOSE` before release.
+- Phase 7: namespace shared page CSS; reader size budgets (JS chunks, `pdfjs/` data, ZIP); consider dropping CMaps if CJK without embedded fonts is out of scope.
 
 ## Phase 3 — Onboarding, preferences and Groq key lifecycle
 

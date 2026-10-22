@@ -12,10 +12,10 @@ Work in this order. Phases 3, 4 and 7 can overlap once Phase 2 closes; see the d
 | --- | --- | --- | --- | --- |
 | 1 | WXT scaffold in `Clavis/`, strict TS, lint, Vitest, CI, `_locales`, bundle-size report | 1 | Everything | Done |
 | 2 | Zod contracts: messages, `SelectionSnapshot`, `ExplainRequest`, `ExplainResult` | 1 | 6, 8, 9 | Done |
-| 3 | Spike A — Groq from background + model comparison (D-09) | 2 | 8 | Not started |
-| 4 | Spike B — optional permission flow, runtime registration, toolbar loading measurement (D-02, D-08) | 2 | 6, 7 | Not started |
-| 5 | Spike C — PDF.js viewer components (D-06) | 2 | 10 | Not started |
-| 6 | Spike D — `chrome.tts` on Linux + offscreen fallback (D-07) | 2 | 9 | Not started |
+| 3 | Spike A — Groq from background + model comparison (D-09) | 2 | 8 | Done; model comparison awaits the user's key |
+| 4 | Spike B — optional permission flow, runtime registration, toolbar loading measurement (D-02, D-08) | 2 | 6, 7 | Done (option c chosen) |
+| 5 | Spike C — PDF.js viewer components (D-06) | 2 | 10 | Done |
+| 6 | Spike D — `chrome.tts` on Linux + offscreen fallback (D-07) | 2 | 9 | Done; voice check awaits the user |
 | 7 | Onboarding, disclosure, site access, key lifecycle, settings | 3 | 8 | Not started |
 | 8 | Selection observer + toolbar on both injection paths | 4 | 8, 9 | Not started |
 | 9 | Core Explain + Must tabs (roots, related words, simplify) | 5 | 11 | Not started |
@@ -102,12 +102,14 @@ FR-026 (IPA and recorded audio) is a Could. FR-058 (remote PDF URLs) and FR-079 
 
 | ID | Risk | Likelihood | Impact | Mitigation | Owner phase |
 | --- | --- | --- | --- | --- | --- |
-| R-01 | `chrome.tts` has no voice on the Linux dev machine, so Listen can't be shown working locally | High | Medium | Install `speech-dispatcher` + `espeak-ng` for the positive path; test the offscreen fallback (D-07); keep the no-voice message honest | 2 |
+| R-01 | `chrome.tts` has no voice on the Linux dev machine, so Listen can't be shown working locally | Confirmed | Medium | Install `speech-dispatcher` + `espeak-ng` for the positive path; test the offscreen fallback (D-07); keep the no-voice message honest | 2 |
 | R-02 | Voices on Windows/macOS never checked by a person | High | Medium | Automated non-voice E2E on CI; one manual tester pass before public listing (D-14); no voice claims until then | 9–10 |
-| R-03 | First toolbar after page load misses 150 ms because UI code must load | Medium | Medium | Spike B measures the three loading options; pick by data (D-08) | 2 |
+| R-03 | First toolbar after page load misses 150 ms because UI code must load | Low (mitigated) | Medium | Spike B: bundled Preact toolbar measured 60 ms p95 (D-08); re-measure on a quiet machine | 2 |
 | R-04 | Reasoning models are slow or truncate JSON on the free tier | Medium | High | Spike A model comparison and token budgets (D-09) | 2 |
 | R-05 | Users decline site access and find the right-click path hard to discover | Medium | Medium | Clear onboarding copy (D-16), toolbar-icon fallback, help text in Phase 8 | 3, 8 |
 | R-06 | Chrome Web Store review is slow or rejects the optional all-sites access | Medium | High | Accurate justifications; privacy policy published; trusted-tester release first | 10 |
 | R-07 | Groq changes model IDs or free-tier limits | Medium | Medium | Model list fetched at runtime; clear "choose another model" path; recheck before release | 5, 11 |
 | R-08 | No GitHub repo / Pages yet for the privacy policy URL | Low | High (blocks submission) | Create repo and enable Pages before Phase 10 (D-15) | 10 |
-| R-09 | PDF.js viewer components change API between versions | Low | Medium | Pin exact version; keep worker, core and viewer identical | 7 |
+| R-09 | PDF.js viewer components change API between versions | Medium (seen in Spike C) | Medium | Pin exact version; keep worker, core and viewer identical; re-read release notes on every bump | 7 |
+| R-10 | Store ZIP grew to ~2.5 MB with the PDF engine and data files | Medium | Low | Reader size budgets in Phase 7; drop CMaps if CJK without embedded fonts is out of scope | 7 |
+| R-11 | An explanation card written in React exceeds the 60 KB lazy-UI budget | High | Medium | Preact card, or load React only on the first Explain via background injection (Phase 5) | 5 |

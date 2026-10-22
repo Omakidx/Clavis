@@ -12,7 +12,7 @@
 | --- | --- | --- | --- |
 | A-001 | Manifest V3 extension | Supported Chrome extension platform | Event-driven service worker; no assumption of persistent background process |
 | A-002 | WXT + React + TypeScript | Reliable packaging and isolated UI components | WXT-generated manifest/build; no handcrafted competing manifest |
-| A-003 | BYOK Groq direct from background service worker | v1 without hosting or accounts | Keys reside on user device; with `https://api.groq.com/*` in `host_permissions`, service-worker `fetch` is not subject to CORS, so the spike focuses on key isolation and model capabilities |
+| A-003 | BYOK Groq direct from background service worker | v1 without hosting or accounts | Keys reside on user device; with `https://api.groq.com/*` in `host_permissions`, service-worker `fetch` is not subject to CORS. Spike A found Groq currently answers with `access-control-allow-origin: *`, so the permission is defence against a future CORS change rather than strictly required today |
 | A-004 | Never place API key in content script | Webpage context is untrusted | Only privileged background/settings/reader contexts handle credentials |
 | A-005 | Shared domain action and result contracts | Web and PDF use same explain/listen workflows | Multiple UI entry points; one adapter for speech and AI |
 | A-006 | PDF.js custom extension page built on PDF.js viewer components | Native Chrome PDF viewer cannot reliably host normal content scripts; viewer components give virtualization, text layer and find for free | User explicitly opens PDF in reader; no browser-wide PDF hijack; local files only in v1 |
@@ -22,7 +22,8 @@
 | A-010 | Future provider interface from day one | Later OpenRouter/Gemini support | v1 contains only `GroqProvider`; no premature complex router |
 | A-011 | Optional all-sites access + runtime content-script registration, with `activeTab` fallback (D-02) | Automatic toolbar for consenting users; on-demand use for everyone else | Two injection paths to test; manifest has no static `content_scripts` for websites |
 | A-012 | Core request + lazy per-tab requests (D-05) | One request per Explain; free-tier friendly | Mode set and schemas differ from a "one mode per tab" design; per-selection in-memory result cache |
-| A-013 | Tiny always-on observer, UI loaded on first qualifying selection (D-08) | Page weight and 150 ms toolbar target | Loading mechanism chosen in Spike B (see §5) |
+| A-013 | Tiny always-on observer with a bundled Preact toolbar; card loaded on first Explain (D-08) | Page weight and 150 ms toolbar target | Chosen by Spike B measurement (see §5) |
+| A-014 | Extension-page CSP allows `wasm-unsafe-eval` only (D-17) | PDF.js wasm decoders | ZIP audit enforces the exact CSP |
 
 ## 2. Container/context architecture
 
@@ -91,7 +92,10 @@ This table is the single source of truth for permissions; the privacy policy, st
 | `activeTab` | `permissions` | Must | Current-tab injection from the context menu or toolbar icon when site access is declined |
 | `contextMenus` | `permissions` | Must | **Explain with Clavis** entry; the fallback path for users without site access (FR-018) |
 | `sidePanel` | `permissions` | Should | Large accessible explanations; include only if the side panel ships |
-| `offscreen` | `permissions` | Conditional | Only if Spike D adopts the `speechSynthesis` fallback (D-07) |
+| `offscreen` | `permissions` | Provisional | Present while D-07 awaits the user's voice check; removed if the fallback finds no extra voices |
+| `content_security_policy.extension_pages` | manifest | Must | Exactly `script-src 'self' 'wasm-unsafe-eval'; object-src 'self'` (D-17) |
+| `commands.explain-selection` (Alt+Shift+E) | manifest | Must | Keyboard path to the toolbar (FR-016); not a permission |
+| `minimum_chrome_version` 147 | manifest | Must | D-18 (set by PDF.js 6's use of `Math.sumPrecise`) |
 | `https://api.groq.com/*` | `host_permissions` | Must | Background Groq API calls; narrowly scoped endpoint |
 | `http://*/*`, `https://*/*` | `optional_host_permissions` | Must | Requested at onboarding with a user gesture; enables the automatic toolbar on all websites |
 
@@ -248,6 +252,8 @@ sequenceDiagram
 
 Whichever is chosen must meet the 150 ms p95 target for the first selection on a page.
 
+**Decision (Spike B, D-08): option (c).** Measured on the dev machine (n=30 page loads, first selection → toolbar visible, p50/p95): (a) 138/239 ms, (b) 129/231 ms, (c) **33/60 ms**; at 4× CPU slowdown (c) was 97/144 ms. The always-loaded observer with the Preact toolbar is 11.8 KB gzip. The explanation card is loaded on the first Explain click, not on selection. Details: [spike-b-toolbar.md](decisions/spike-b-toolbar.md).
+
 ### Tooltip UI state machine
 
 ```mermaid
@@ -390,9 +396,10 @@ flowchart TD
 - **Viewer components (D-06):** use `PDFViewer`, `EventBus`, `PDFLinkService` and `PDFFindController` from `pdfjs-dist/web/pdf_viewer` (plus its CSS), all from the **same pinned PDF.js version** as the worker. They provide page virtualization, canvas + aligned text layer per page, zoom/fit-width, scrolling and find. Clavis builds only the React shell around the viewer container: toolbar, page number, zoom controls, open/drop UI and error states.
 - **Worker:** bundle `pdf.worker.mjs` locally. Configure `GlobalWorkerOptions.workerSrc` (or WXT-compatible worker asset URL). Never load worker code from a public CDN in the published extension. Bundle `cmaps` and standard fonts if the pinned version needs them.
 - **Text layer:** provided by the viewer; selecting text from canvas pixels alone is impossible.
-- **Performance:** the viewer renders pages near the viewport and releases distant canvases; Clavis must still call `pdfDocument.destroy()` and clean up on close.
+- **Performance:** the viewer renders pages near the viewport and releases distant canvases; Clavis must still clean up on close with `pdfViewer.setDocument(null)` and `loadingTask.destroy()` (pdfjs-dist 6.x has no `PDFDocumentProxy.destroy()`).
 - **Password:** handle PDF.js `onPassword` with a controlled prompt; keep the password transient and never log it.
-- **Security:** set `isEvalSupported: false`; do not run PDF JavaScript actions; confirm before following external links (`PDFLinkService` with an external-link target that opens a new tab after confirmation).
+- **Version notes (pdfjs-dist 6.4.299, Spike C):** `isEvalSupported` no longer exists (6.x has no eval path); set `useWorkerFetch: true` explicitly, because PDF.js turns it off for `chrome-extension://` URLs and that silently disables wasm; import the core library before the viewer module (it reads `globalThis.pdfjsLib`); scope the reader's CSS so shared page styles (`box-sizing`, `.page` padding) don't shift the text layer.
+- **Security:** do not run PDF JavaScript actions (the scripting sandbox is not shipped); confirm before following external links (`PDFLinkService` with an external-link target that opens a new tab after confirmation).
 - **Local files:** file input/drag/drop provides `File` bytes without requiring global `file://` extension permission.
 - **Remote files:** out of scope for v1 (D-03). When added, validate `https:` URL and user gesture, request narrow origin permission, cap size/time, check redirects, block private-network targets, and fall back to the local picker.
 
@@ -403,9 +410,14 @@ type ReaderState =
   | { phase: 'empty' }
   | { phase: 'loading'; name: string }
   | { phase: 'ready'; name: string; pageCount: number; page: number; zoom: number }
-  | { phase: 'password-required'; name: string }
+  | { phase: 'password-required'; name: string; incorrect?: boolean }
   | { phase: 'image-only'; name: string; pageCount: number }
-  | { phase: 'error'; code: 'CORRUPT' | 'PERMISSION' | 'TOO_LARGE' | 'UNSUPPORTED'; message: string };
+  | {
+      phase: 'error';
+      code: 'CORRUPT' | 'PERMISSION' | 'TOO_LARGE' | 'UNSUPPORTED';
+      limit?: 'bytes' | 'pages'; // for TOO_LARGE: 100 MiB file or 5,000 pages
+      message: string; // diagnostic only; the UI shows a localized message per code
+    };
 ```
 
 ### PDF selection and context

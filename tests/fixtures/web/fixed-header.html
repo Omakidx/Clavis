@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Fixed header, long page</title>
+    <style>
+      body {
+        margin: 0;
+        font:
+          18px/1.7 system-ui,
+          sans-serif;
+      }
+      header {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 64px;
+        background: #123;
+        color: #fff;
+        display: flex;
+        align-items: center;
+        padding: 0 1rem;
+        z-index: 2147483647;
+      }
+      main {
+        max-width: 40rem;
+        margin: 0 auto;
+        padding: 96px 1rem 4rem;
+      }
+    </style>
+  </head>
+  <body>
+    <header><strong>Site header</strong>&nbsp;with a very high z-index</header>
+    <main id="main"></main>
+    <script>
+      const main = document.getElementById('main');
+      for (let i = 1; i <= 60; i++) {
+        const p = document.createElement('p');
+        p.id = 'para' + i;
+        p.textContent = `Paragraph ${i}: the harvest festival begins when the first lantern is lit above the market square, and every visitor receives a small loaf of bread.`;
+        main.append(p);
+      }
+    </script>
+  </body>
+</html>

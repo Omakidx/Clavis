@@ -27,7 +27,7 @@ The product's single purpose is **helping users understand what they read, in co
 
 | Topic | Normative home |
 | --- | --- |
-| Product decisions (D-01 … D-16) | [requirements.md §11](requirements.md#11-product-decisions) |
+| Product decisions (D-01 … D-18) | [requirements.md §11](requirements.md#11-product-decisions) |
 | Scope, priorities, acceptance tests, selection limits | [requirements.md](requirements.md) §2–§4 |
 | Manifest permissions and site-access model | [architecture.md §3](architecture.md#3-extension-entry-points-and-message-routes) |
 | Message and data contracts | [architecture.md §4](architecture.md#4-shared-domain-objects-and-boundaries) |

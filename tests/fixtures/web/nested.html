@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Nested inline markup</title>
+    <style>
+      body {
+        margin: 0;
+        font:
+          18px/1.6 system-ui,
+          sans-serif;
+      }
+      main {
+        max-width: 40rem;
+        margin: 0 auto;
+        padding: 2rem 1rem;
+      }
+      a {
+        color: #0645ad;
+      }
+      code {
+        background: #eee;
+        padding: 0 0.2em;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h2>Notes on <em>inline</em> structure</h2>
+      <p id="nested">
+        A
+        <strong
+          >carefully
+          <em
+            >nested
+            <a href="#x"
+              >link with <span class="hl">highlighted <code>inline code</code></span> inside</a
+            ></em
+          >
+          structure</strong
+        >
+        can split one sentence across a dozen text nodes<sup>1</sup>, and a selection that starts in
+        <b>bold</b> and ends in <i>italic</i> must still produce one clean snapshot.
+      </p>
+      <p id="split">The word un<b>break</b>able is split across inline elements in the markup.</p>
+      <ul>
+        <li id="li1">First list item with <a href="#y">a link</a> in the middle of it.</li>
+        <li id="li2">Second list item, plain.</li>
+      </ul>
+      <table>
+        <tr>
+          <td id="cell">Table cell text that is selectable</td>
+          <td>Another cell</td>
+        </tr>
+      </table>
+    </main>
+  </body>
+</html>

@@ -1,7 +1,35 @@
 {
-  "$comment": "Allowlist for the release ZIP audit. Mirrors docs/architecture.md section 3 and wxt.config.ts. Change docs first, then wxt.config.ts, then this file, and update the privacy policy. Order is ignored; any addition or removal fails scripts/audit-zip.mjs.",
-  "permissions": ["storage", "tts", "scripting", "activeTab", "contextMenus"],
+  "$comment": "Allowlist for the release ZIP audit (scripts/audit-zip.mjs). Mirrors docs/architecture.md section 3 and wxt.config.ts. Change docs first, then wxt.config.ts, then this file, and update the privacy policy. Permission order is ignored; any addition or removal fails. Manifest top-level keys outside allowedManifestKeys fail. Risky keys (web_accessible_resources, externally_connectable, sandbox, oauth2, key, update_url, chrome_url_overrides) fail unless a matching expected value is added to this file; web_accessible_resources must also set use_dynamic_url: true on every entry. commands, minimum_chrome_version and content_security_policy must equal the values here.",
+  "allowedManifestKeys": [
+    "manifest_version",
+    "name",
+    "description",
+    "version",
+    "icons",
+    "default_locale",
+    "minimum_chrome_version",
+    "permissions",
+    "optional_permissions",
+    "host_permissions",
+    "optional_host_permissions",
+    "action",
+    "commands",
+    "content_security_policy",
+    "background",
+    "options_ui"
+  ],
+  "minimum_chrome_version": "147",
+  "permissions": ["storage", "tts", "scripting", "activeTab", "contextMenus", "offscreen"],
   "optional_permissions": [],
   "host_permissions": ["https://api.groq.com/*"],
-  "optional_host_permissions": ["http://*/*", "https://*/*"]
+  "optional_host_permissions": ["http://*/*", "https://*/*"],
+  "commands": {
+    "explain-selection": {
+      "suggested_key": { "default": "Alt+Shift+E" },
+      "description": "__MSG_toolbarCommandExplain__"
+    }
+  },
+  "content_security_policy": {
+    "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'"
+  }
 }
