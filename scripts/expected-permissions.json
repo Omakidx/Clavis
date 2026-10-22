@@ -1,0 +1,7 @@
+{
+  "$comment": "Allowlist for the release ZIP audit. Mirrors docs/architecture.md section 3 and wxt.config.ts. Change docs first, then wxt.config.ts, then this file, and update the privacy policy. Order is ignored; any addition or removal fails scripts/audit-zip.mjs.",
+  "permissions": ["storage", "tts", "scripting", "activeTab", "contextMenus"],
+  "optional_permissions": [],
+  "host_permissions": ["https://api.groq.com/*"],
+  "optional_host_permissions": ["http://*/*", "https://*/*"]
+}

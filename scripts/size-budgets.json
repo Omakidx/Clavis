@@ -1,0 +1,25 @@
+{
+  "$comment": "Content-script budgets from docs/tech-stack.md section 6 (D-08). KB means 1024 bytes. Sizes are gzip level 9 of the built file. Revisit after Spike B picks the lazy UI loading option and update the lazy-ui pattern to the real chunk names.",
+  "buildDir": ".output/chrome-mv3",
+  "budgets": [
+    {
+      "id": "content-observer",
+      "description": "Always-loaded selection observer (no framework)",
+      "files": ["content-scripts/content.js"],
+      "maxGzipBytes": 15360,
+      "required": true
+    },
+    {
+      "id": "content-lazy-ui",
+      "description": "UI loaded on first qualifying selection, JS and CSS combined (reserved for Spike B)",
+      "files": [
+        "content-scripts/content-ui*.js",
+        "content-scripts/content-ui*.css",
+        "chunks/content-ui*.js"
+      ],
+      "maxGzipBytes": 61440,
+      "required": false,
+      "aggregate": true
+    }
+  ]
+}

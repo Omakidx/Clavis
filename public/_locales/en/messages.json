@@ -1,0 +1,110 @@
+{
+  "extName": {
+    "message": "Clavis",
+    "description": "Extension name shown in the Chrome toolbar, extensions page and store listing."
+  },
+  "extDescription": {
+    "message": "Understand and pronounce selected text in webpages and PDFs.",
+    "description": "Short extension description shown on the extensions page. Chrome limits this to 132 characters."
+  },
+  "disclosureTitle": {
+    "message": "Your reading stays on your device until you ask",
+    "description": "Heading of the data disclosure on the onboarding page (FR-002). Approved copy; do not weaken."
+  },
+  "disclosureSelect": {
+    "message": "Selecting text does nothing by itself. Clavis notices the selection on your device and shows its toolbar.",
+    "description": "Disclosure bullet explaining that selecting text sends nothing anywhere (FR-017). Approved copy."
+  },
+  "disclosureListen": {
+    "message": "Listen uses the voices on your computer. Nothing is sent to Groq.",
+    "description": "Disclosure bullet explaining that the Listen action is local. Listen is the name of a toolbar button. Approved copy."
+  },
+  "disclosureExplain": {
+    "message": "Explain sends the text you selected, up to 1,000 characters of the text around it, and your chosen language to Groq, using your own API key. Groq handles it under its own terms and privacy policy.",
+    "description": "Disclosure bullet explaining exactly what the Explain action sends to Groq. Explain is the name of a toolbar button. Approved copy; a Groq privacy policy link follows it."
+  },
+  "disclosurePrivacyLink": {
+    "message": "Groq privacy policy",
+    "description": "Link text placed after the Explain disclosure bullet; points to Groq's privacy policy."
+  },
+  "disclosurePdf": {
+    "message": "PDFs you open are read inside your browser and never uploaded. Only text you select and explain is sent.",
+    "description": "Disclosure bullet explaining how PDFs are handled locally. Approved copy."
+  },
+  "disclosureNoServer": {
+    "message": "Clavis has no server of its own and collects no data about you.",
+    "description": "Disclosure bullet stating there is no developer backend and no data collection. Approved copy."
+  },
+  "disclosureAccept": {
+    "message": "I understand",
+    "description": "Button that acknowledges the data disclosure on the onboarding page."
+  },
+  "firstSendBody": {
+    "message": "Send this to Groq? Clavis will send the selected text and a little of the text around it to Groq to explain it. You'll only be asked once.",
+    "description": "Confirmation shown inside the card the first time Explain is used if the disclosure was never acknowledged. Starts with a question that acts as its title."
+  },
+  "firstSendConfirm": {
+    "message": "Explain",
+    "description": "Button that confirms sending the selected text to Groq for the first time."
+  },
+  "firstSendCancel": {
+    "message": "Cancel",
+    "description": "Button that cancels the first-time send to Groq."
+  },
+  "siteAccessTitle": {
+    "message": "Show Clavis when you select text",
+    "description": "Heading of the optional all-sites access section on the onboarding page (FR-009)."
+  },
+  "siteAccessBody": {
+    "message": "To show the toolbar automatically, Chrome will ask you to let Clavis read and change data on websites. Clavis uses this only to notice when you select text and to show its toolbar. It does not read pages in the background, and nothing leaves your device until you click Explain.",
+    "description": "Explains why Chrome will show a permission prompt for website access. Approved copy; do not weaken."
+  },
+  "siteAccessGrant": {
+    "message": "Enable on websites",
+    "description": "Button that starts the Chrome permission prompt for optional website access."
+  },
+  "siteAccessSkip": {
+    "message": "Not now — I'll use right-click instead",
+    "description": "Button that skips website access; the user will use the right-click Explain with Clavis menu item instead."
+  },
+  "keyStoreLocal": {
+    "message": "Remember on this device — Saved in Chrome's extension storage on this computer until you remove it. It is not encrypted: anyone with access to your Chrome profile could find it.",
+    "description": "Option for storing the API key persistently. Must not claim encryption (FR-071). Starts with a short option label."
+  },
+  "keyStoreSession": {
+    "message": "Only for this session — Kept in memory and cleared when you close Chrome. You'll paste it again next time.",
+    "description": "Option for keeping the API key only for the browser session (FR-071). Starts with a short option label."
+  },
+  "keyWarning": {
+    "message": "Never paste your key into a website or share it in a chat.",
+    "description": "Warning shown next to the API key input."
+  },
+  "popupOpenReader": {
+    "message": "Open PDF reader",
+    "description": "Popup button that opens the extension's PDF reader page in a new tab."
+  },
+  "popupSettings": {
+    "message": "Settings",
+    "description": "Popup button that opens the extension's settings page."
+  },
+  "onboardingTitle": {
+    "message": "Welcome to Clavis",
+    "description": "Main heading and tab title of the onboarding page shown once after installation."
+  },
+  "optionsTitle": {
+    "message": "Clavis settings",
+    "description": "Main heading and tab title of the settings page."
+  },
+  "optionsPlaceholder": {
+    "message": "Settings will be available in a later phase.",
+    "description": "Placeholder text on the settings page while the real settings are not built yet."
+  },
+  "readerTitle": {
+    "message": "Clavis PDF reader",
+    "description": "Main heading and tab title of the PDF reader page."
+  },
+  "readerPlaceholder": {
+    "message": "The PDF reader will be available in a later phase.",
+    "description": "Placeholder text on the PDF reader page while the reader is not built yet."
+  }
+}

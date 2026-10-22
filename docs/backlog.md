@@ -10,8 +10,8 @@ Work in this order. Phases 3, 4 and 7 can overlap once Phase 2 closes; see the d
 
 | # | Item | Phase | Blocks | Status |
 | --- | --- | --- | --- | --- |
-| 1 | WXT scaffold in `Clavis/`, strict TS, lint, Vitest, CI, `_locales`, bundle-size report | 1 | Everything | Not started |
-| 2 | Zod contracts: messages, `SelectionSnapshot`, `ExplainRequest`, `ExplainResult` | 1 | 6, 8, 9 | Not started |
+| 1 | WXT scaffold in `Clavis/`, strict TS, lint, Vitest, CI, `_locales`, bundle-size report | 1 | Everything | Done |
+| 2 | Zod contracts: messages, `SelectionSnapshot`, `ExplainRequest`, `ExplainResult` | 1 | 6, 8, 9 | Done |
 | 3 | Spike A — Groq from background + model comparison (D-09) | 2 | 8 | Not started |
 | 4 | Spike B — optional permission flow, runtime registration, toolbar loading measurement (D-02, D-08) | 2 | 6, 7 | Not started |
 | 5 | Spike C — PDF.js viewer components (D-06) | 2 | 10 | Not started |
@@ -74,10 +74,10 @@ Work in this order. Phases 3, 4 and 7 can overlap once Phase 2 closes; see the d
 | FR-070 | Key only in trusted contexts | 3 | Not started |
 | FR-071 | Key storage caveats; session mode | 3 | Not started |
 | FR-072 | Revoked key / transient errors | 5 | Not started |
-| FR-073 | No content/key in logs | 1–9 | Not started |
+| FR-073 | No content/key in logs | 1–9 | In progress (metadata-only logger; lint bans console.log) |
 | FR-074 | Public privacy policy + store disclosures | 10 | Draft written ([privacy-policy.md](privacy-policy.md)) |
-| FR-075 | All executable code packaged locally | 1–10 | Not started |
-| FR-076 | Minimum permissions with justification | 1–10 | Not started |
+| FR-075 | All executable code packaged locally | 1–10 | In progress (ZIP audit enforces it) |
+| FR-076 | Minimum permissions with justification | 1–10 | In progress (ZIP audit checks the allowlist) |
 | FR-077 | Works from production ZIP | 9–10 | Not started |
 
 ### Should

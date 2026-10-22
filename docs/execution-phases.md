@@ -36,7 +36,7 @@ flowchart TD
 | Phase | Approx. effort | Exit gate |
 | --- | --- | --- |
 | 0 — Specification & risks | Done 2026-10-22 | Scope frozen, decisions D-01 … D-16 logged |
-| 1 — Scaffold & CI | 0.5–1.5 days | Unpacked extension loads; lint/test/build pipeline works |
+| 1 — Scaffold & CI | Done 2026-10-22 | Unpacked extension loads; lint/test/build pipeline works |
 | 2 — Feasibility spikes | 2–4 days | Groq call + model comparison, permission flow + toolbar latency, PDF viewer text layer and TTS capability proven |
 | 3 — Onboarding & BYOK | 2–4 days | Site access, valid/invalid keys, trusted storage and settings covered |
 | 4 — Web highlight toolbar | 3–5 days | Reliable selection/position/dismiss/keyboard behavior on both injection paths |
@@ -77,22 +77,29 @@ Effort counts are overlapping planning estimates, not additive deadlines; use th
 
 **Tasks**
 
-- [ ] Run `npx wxt@latest init` in the existing `Clavis/` repository (keep `docs/` in place); choose React, TypeScript, one package manager.
-- [ ] Commit lockfile, `.gitignore`, `LICENSE` (MIT, D-13) and the `docs/` folder. Decide whether the agent tooling folders (`.claude/`, `.codex/`, `.agents/`) are committed or git-ignored.
-- [ ] Add CI jobs on Linux, Windows and macOS runners for the automated E2E coverage in the [platform matrix](requirements.md#platform-matrix-d-14) (D-14).
-- [ ] Configure TypeScript strict mode, linting, formatting, Vitest and browser-test harness.
-- [ ] Create `entrypoints/background.ts`, `content.ts` (runtime-registered observer), `popup`, `onboarding`, `options`, `reader` and optionally `sidepanel`.
-- [ ] Set up `public/_locales/en/messages.json` and use `chrome.i18n` for every user-visible string from the first component (D-11).
-- [ ] Add a bundle-size report to CI and fail on content-script budget overruns ([tech-stack.md §6](tech-stack.md#content-script-budget-d-08)).
-- [ ] Create `lib/contracts`, `lib/ai`, `lib/pdf`, `lib/speech`, `lib/storage`, `lib/security` and `components` folders.
-- [ ] Add a single source of truth for extension ID-independent routes and provider endpoint constants.
-- [ ] Introduce Zod schemas for versioned messages, selection data and validated AI responses.
-- [ ] Configure safe build artifact handling; secret scanning and `.env` exclusion.
-- [ ] Add CI for typecheck, lint, unit tests and production ZIP build.
-- [ ] Verify the extension loads from built output in `chrome://extensions` Developer mode.
+- [x] Scaffold WXT 0.21.4 (React, TypeScript, npm) in the existing `Clavis/` repository, keeping `docs/` in place.
+- [x] Commit lockfile, `.gitignore`, `LICENSE` (MIT, D-13) and the `docs/` folder. Agent tooling folders (`.claude/`, `.codex/`, `.agents/`) are committed.
+- [x] Add CI jobs on Linux, Windows and macOS runners for the automated E2E coverage in the [platform matrix](requirements.md#platform-matrix-d-14) (D-14) — `.github/workflows/ci.yml`. Not yet run: no GitHub remote exists.
+- [x] Configure TypeScript strict mode, linting, formatting, Vitest and the Playwright harness. Node-side TypeScript is checked by `tsconfig.node.json`; ESLint blocks Node globals, `eval` and HTML-string rendering in extension code.
+- [x] Create `entrypoints/background.ts`, `content.ts` (runtime-registered observer), `popup`, `onboarding`, `options`, `reader`. The side panel is deferred to Phase 8 (FR-042).
+- [x] Set up `public/_locales/en/messages.json` and use `chrome.i18n` for every user-visible string (D-11); a unit test checks every key used exists.
+- [x] Add a bundle-size check and fail on content-script budget overruns (`npm run size`, [tech-stack.md §6](tech-stack.md#content-script-budget-d-08)).
+- [x] Create `lib/contracts`, `lib/config`, `lib/security`, `lib/i18n` and `components`. `lib/ai`, `lib/pdf`, `lib/speech` and `lib/storage` are created with their first code in Phase 2+.
+- [x] Add a single source of truth for routes, provider endpoints, limits and model candidates (`lib/config/constants.ts`).
+- [x] Introduce Zod schemas for versioned messages, selection data and validated AI responses (`lib/contracts`, 107 unit tests).
+- [x] Configure safe build artifact handling: `.env` exclusion, release-ZIP audit (`npm run audit:zip`) and gitleaks secret scanning.
+- [x] Add CI for typecheck, lint, format, unit tests, build, size, ZIP and audit; `npm run ci` runs the same locally.
+- [x] Verify the extension loads from built output — Playwright loads `.output/chrome-mv3` in Chromium and checks the service worker, manifest, popup and onboarding pages (`npm run test:e2e`).
 
-**Deliverables:** Loading MV3 extension with action popup and generated manifest; CI pipeline.  
-**Gate:** Fresh clone installs, runs, builds and packages without secrets or missing imports.
+**Phase 1 follow-ups (scheduled later):**
+
+- Phase 3: register the content script at runtime with the real `OPTIONAL_SITE_ORIGINS` patterns (the entrypoint uses `matches: []`, because WXT copies runtime-script matches into `host_permissions`); storage-reading message routes must await the background's `setAccessLevel` promise; check message senders in the router; define the `GET_AI_STATUS` reply contract.
+- Phase 5: adjust optional fields in mode output schemas for Groq strict JSON-schema mode (or use JSON mode); retune output length bounds after Spike A.
+- Phase 9: add the minimum-Chrome smoke test against a pinned Chrome for Testing 116 build (D-14).
+- Before Phase 10: first real CI run once a GitHub remote exists; confirm the Groq privacy-policy URL used in onboarding.
+
+**Deliverables (done 2026-10-22):** loading MV3 extension with popup, onboarding, options and reader pages; generated manifest matching [architecture.md §3](architecture.md#3-extension-entry-points-and-message-routes); CI pipeline.  
+**Gate:** Fresh clone installs, runs, builds and packages without secrets or missing imports. **Passed locally on Linux 2026-10-22** (`npm run ci`, `npm run test:e2e`).
 
 ## Phase 2 — Feasibility spikes (complete before UI polish)
 

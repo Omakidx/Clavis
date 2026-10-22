@@ -1,0 +1,15 @@
+{
+  "extends": "./.wxt/tsconfig.json",
+  "compilerOptions": {
+    "allowImportingTsExtensions": true,
+    "jsx": "react-jsx",
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "noFallthroughCasesInSwitch": true,
+    "exactOptionalPropertyTypes": true,
+    "types": ["vitest/globals"]
+  },
+  // Node-side files are checked by tsconfig.node.json instead.
+  "exclude": ["node_modules", ".output", "playwright.config.ts", "tests/e2e"]
+}

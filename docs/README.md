@@ -186,9 +186,12 @@ WXT opens a development browser in supported configurations; alternatively use C
 After features are implemented:
 
 ```bash
-npm run build
-npm run zip
-# Add project-specific scripts later: lint, typecheck, test, test:e2e
+npm run build          # production build in .output/chrome-mv3
+npm run zip            # store ZIP in .output/
+npm run check          # typecheck, lint, format check, unit tests
+npm run e2e:install    # once: download Playwright's Chromium
+npm run test:e2e       # load the built extension in Chromium and smoke-test it
+npm run ci             # everything CI runs: check, build, size, zip, audit, secret scan
 ```
 
 The ZIP is the Chrome Web Store artifact; the release pipeline should verify that the ZIP contains bundled PDF.js workers/assets and **no** API keys, source maps with private material, `.env` files, or remotely loaded executable scripts.

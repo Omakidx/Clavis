@@ -1,0 +1,32 @@
+# Dependencies and build output
+node_modules
+.output
+.wxt
+stats.html
+stats-*.json
+web-ext.config.ts
+
+# Test output
+coverage
+playwright-report
+test-results
+blob-report
+
+# Secrets — never commit API keys or env files (see docs/architecture.md §9)
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Logs
+logs
+*.log
+npm-debug.log*
+
+# Editor and OS files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.sw?

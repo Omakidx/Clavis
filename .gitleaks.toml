@@ -1,0 +1,35 @@
+# Gitleaks configuration (https://github.com/gitleaks/gitleaks), used by CI and
+# `node scripts/scan-secrets.mjs`. Extends the default ruleset and adds the Groq key format,
+# which the default rules do not cover. docs/README.md "Environment and configuration policy":
+# no API key or .env file may ever be committed or packaged.
+title = "Clavis gitleaks config"
+
+[extend]
+useDefault = true
+
+[[rules]]
+id = "groq-api-key"
+description = "Groq API key (gsk_ prefix)"
+regex = '''\bgsk_[A-Za-z0-9]{20,}\b'''
+keywords = ["gsk_"]
+tags = ["key", "groq"]
+
+# Fake keys in tests must carry an obvious marker so they never look like real ones, e.g.
+# "gsk_TESTxxxxxxxxxxxxxxxxxxxxxxxx" or "gsk_FAKE...". A real key never starts with these words.
+[[allowlists]]
+description = "Clearly fake Groq keys used in tests and docs"
+targetRules = ["groq-api-key"]
+regexes = ['''gsk_(?:TEST|FAKE|EXAMPLE|DUMMY|MOCK|REDACTED)[A-Za-z0-9_]*''']
+
+# Only matters for `gitleaks dir` (working-tree scans): these directories are generated or
+# third-party and are never committed. `gitleaks git` (CI) scans commits and ignores them anyway.
+[[allowlists]]
+description = "Generated and third-party directories"
+paths = [
+  '''(^|/)node_modules/''',
+  '''(^|/)\.output/''',
+  '''(^|/)\.wxt/''',
+  '''(^|/)coverage/''',
+  '''(^|/)playwright-report/''',
+  '''(^|/)test-results/''',
+]

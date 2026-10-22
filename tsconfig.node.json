@@ -1,0 +1,16 @@
+{
+  // Node-side TypeScript (Playwright config and E2E tests). Kept separate so
+  // Node globals never leak into extension code type-checked by tsconfig.json.
+  "compilerOptions": {
+    "target": "ESNext",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "lib": ["ESNext", "DOM"],
+    "types": ["node"],
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "skipLibCheck": true,
+    "noEmit": true
+  },
+  "include": ["playwright.config.ts", "tests/e2e/**/*.ts"]
+}

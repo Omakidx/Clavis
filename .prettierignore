@@ -1,0 +1,12 @@
+.output
+.wxt
+node_modules
+coverage
+playwright-report
+test-results
+package-lock.json
+public/icon
+docs
+.claude
+.codex
+.agents
