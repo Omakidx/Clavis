@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Modal dialog</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 1.5rem;
+        font:
+          18px/1.6 system-ui,
+          sans-serif;
+      }
+      dialog {
+        max-width: 28rem;
+        padding: 1.5rem;
+        transform: translateX(6px);
+        overflow: auto;
+      }
+    </style>
+  </head>
+  <body>
+    <p id="background">Background paragraph with the word backdrop in it.</p>
+    <button id="open" type="button">Open dialog</button>
+    <dialog id="dlg">
+      <p id="inside">Dialog paragraph with the word keystone in it, and more words after.</p>
+      <button id="close" type="button">Close dialog</button>
+    </dialog>
+    <script>
+      document.getElementById('open').addEventListener('click', () => dlg.showModal());
+      document.getElementById('close').addEventListener('click', () => dlg.close());
+    </script>
+  </body>
+</html>

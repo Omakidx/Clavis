@@ -17,7 +17,7 @@ Work in this order. Phases 3, 4 and 7 can overlap once Phase 2 closes; see the d
 | 5 | Spike C — PDF.js viewer components (D-06) | 2 | 10 | Done |
 | 6 | Spike D — `chrome.tts` on Linux + offscreen fallback (D-07) | 2 | 9 | Done; voice check awaits the user |
 | 7 | Onboarding, disclosure, site access, key lifecycle, settings | 3 | 8 | Done |
-| 8 | Selection observer + toolbar on both injection paths | 4 | 8, 9 | Not started |
+| 8 | Selection observer + toolbar on both injection paths | 4 | 8, 9 | Done |
 | 9 | Core Explain + Must tabs (roots, related words, simplify) | 5 | 11 | Not started |
 | 10 | Listen / `SpeechService` | 6 | 11 | Not started |
 | 11 | PDF reader | 7 | 11 | Not started |
@@ -39,15 +39,15 @@ Work in this order. Phases 3, 4 and 7 can overlap once Phase 2 closes; see the d
 | FR-006 | Language, reading level, tooltip, TTS preferences | 3 | Done |
 | FR-007 | Change/revoke key; persistent vs session | 3 | Done |
 | FR-009 | Optional all-sites access, grant/revoke | 3 | Done |
-| FR-010 | Detect selections on granted sites | 4 | Not started |
-| FR-011 | Word/phrase/sentence/passage classification | 4 | Not started |
-| FR-012 | Toolbar placement | 4 | Not started |
-| FR-013 | Listen + Explain primary actions | 4 | Not started |
-| FR-014 | Dismiss behavior | 4 | Not started |
-| FR-015 | Respect site permissions/exclusions | 4 | Not started |
-| FR-016 | Accessibility of toolbar | 4 | Not started |
-| FR-017 | No transmission on highlight | 4 | Not started |
-| FR-018 | Context menu / toolbar icon without site access | 4 | Not started |
+| FR-010 | Detect selections on granted sites | 4 | Done |
+| FR-011 | Word/phrase/sentence/passage classification | 4 | Done |
+| FR-012 | Toolbar placement | 4 | Done |
+| FR-013 | Listen + Explain primary actions | 4 | Done |
+| FR-014 | Dismiss behavior | 4 | Done |
+| FR-015 | Respect site permissions/exclusions | 4 | Done |
+| FR-016 | Accessibility of toolbar | 4 | Done |
+| FR-017 | No transmission on highlight | 4 | Done |
+| FR-018 | Context menu / toolbar icon without site access | 4 | Done |
 | FR-020 | Speak selected word | 6 | Not started |
 | FR-021 | Speak selected sentence | 6 | Not started |
 | FR-022 | Normal/slow, Stop, Replay | 6 | Not started |
@@ -112,4 +112,4 @@ FR-026 (IPA and recorded audio) is a Could. FR-058 (remote PDF URLs) and FR-079 
 | R-08 | No GitHub repo / Pages yet for the privacy policy URL | Low | High (blocks submission) | Create repo and enable Pages before Phase 10 (D-15) | 10 |
 | R-09 | PDF.js viewer components change API between versions | Medium (seen in Spike C) | Medium | Pin exact version; keep worker, core and viewer identical; re-read release notes on every bump | 7 |
 | R-10 | Store ZIP grew to ~2.5 MB with the PDF engine and data files | Medium | Low | Reader size budgets in Phase 7; drop CMaps if CJK without embedded fonts is out of scope | 7 |
-| R-11 | An explanation card written in React exceeds the 60 KB lazy-UI budget | High | Medium | Preact card, or load React only on the first Explain via background injection (Phase 5) | 5 |
+| R-11 | Observer budget could fill up as Phases 5–6 add actions | Medium | Medium | Budget raised to 18 KB (D-20) with latency headroom; the explanation card still loads separately on the first Explain (Phase 5) | 5 |

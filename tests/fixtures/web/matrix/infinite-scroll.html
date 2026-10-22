@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Infinite feed</title>
+    <style>
+      body {
+        margin: 0;
+        font:
+          17px/1.6 Arial,
+          sans-serif;
+        background: #f0f2f5;
+        color: #1c1e21;
+      }
+      #feed {
+        max-width: 620px;
+        margin: 0 auto;
+        padding: 16px;
+      }
+      .item {
+        background: #fff;
+        border-radius: 8px;
+        padding: 16px 20px;
+        margin-bottom: 16px;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+        min-height: 180px;
+      }
+      #sentinel {
+        height: 40px;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="feed"></div>
+    <div id="sentinel"></div>
+    <script>
+      const feed = document.getElementById('feed');
+      const TEXTS = [
+        'Morning markets opened under pale rain, and the fruit sellers rearranged their crates twice before nine.',
+        'A cyclist returned a lost glove to the bakery, and the baker rewarded him with a warm cinnamon roll.',
+        'The library introduced a quiet hour for tired parents, complete with soft chairs and a very small kettle.',
+        'Neighbours repainted the bus shelter in bright yellow, and nobody complained about the unusual colour.',
+        'Rain finally stopped on Thursday, and the whole street swept the leaves into one enormous golden heap.',
+      ];
+      let count = 0;
+      function addItems(n) {
+        for (let i = 0; i < n; i++) {
+          const el = document.createElement('div');
+          el.className = 'item';
+          el.id = 'item-' + count;
+          const text =
+            count < TEXTS.length
+              ? TEXTS[count]
+              : 'Later update number ' +
+                (count + 1) +
+                ' arrived through the scroll sentinel, so its wording is unique on the page.';
+          el.innerHTML = '<h3>Update number ' + (count + 1) + '</h3><p>' + text + '</p>';
+          feed.appendChild(el);
+          count++;
+        }
+      }
+      // First batch arrives after load (dynamic insertion), later batches on scroll.
+      setTimeout(() => {
+        addItems(3);
+        document.documentElement.dataset.ready = '1';
+      }, 30);
+      new IntersectionObserver((entries) => {
+        if (entries[0].isIntersecting && count > 0 && count < 30) addItems(3);
+      }).observe(document.getElementById('sentinel'));
+    </script>
+  </body>
+</html>

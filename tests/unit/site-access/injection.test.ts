@@ -3,12 +3,10 @@ import {
   CONTEXT_MENU_ID,
   classifyInjectError,
   explainInTab,
-  filesForVariant,
   handleCommand,
   handleContextMenuClick,
   isInjectableUrl,
   injectTabForPopup,
-  injectUiForSender,
   type InjectionDeps,
 } from '../../../lib/site-access/injection';
 import { injectTabMessage } from '../../../lib/site-access/messages';
@@ -25,7 +23,6 @@ function deps(
   const value: InjectionDeps = {
     scripting: { executeScript } as never,
     tabs: { sendMessage } as never,
-    files: filesForVariant('a'),
   };
   return { executeScript, sendMessage, value };
 }
@@ -64,12 +61,12 @@ describe('classifyInjectError', () => {
 });
 
 describe('explainInTab (declined-access path, activeTab)', () => {
-  it('injects observer and UI into the clicked frame only, then opens the selection', async () => {
+  it('injects the observer (which bundles the toolbar) into the clicked frame only, then opens the selection', async () => {
     const { executeScript, sendMessage, value } = deps();
     const result = await explainInTab(value, { tabId: 7, frameId: 3, url: 'https://example.com/' });
     expect(executeScript).toHaveBeenCalledWith({
       target: { tabId: 7, frameIds: [3] },
-      files: ['/content-scripts/content.js', '/content-scripts/content-ui.js'],
+      files: ['/content-scripts/content.js'],
     });
     expect(sendMessage).toHaveBeenCalledWith(
       7,
@@ -77,11 +74,6 @@ describe('explainInTab (declined-access path, activeTab)', () => {
       { frameId: 3 },
     );
     expect(result).toEqual({ ok: true, shown: true });
-  });
-
-  it('only injects the observer for the bundled-UI option (c)', () => {
-    expect(filesForVariant('c')).toEqual(['/content-scripts/content.js']);
-    expect(filesForVariant('b')).toEqual(filesForVariant('a'));
   });
 
   it('does not even try on restricted pages', async () => {
@@ -195,59 +187,6 @@ describe('handleCommand (keyboard shortcut)', () => {
   });
 });
 
-describe('injectUiForSender (option a)', () => {
-  it('injects only the UI file into the sender frame', async () => {
-    const { executeScript, value } = deps();
-    const result = await injectUiForSender(value, {
-      tabId: 12,
-      frameId: 5,
-      url: 'https://example.com/page',
-    });
-    expect(result).toEqual({ ok: true, shown: false });
-    expect(executeScript).toHaveBeenCalledWith({
-      target: { tabId: 12, frameIds: [5] },
-      files: ['/content-scripts/content-ui.js'],
-    });
-  });
-
-  it('defaults the frame to the top frame', async () => {
-    const { executeScript, value } = deps();
-    await injectUiForSender(value, { tabId: 1, frameId: undefined, url: 'https://a.test/' });
-    expect(executeScript).toHaveBeenCalledWith(
-      expect.objectContaining({ target: { tabId: 1, frameIds: [0] } }),
-    );
-  });
-
-  it('serves about:blank and about:srcdoc frames, which inherit their parent origin', async () => {
-    const { executeScript, value } = deps();
-    for (const url of ['about:srcdoc', 'about:blank']) {
-      const result = await injectUiForSender(value, { tabId: 1, frameId: 4, url });
-      expect(result).toEqual({ ok: true, shown: false });
-    }
-    expect(executeScript).toHaveBeenCalledTimes(2);
-  });
-
-  it('refuses browser-internal frames', async () => {
-    const { executeScript, value } = deps();
-    const result = await injectUiForSender(value, {
-      tabId: 1,
-      frameId: 0,
-      url: 'chrome://extensions/',
-    });
-    expect(result).toEqual({ ok: false, reason: 'restricted' });
-    expect(executeScript).not.toHaveBeenCalled();
-  });
-
-  it('maps an injection failure to a reason', async () => {
-    const { value } = deps({
-      executeScript: vi.fn(() => Promise.reject(new Error('Cannot access contents of the page'))),
-    });
-    expect(
-      await injectUiForSender(value, { tabId: 1, frameId: 0, url: 'https://a.test/' }),
-    ).toEqual({ ok: false, reason: 'no-access' });
-  });
-});
-
 describe('injectTabForPopup (activeTab fallback)', () => {
   it('covers every reachable frame and answers "any frame shown"', async () => {
     const { executeScript, sendMessage, value } = deps({
@@ -271,5 +210,103 @@ describe('injectTabForPopup (activeTab fallback)', () => {
       reason: 'restricted',
     });
     expect(executeScript).not.toHaveBeenCalled();
+  });
+});
+
+describe('handleContextMenuClick: cross-origin iframe under activeTab', () => {
+  const noAccess = () =>
+    new Error('Cannot access contents of the page. Extension manifest must request permission.');
+  const click = { menuItemId: CONTEXT_MENU_ID, frameId: 5 };
+  const tab = { id: 9, url: 'https://top.example/page' };
+
+  it('injects the observer into the top frame and sends a notice there', async () => {
+    const executeScript = vi
+      .fn()
+      .mockRejectedValueOnce(noAccess()) // the iframe: refused by Chrome
+      .mockResolvedValue([{ frameId: 0 }]); // the top frame: covered by the grant
+    const { sendMessage, value } = deps({ executeScript });
+    const result = await handleContextMenuClick(value, click, tab);
+
+    expect(executeScript).toHaveBeenNthCalledWith(1, {
+      target: { tabId: 9, frameIds: [5] },
+      files: ['/content-scripts/content.js'],
+    });
+    expect(executeScript).toHaveBeenNthCalledWith(2, {
+      target: { tabId: 9, frameIds: [0] },
+      files: ['/content-scripts/content.js'],
+    });
+    expect(sendMessage).toHaveBeenCalledTimes(1);
+    expect(sendMessage).toHaveBeenCalledWith(
+      9,
+      { v: 1, type: 'CLAVIS_SHOW_NOTICE', reason: 'frame-no-access' },
+      { frameId: 0 },
+    );
+    // No toolbar was shown for the frame the user clicked in.
+    expect(result).toEqual({ ok: false, reason: 'no-access' });
+  });
+
+  it('does nothing extra when the top frame (frameId 0) itself is refused', async () => {
+    const { executeScript, sendMessage, value } = deps({
+      executeScript: vi.fn(() => Promise.reject(noAccess())),
+    });
+    expect(await handleContextMenuClick(value, { ...click, frameId: 0 }, tab)).toEqual({
+      ok: false,
+      reason: 'no-access',
+    });
+    expect(executeScript).toHaveBeenCalledTimes(1);
+    expect(sendMessage).not.toHaveBeenCalled();
+  });
+
+  it('does not fall back for other failures (restricted, failed)', async () => {
+    for (const message of ['Cannot access a chrome:// URL', 'Frame with ID 5 was removed.']) {
+      const { executeScript, sendMessage, value } = deps({
+        executeScript: vi.fn(() => Promise.reject(new Error(message))),
+      });
+      const result = await handleContextMenuClick(value, click, tab);
+      expect(result).toMatchObject({ ok: false });
+      expect(executeScript).toHaveBeenCalledTimes(1);
+      expect(sendMessage).not.toHaveBeenCalled();
+    }
+  });
+
+  it('does not fall back when the top page is restricted', async () => {
+    const { executeScript, sendMessage, value } = deps({
+      executeScript: vi.fn(() => Promise.reject(noAccess())),
+    });
+    // A subframe URL check passes (tab.url is the top page), so use a Web Store top page.
+    const result = await handleContextMenuClick(
+      value,
+      { ...click, pageUrl: 'https://ok.example/' },
+      { id: 9, url: 'https://chromewebstore.google.com/detail/x' },
+    );
+    expect(result).toEqual({ ok: false, reason: 'restricted' });
+    expect(executeScript).not.toHaveBeenCalled();
+    expect(sendMessage).not.toHaveBeenCalled();
+  });
+
+  it('keeps the original failure if the top frame cannot be injected either', async () => {
+    const { sendMessage, value } = deps({
+      executeScript: vi.fn(() => Promise.reject(noAccess())),
+    });
+    expect(await handleContextMenuClick(value, click, tab)).toEqual({
+      ok: false,
+      reason: 'no-access',
+    });
+    expect(sendMessage).not.toHaveBeenCalled();
+  });
+
+  it('tolerates the top frame going away before the notice is delivered', async () => {
+    const executeScript = vi
+      .fn()
+      .mockRejectedValueOnce(noAccess())
+      .mockResolvedValue([{ frameId: 0 }]);
+    const { value } = deps({
+      executeScript,
+      sendMessage: vi.fn(() => Promise.reject(new Error('Receiving end does not exist.'))),
+    });
+    await expect(handleContextMenuClick(value, click, tab)).resolves.toEqual({
+      ok: false,
+      reason: 'no-access',
+    });
   });
 });

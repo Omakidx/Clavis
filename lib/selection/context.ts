@@ -89,8 +89,15 @@ function blockOf(node: Node): Element | null {
 
 /** The nearest block around the selection; context never leaves it. */
 export function findContextScope(range: Range): Element {
-  const doc = range.commonAncestorContainer.ownerDocument ?? document;
-  return blockOf(range.commonAncestorContainer) ?? doc.body ?? doc.documentElement;
+  const common = range.commonAncestorContainer;
+  const doc = common.ownerDocument ?? document;
+  const block = blockOf(common);
+  if (block !== null) return block;
+  // Inside an open shadow root there is no <body> above: use the outermost element of that tree.
+  let top = elementOf(common);
+  while (top?.parentElement) top = top.parentElement;
+  const inShadow = common.getRootNode() !== doc;
+  return (inShadow ? top : null) ?? doc.body ?? doc.documentElement;
 }
 
 /**

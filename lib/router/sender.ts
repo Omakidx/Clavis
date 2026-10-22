@@ -110,10 +110,18 @@ export function classifySender(sender: SenderLike, identity: SenderIdentity): Cl
         : unknown;
     }
     if (!KNOWN_PAGES.has(url.pathname)) return unknown;
-    // Our pages are always top frames (popup, options and onboarding in a tab; the reader and
-    // practice page too). A frame of one of them (e.g. the reader framing /options.html) is
-    // not trusted as that page.
-    if (sender.frameId !== 0) return unknown;
+    // Our pages are always top frames. A frame of one of them (e.g. the reader framing
+    // /options.html) is not trusted as that page. Chrome only reports `frameId` for senders in a
+    // tab: a page opened in a tab must be frame 0, while the real toolbar popup has no tab and
+    // no frameId (none of our pages embeds another extension page, so a tab-less frame can't occur).
+    // Only the popup is ever tab-less (options opens in a tab; there are no web-accessible
+    // resources), so a tab-less sender must be the popup.
+    const topFrame =
+      sender.tab === undefined
+        ? url.pathname === EXTENSION_PAGES.popup &&
+          (sender.frameId === undefined || sender.frameId === 0)
+        : sender.frameId === 0;
+    if (!topFrame) return unknown;
     return { kind: 'extension', path: url.pathname as ExtensionPagePath, ...located };
   }
 

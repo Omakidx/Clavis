@@ -1,4 +1,5 @@
 import { captureSelection, type CapturedSelection } from './capture';
+import { hasSelection } from './composed';
 import { isOwnUiNode } from './own-ui';
 import { isTrustedEvent } from './trust';
 
@@ -35,6 +36,11 @@ export interface SelectionObserver {
    * paths) and return it WITHOUT calling `onSelection`: the caller presents it.
    */
   captureNow(): CapturedSelection | null;
+  /**
+   * The toolbar was dismissed with Escape: let the next real click ON the same selection (an
+   * instantaneous double-click on the selected word leaves it unchanged) show the toolbar again.
+   */
+  allowReshow(): void;
   stop(): void;
 }
 
@@ -42,10 +48,22 @@ function insideOwnUi(event: Event): boolean {
   return event.composedPath().some((node) => isOwnUiNode(node as Node));
 }
 
-function sameRange(a: Range, b: Range): boolean {
-  return (
-    a.compareBoundaryPoints(Range.START_TO_START, b) === 0 &&
-    a.compareBoundaryPoints(Range.END_TO_END, b) === 0
+export function sameRange(a: Range, b: Range): boolean {
+  try {
+    return (
+      a.compareBoundaryPoints(Range.START_TO_START, b) === 0 &&
+      a.compareBoundaryPoints(Range.END_TO_END, b) === 0
+    );
+  } catch {
+    // Ranges in different trees (document versus a shadow root) are never the same selection.
+    return false;
+  }
+}
+
+/** Whether the pointer was released on the selected text (by position, so shadow roots work too). */
+function pressedOn(range: Range, { clientX: x, clientY: y }: MouseEvent): boolean {
+  return Array.from(range.getClientRects()).some(
+    (r) => x >= r.left - 1 && x <= r.right + 1 && y >= r.top - 1 && y <= r.bottom + 1,
   );
 }
 
@@ -65,6 +83,7 @@ export function startSelectionObserver(options: SelectionObserverOptions): Selec
   /** Time of the last mouseup/keyup the browser created from real input. */
   let lastTrustedAt = Number.NEGATIVE_INFINITY;
   let last: CapturedSelection | null = null;
+  let reshow = false;
 
   /** `silent` records the capture without notifying (the caller presents it itself). */
   function evaluate(silent: boolean, mayShow = true): CapturedSelection | null {
@@ -76,8 +95,15 @@ export function startSelectionObserver(options: SelectionObserverOptions): Selec
       }
       return null;
     }
-    // Nothing real happened: a page-made selection must not raise the toolbar.
-    if (!mayShow) return null;
+    // Nothing real happened: a page-made selection must not raise the toolbar. It must not leave
+    // the toolbar sitting on the OLD text either: a different selection clears it.
+    if (!mayShow) {
+      if (last !== null && !sameRange(last.range, captured.range)) {
+        last = null;
+        if (!silent) options.onClear();
+      }
+      return null;
+    }
     if (!silent && last !== null && sameRange(last.range, captured.range)) return last;
     last = captured;
     if (!silent) options.onSelection(captured);
@@ -104,7 +130,7 @@ export function startSelectionObserver(options: SelectionObserverOptions): Selec
 
   /** Nothing selected and nothing shown: the event cannot matter. */
   function idle(): boolean {
-    return last === null && (win.getSelection()?.isCollapsed ?? true);
+    return last === null && !hasSelection(win.getSelection());
   }
 
   const onSelectionChange = (): void => {
@@ -121,6 +147,8 @@ export function startSelectionObserver(options: SelectionObserverOptions): Selec
     if (!isTrustedEvent(event) || insideOwnUi(event)) return;
     pointerDown = false;
     lastTrustedAt = Date.now();
+    if (reshow && last !== null && pressedOn(last.range, event as MouseEvent)) last = null;
+    reshow = false;
     if (idle()) return;
     schedule(timings.pointer);
   };
@@ -143,8 +171,14 @@ export function startSelectionObserver(options: SelectionObserverOptions): Selec
 
   return {
     captureNow: () => evaluate(true),
+    allowReshow() {
+      reshow = true;
+    },
     stop() {
       if (timer !== undefined) win.clearTimeout(timer);
+      timer = undefined;
+      last = null;
+      reshow = false;
       doc.removeEventListener('selectionchange', onSelectionChange);
       doc.removeEventListener('mousedown', onMouseDown, true);
       doc.removeEventListener('mouseup', onMouseUp, true);

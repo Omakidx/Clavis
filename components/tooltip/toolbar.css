@@ -2,21 +2,44 @@
   all: initial;
 }
 
+/*
+ * The host is a popover, so it has a ::backdrop. A page rule such as `::backdrop { background:
+ * rgb(0 0 0 / 60%) }` (made for its own dialogs) would dim the whole page whenever the toolbar
+ * shows, and inline styles cannot reach the pseudo-element. Important declarations of a shadow
+ * tree beat important page declarations, so this wins even against `!important`.
+ */
+:host::backdrop {
+  background: transparent !important;
+  backdrop-filter: none !important;
+  display: none !important;
+}
+
+/* No transition or animation anywhere in this toolbar, so prefers-reduced-motion has nothing to
+   reduce; if one is ever added, wrap it in @media (prefers-reduced-motion: no-preference). */
+
+/* Colours are variables so dark mode and high contrast only re-declare them. */
 .panel {
+  --bar: #1b1f24;
+  --on-bar: #fff;
+  --hover: #38414c;
+  --ring: #8db3ff;
+  --surface: #fff;
+  --line: #d0d7de;
+  --ink: #1b1f24;
+  --muted: #4a5360;
   position: fixed;
   left: 0;
   top: 0;
   display: flex;
   flex-direction: column;
+  align-items: flex-start;
   gap: 6px;
-  max-width: min(22rem, calc(100vw - 16px));
+  width: max-content;
+  max-width: min(352px, calc(100vw - 16px));
   font:
     14px/1.4 system-ui,
-    -apple-system,
-    'Segoe UI',
-    Roboto,
     sans-serif;
-  color: #1b1f24;
+  color: var(--ink);
   pointer-events: auto;
 }
 
@@ -26,39 +49,63 @@
 
 .toolbar {
   display: flex;
+  flex-wrap: wrap;
   gap: 4px;
   padding: 4px;
+  max-width: 100%;
   width: max-content;
-  background: #1b1f24;
+  background: var(--bar);
+  border: 1px solid transparent;
   border-radius: 8px;
   box-shadow: 0 2px 8px rgb(0 0 0 / 35%);
 }
 
 .button {
+  box-sizing: border-box;
   min-width: 44px;
   min-height: 32px;
   padding: 4px 12px;
-  border: 0;
+  border: 1px solid transparent;
   border-radius: 6px;
   background: transparent;
-  color: #ffffff;
+  color: var(--on-bar);
   font: inherit;
+  text-align: center;
   cursor: pointer;
 }
 
-.button:hover {
-  background: #38414c;
+.button:hover,
+.button[data-state='working'] {
+  background: var(--hover);
 }
 
-.button:focus-visible {
-  outline: 2px solid #8db3ff;
+.button[data-state='working'] {
+  cursor: progress;
+}
+
+.button:focus-visible,
+.card__text--scroll:focus-visible {
+  outline: 2px solid var(--ring);
   outline-offset: 1px;
 }
 
+/* The notice's Close button sits on the card, not on the dark bar. */
+.card .button {
+  margin-top: 6px;
+  color: var(--ink);
+  border-color: var(--line);
+}
+
+.card .button:hover {
+  background: var(--line);
+}
+
 .card {
+  box-sizing: border-box;
+  width: 100%;
   padding: 10px 12px;
-  background: #ffffff;
-  border: 1px solid #d0d7de;
+  background: var(--surface);
+  border: 1px solid var(--line);
   border-radius: 8px;
   box-shadow: 0 2px 8px rgb(0 0 0 / 25%);
 }
@@ -67,32 +114,60 @@
   margin: 0;
 }
 
+.card__title {
+  font-weight: 600;
+}
+
 .card__text {
   margin-top: 4px;
   overflow-wrap: anywhere;
   user-select: text;
 }
 
+.card__text--scroll {
+  max-height: 7.5em;
+  overflow: auto;
+}
+
 .card__note {
-  color: #4a5360;
+  color: var(--muted);
+}
+
+/* Visually hidden, still read out: the polite live region for state changes. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
 }
 
 @media (prefers-color-scheme: dark) {
-  .toolbar {
-    background: #e8ecf1;
+  .panel {
+    --bar: #e8ecf1;
+    --on-bar: #14181d;
+    --hover: #c3ccd6;
+    --ring: #0b57d0;
+    --surface: #1d232b;
+    --line: #38414c;
+    --ink: #e8ecf1;
+    --muted: #a8b3c0;
   }
-  .button {
-    color: #14181d;
-  }
-  .button:hover {
-    background: #c3ccd6;
-  }
+}
+
+/* High contrast: the browser forces system colours; keep real borders and a visible hover. */
+@media (forced-colors: active) {
+  .toolbar,
   .card {
-    background: #1d232b;
-    border-color: #38414c;
-    color: #e8ecf1;
+    box-shadow: none;
   }
-  .card__note {
-    color: #a8b3c0;
+  .button:hover,
+  .button[data-state='working'] {
+    background: Highlight;
+    color: HighlightText;
   }
 }

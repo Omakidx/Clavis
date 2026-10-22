@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Page with a cross-origin iframe</title>
+    <style>
+      body {
+        margin: 0;
+        font:
+          17px/1.6 Georgia,
+          serif;
+        color: #222;
+      }
+      main {
+        max-width: 760px;
+        margin: 0 auto;
+        padding: 24px 20px;
+      }
+      iframe {
+        width: 100%;
+        height: 280px;
+        border: 2px solid #aa8899;
+        margin-top: 12px;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Embedded advertisement-style frame</h1>
+      <p id="xo-outer">
+        The outer page embeds a document from another origin, as news sites do with widgets.
+      </p>
+      <iframe
+        id="cross"
+        title="Cross-origin reader"
+        src="__CROSS_ORIGIN__/matrix-iframe-inner.html"
+      ></iframe>
+    </main>
+  </body>
+</html>

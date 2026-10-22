@@ -143,3 +143,55 @@ jobs:
             test-results/
           if-no-files-found: ignore
           retention-days: 7
+
+  # Drives Chrome's real native UI (permission prompt, toolbar popup, context menu, keyboard
+  # shortcut) with xdotool on a virtual display. Catches bugs that tab-opened extension pages
+  # hide (e.g. the real popup has no tab and no frameId). Coordinates were tuned on Linux with
+  # Playwright's bundled Chromium; informational until proven stable on CI runners.
+  e2e-real-ui:
+    name: E2E real browser UI (Linux, xvfb)
+    needs: checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    continue-on-error: true
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install system tools
+        run: sudo apt-get update && sudo apt-get install -y xvfb xdotool imagemagick
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build extension
+        run: npm run build
+
+      - name: Install Playwright Chromium
+        run: npm run e2e:install -- --with-deps
+
+      # One worker: every real-UI spec drives the same X display with xdotool, so parallel
+      # workers would send clicks and keystrokes into each other's browser windows.
+      - name: Run real-UI tests
+        env:
+          CLAVIS_E2E_REAL_UI: '1'
+        run: xvfb-run -a -s "-screen 0 1920x1080x24" npx playwright test --workers=1 tests/e2e/spike-b-real-ui.spec.ts tests/e2e/p4-matrix-realui.spec.ts
+
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: playwright-report-real-ui
+          path: |
+            playwright-report/
+            test-results/
+          if-no-files-found: ignore
+          retention-days: 7

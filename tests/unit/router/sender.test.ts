@@ -92,6 +92,22 @@ describe('classifySender', () => {
     expect(classify({ ...popupSender(), frameId: 1 }).kind).toBe('unknown');
   });
 
+  it('trusts the real toolbar popup, which has no tab and no frameId (regression)', () => {
+    expect(classify(popupSender())).toMatchObject({ kind: 'extension', path: '/popup.html' });
+    expect(classify({ ...popupSender(), frameId: 0 }).kind).toBe('extension');
+    // Only the popup may be tab-less; any other page without a tab is not trusted.
+    expect(classify({ id: RUNTIME_ID, url: `${ORIGIN}/options.html` }).kind).toBe('unknown');
+    expect(classify({ id: RUNTIME_ID, url: `${ORIGIN}/reader.html` }).kind).toBe('unknown');
+    // A page opened in a tab still has to report frame 0.
+    expect(
+      classify({
+        id: RUNTIME_ID,
+        url: `${ORIGIN}/popup.html`,
+        tab: { id: 2, url: `${ORIGIN}/popup.html` },
+      }).kind,
+    ).toBe('unknown');
+  });
+
   it('does not take an about:blank / srcdoc frame inside our own page for a content script', () => {
     for (const url of ['about:blank', 'about:srcdoc']) {
       const insideOurPage = {

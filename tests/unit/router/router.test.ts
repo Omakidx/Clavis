@@ -343,31 +343,12 @@ describe('listener behaviour', () => {
 });
 
 describe('internal routes keep their own reply shapes', () => {
-  it('CLAVIS_INJECT_UI: content scripts only, {ok:false, reason} otherwise', async () => {
+  it('CLAVIS_INJECT_UI is gone (the toolbar is bundled in the observer): unowned, no reply', async () => {
     const h = createHarness();
-    const message = { v: 1, type: 'CLAVIS_INJECT_UI' };
-    expect(await h.call(message, contentSender(12))).toEqual({ ok: true, shown: false });
-    expect(h.injection.scripting.executeScript).toHaveBeenCalledWith({
-      target: { tabId: 12, frameIds: [0] },
-      files: ['/content-scripts/content-ui.js'],
-    });
-    for (const sender of [popupSender(), pageSender('/options.html'), offscreenSender(), {}]) {
-      expect(await h.call(message, sender)).toEqual({ ok: false, reason: 'failed' });
-    }
-    expect(h.injection.scripting.executeScript).toHaveBeenCalledTimes(1);
-  });
-
-  it('CLAVIS_INJECT_UI: refuses restricted frames but serves about:blank', async () => {
-    const h = createHarness();
-    const message = { v: 1, type: 'CLAVIS_INJECT_UI' };
-    expect(
-      await h.call(message, {
-        id: RUNTIME_ID,
-        url: 'about:blank',
-        frameId: 4,
-        tab: { id: 2 },
-      }),
-    ).toEqual({ ok: true, shown: false });
+    const { claimed, reply } = h.send({ v: 1, type: 'CLAVIS_INJECT_UI' }, contentSender(12));
+    expect(claimed).toBeUndefined();
+    expect(await reply).toBeUndefined();
+    expect(h.injection.scripting.executeScript).not.toHaveBeenCalled();
   });
 
   it('CLAVIS_INJECT_TAB: the popup only', async () => {

@@ -277,6 +277,8 @@ stateDiagram-v2
     ToolbarVisible --> Idle: Escape / outside click
 ```
 
+**Phase 4 implementation notes.** The toolbar emits typed actions (`listen`, `explain`, `trim`, `dismiss`) with the snapshot captured at selection end to a `ToolbarActions` controller (`lib/selection/ui-api.ts`); Phases 5–6 implement `explain` and `listen` in `entrypoints/content.ts`. A returned promise shows a working state; a rejection shows an error line. Extra states: **Selection too long** (one action, *Use the first 2,000 characters*, which creates a new trimmed snapshot) and a top-of-page notice for cross-origin frames Chrome won't let the extension read. Selections are found in open shadow roots via `Selection.getComposedRanges`, and inside a modal `<dialog>` the host is mounted in the dialog so it isn't inert. Closed shadow roots are unsupported by design.
+
 A response is displayed only if its `requestId` **and** selection token match the current visible selection. Timers and subscriptions must be cleaned up when the content script UI is removed or its document navigates.
 
 ## 6. Groq provider adapter

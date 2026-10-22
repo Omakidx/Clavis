@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>A page that clears the selection on every press</title>
+    <style>
+      body {
+        margin: 0;
+        font:
+          18px/1.6 Georgia,
+          serif;
+        padding: 40px;
+        max-width: 640px;
+      }
+    </style>
+  </head>
+  <body>
+    <p id="clear-1">
+      Some sites clear the selection whenever the pointer goes down, for custom context menus or
+      drag handling.
+    </p>
+    <p id="clear-2">This paragraph exists only so there is somewhere else to click.</p>
+    <script>
+      // Runs in the capture phase, before any extension handler: pointer or mouse presses
+      // anywhere (including on the extension's toolbar host) remove the page selection.
+      for (const type of ['pointerdown', 'mousedown']) {
+        document.addEventListener(type, () => getSelection().removeAllRanges(), true);
+      }
+    </script>
+  </body>
+</html>

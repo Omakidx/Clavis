@@ -38,8 +38,8 @@ export const pageSender = (path: string, tabId: number | null = 9): SenderLike =
   ...(tabId === null ? {} : { tab: { id: tabId, url: `${ORIGIN}${path}` } }),
 });
 
-/** The popup has no tab. */
-export const popupSender = (): SenderLike => pageSender('/popup.html', null);
+/** The real toolbar popup has no tab, and Chrome reports no frameId for tab-less senders. */
+export const popupSender = (): SenderLike => ({ id: RUNTIME_ID, url: `${ORIGIN}/popup.html` });
 
 export const offscreenSender = (): SenderLike => ({
   id: RUNTIME_ID,
@@ -159,7 +159,6 @@ export function createHarness(options: HarnessOptions = {}) {
   const injection = {
     scripting: { executeScript: vi.fn(() => Promise.resolve([{ frameId: 0 }])) },
     tabs: { sendMessage: vi.fn(() => Promise.resolve({ ok: true, shown: true })) },
-    files: ['/content-scripts/content.js' as const],
   };
 
   const routes: Route[] = buildRoutes({

@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Zoomed and transformed content</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 1rem;
+        font:
+          18px/1.6 system-ui,
+          sans-serif;
+      }
+      p {
+        max-width: 26rem;
+      }
+    </style>
+  </head>
+  <body>
+    <p id="p">
+      Zoomed paragraph with the word lighthouse in it, followed by enough text to wrap onto a second
+      line for the multi-line cases.
+    </p>
+    <script>
+      // ?mode=html-zoom | body-zoom | body-scale | html-scale
+      const mode = new URLSearchParams(location.search).get('mode');
+      if (mode === 'html-zoom') document.documentElement.style.zoom = '1.5';
+      if (mode === 'body-zoom') document.body.style.zoom = '1.5';
+      if (mode === 'body-scale') {
+        document.body.style.transform = 'scale(1.4)';
+        document.body.style.transformOrigin = '0 0';
+      }
+      if (mode === 'html-scale') {
+        document.documentElement.style.transform = 'scale(1.3)';
+        document.documentElement.style.transformOrigin = '0 0';
+      }
+    </script>
+  </body>
+</html>

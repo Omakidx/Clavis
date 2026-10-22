@@ -173,3 +173,29 @@ describe('extractContext skips text a reader cannot see (security review LOW-4)'
     expect(before).toBe('Visible before.');
   });
 });
+
+describe('context inside an open shadow root', () => {
+  function shadowParagraph(html: string): Text {
+    setBody('<div id="host"></div>');
+    const root = (document.getElementById('host') as HTMLElement).attachShadow({ mode: 'open' });
+    root.append(document.createRange().createContextualFragment(html));
+    return root.querySelector('p, span')!.firstChild as Text;
+  }
+
+  it('stays inside the shadow tree, in the nearest block', () => {
+    const text = shadowParagraph('<p>The old bank by the river.</p><p>Other block.</p>');
+    const range = document.createRange();
+    range.setStart(text, 8);
+    range.setEnd(text, 12);
+    expect(extractContext(range)).toEqual({ before: 'The old', after: 'by the river.' });
+  });
+
+  it('uses the outermost element of the tree when there is no block (a bare span)', () => {
+    const text = shadowParagraph('<span>plain bank text</span>');
+    const range = document.createRange();
+    range.setStart(text, 6);
+    range.setEnd(text, 10);
+    expect(findContextScope(range).localName).toBe('span');
+    expect(extractContext(range)).toEqual({ before: 'plain', after: 'text' });
+  });
+});

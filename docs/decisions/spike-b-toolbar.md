@@ -343,3 +343,67 @@ CLAVIS_EXTENSION_DIR=.output-spike-b/chrome-mv3 npx playwright test tests/e2e/sp
 
 `npx playwright test tests/e2e/spike-b-*.spec.ts` runs all of them; the real-UI spec and the measurement need their
 preconditions (display and build variants) and skip themselves otherwise.
+
+## Phase 4: production toolbar (2026-10-22)
+
+The spike's variant switch is gone (`loaders.ts`, `variant.ts`, `react-renderer.ts`, `content-ui.content.ts`,
+`VITE_CLAVIS_TOOLBAR_VARIANT`, the variant builds and `spike-b-measure.spec.ts`). The Preact toolbar is bundled in the
+observer (D-08).
+
+**Action interface** (`lib/selection/ui-api.ts`): the toolbar calls the optional members of `ToolbarActions`
+(`listen`, `explain`, `trim`, `dismiss`) with `{ snapshot, overLimit }` (the snapshot captured at selection end), only from
+trusted events. A returned promise keeps the button in its working state; a rejection shows the error state. Phase 4 passes
+`createLocalActions()` (`local-actions.ts`: a 700 ms pause, nothing sent). Phase 5 supplies `explain`, Phase 6 `listen`.
+
+**Behaviour added**
+
+| Area | Behaviour |
+| --- | --- |
+| Over the limit | "Selection too long" and one button, "Use the first 2,000 characters". Trimming cuts on a word boundary (surrogate and combining-mark safe), shows the exact text and its length, creates a new snapshot (new `selectionId`, no `contextAfter`) and sends nothing. |
+| Shadow roots | Chrome retargets a selection inside an open shadow root to the host (collapsed range, `isCollapsed` true, `toString()` still right). `getComposedRanges({shadowRoots})` is called with the open roots next to the retargeted boundary, following nesting up to 8 levels. Closed roots are out of reach (no toolbar, no error). |
+| Modal `<dialog>` | The host is mounted inside the open modal dialog that holds the selection (top-layer popover, so its transform and clipping do not matter); Escape closes the toolbar first and the dialog on the second press. |
+| Placement | One-line selections: above, else below. Multi-line: below the LAST line at the selection end (tucked to the end edge for wide lines, per direction), else above the first line, else over the line above the last one, else the bottom edge. Zero-width boxes are ignored (triple-click). Fixed or sticky page elements that cover the anchor line or the candidate box are avoided (`elementFromPoint` plus computed `position`, ignoring an ancestor that contains the selection); the toolbar hides when the whole selection is behind one. `visualViewport` (pinch zoom), the host's effective scale (`zoom`, `transform`) and `devicePixelRatio` are taken into account. |
+| Accessibility | Arrows/Home/End move focus (RTL aware), Tab leaves from where the user was, Escape restores the previously focused element, polite live region (announces after the region is visible), 32 px targets, `prefers-color-scheme`, `forced-colors` and `prefers-reduced-motion`. |
+| Notice | `CLAVIS_SHOW_NOTICE` (`lib/selection/notice.ts`) shows a message with a Close button at the top of the viewport. `lib/site-access` sends it to the top frame when a right-click inside a cross-origin iframe cannot be injected under `activeTab`. |
+
+**Latency, production build** (`p4-toolbar-latency.spec.ts`, n = 30 fresh page loads per row, p50 / p95 ms, frame-based,
+Chrome for Testing 156, 16 CPUs, load average 21 to 26 during both runs, so pessimistic):
+
+| Scenario | First toolbar | Repeat toolbar |
+| --- | --- | --- |
+| 1x CPU | 29.2 / 58.5 (run 1: 34.3 / 72.1) | 16.8 / 36.7 (run 1: 20.3 / 37.9) |
+| 4x CPU | 95.3 / 133.9 (run 1: 115.1 / 149.2) | 24.9 / 44.8 (run 1: 28.4 / 45.7) |
+
+Budgets (first p95 150 ms, repeat p95 50 ms) hold in both runs; the 4x first-toolbar p95 of run 1 was 0.8 ms under the limit, so
+keep the first selection free of extra synchronous work. Observer size at the end of Phase 4 (after the review fixes below): about 15.3 KB gzip of 18 KB (D-20 raised the budget from 15 KB).
+
+**Review fixes** (after the independent review)
+
+- A page-wide `::backdrop` rule no longer dims the page: `:host::backdrop { ... !important }` in the shadow sheet wins even against
+  a page `!important` rule (important declarations of an inner tree beat outer ones; verified in Chromium, E2E with a control popover).
+- Lifecycle: `main(ctx)` registers `ctx.onInvalidated` (removes the runtime listener, `controller.stop()`: observer listeners,
+  timers and the toolbar host); a newer injection stops the previous instance instead of being skipped; an invalid runtime never starts.
+- Action contract: `listen` and `explain` get `signal: AbortSignal` (aborted when superseded, replaced or dismissed); reject with
+  `actionError(messageKey)` for a specific message.
+- `trimToWordBoundary` cuts on grapheme and word boundaries (`Intl.Segmenter`) and never returns an empty string.
+- Reshow after Escape is decided by the pointer position on the selection rects (works in shadow roots); the context menu and the
+  shortcut on an already shown selection keep its snapshot; a page-made selection change clears a toolbar that shows old text;
+  the shortcut only opens (and focuses) the frame the user is in.
+
+**Follow-ups for other owners**
+
+1. `tests/e2e/spike-b-real-ui.spec.ts` "toolbar icon (popup button)" fails on `HEAD` too: the popup's tab order changed in
+   Phase 3 (not caused by this phase). The native Alt+Shift+E and context-menu tests pass.
+
+**Run**
+
+```text
+npx vitest run tests/unit/selection tests/unit/tooltip tests/unit/i18n
+npm run build && npm run size
+npx playwright test tests/e2e/spike-b-*.spec.ts tests/e2e/p4-toolbar-*.spec.ts tests/e2e/p3-ui-practice.spec.ts
+CLAVIS_LATENCY_STRICT=1 npx playwright test tests/e2e/p4-toolbar-latency.spec.ts   # assert the real budgets (quiet machine)
+CLAVIS_E2E_REAL_UI=1 xvfb-run -a -s "-screen 0 1920x1080x24" npx playwright test --workers=1 tests/e2e/spike-b-real-ui.spec.ts
+```
+
+The closed-root test helper is `tests/e2e/spike-b-support/toolbar.ts` (`ToolbarProbe`, `SEL`); axe runs on the production view in
+an open root (`tests/e2e/p4-toolbar-a11y.spec.ts`).

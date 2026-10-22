@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Transformed and zoomed content</title>
+    <style>
+      body {
+        margin: 0;
+        font:
+          16px/1.6 Georgia,
+          serif;
+        color: #222;
+      }
+      .row {
+        padding: 12px 24px;
+      }
+      .zoomed {
+        zoom: 1.6;
+        width: 420px;
+        background: #eef6ee;
+      }
+      .scaled {
+        transform: scale(1.4);
+        transform-origin: top left;
+        width: 420px;
+        margin: 40px 0 120px 24px;
+        background: #f6eef6;
+        padding: 8px;
+      }
+      .rotated {
+        transform: rotate(-3deg);
+        width: 460px;
+        margin: 40px 24px 80px;
+        background: #eef0f8;
+        padding: 8px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="row zoomed">
+      <p id="tz-zoom">
+        Content inside a zoomed container renders larger than its layout box suggests, so rectangles
+        must be read after zoom is applied.
+      </p>
+    </div>
+    <div class="scaled">
+      <p id="tz-scale">
+        A scaled block uses a transform, which changes every client rectangle without changing the
+        layout flow around it.
+      </p>
+    </div>
+    <div class="rotated">
+      <p id="tz-rotate">
+        Slightly rotated paragraphs are common in magazine layouts and decorative banners, and they
+        are still perfectly selectable.
+      </p>
+    </div>
+  </body>
+</html>

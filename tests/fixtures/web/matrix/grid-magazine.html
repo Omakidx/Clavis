@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Kestrel Magazine: front page</title>
+    <style>
+      body {
+        margin: 0;
+        font:
+          16px/1.5 'Segoe UI',
+          Arial,
+          sans-serif;
+        background: #f2efe9;
+        color: #1c1c1c;
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        grid-template-rows: auto auto auto;
+        gap: 16px;
+        max-width: 1100px;
+        margin: 0 auto;
+        padding: 24px 16px;
+      }
+      .card {
+        background: #fff;
+        padding: 16px;
+        border-radius: 6px;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+      }
+      .hero {
+        grid-column: 1 / span 3;
+        grid-row: 1 / span 2;
+        background: #1c3144;
+        color: #fff;
+      }
+      .tall {
+        grid-column: 4;
+        grid-row: 1 / span 3;
+      }
+      .wide {
+        grid-column: 1 / span 2;
+      }
+      h1,
+      h2 {
+        margin: 0 0 8px;
+        line-height: 1.2;
+      }
+      h1 {
+        font-size: 2.4rem;
+      }
+      h2 {
+        font-size: 1.2rem;
+      }
+      .tag {
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        opacity: 0.75;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="grid">
+      <div class="card hero">
+        <div class="tag">Feature</div>
+        <h1>Gardens on the roof</h1>
+        <p id="hero-text">
+          Architects in the northern districts are covering flat roofs with soil, herbs and tiny
+          orchards. Residents harvest tomatoes above the traffic and swap seedlings across the
+          narrow alleys between their buildings.
+        </p>
+        <p id="hero-more">
+          The movement began as a hobby, yet it now shapes municipal planning rules and the way new
+          apartment blocks are designed.
+        </p>
+      </div>
+      <div class="card tall">
+        <div class="tag">Profile</div>
+        <h2>A potter with patience</h2>
+        <p id="tall-text">
+          Ines Calloway fires every bowl twice and sells them only at the Saturday market, where
+          regulars line up before sunrise.
+        </p>
+      </div>
+      <div class="card wide">
+        <div class="tag">Food</div>
+        <h2>Seven soups for February</h2>
+        <p id="wide-text">
+          Roasted squash, barley and plenty of black pepper carry most of these recipes through the
+          coldest weeks.
+        </p>
+      </div>
+      <div class="card">
+        <div class="tag">Travel</div>
+        <h2>Slow trains</h2>
+        <p id="small-text">Window seats, flasks of coffee and no schedule at all.</p>
+      </div>
+    </div>
+  </body>
+</html>

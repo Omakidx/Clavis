@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Web component article</title>
+    <style>
+      body {
+        margin: 0;
+        font:
+          17px/1.6 Georgia,
+          serif;
+        color: #222;
+      }
+      #light-head {
+        max-width: 680px;
+        margin: 0 auto;
+        padding: 24px 20px 0;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="light-head">
+      <h1 id="wc-title">Lantern festival preparations</h1>
+      <p id="wc-light">
+        This introduction is ordinary light DOM text that sits above the component.
+      </p>
+    </div>
+    <article-body id="host"></article-body>
+    <script>
+      class ArticleBody extends HTMLElement {
+        constructor() {
+          super();
+          const root = this.attachShadow({ mode: 'open' });
+          root.innerHTML = `
+            <style>
+              .body { max-width: 680px; margin: 0 auto; padding: 8px 20px 60px; font: 17px/1.6 Georgia, serif; }
+              p { margin: 0 0 1em; }
+              em { color: #8a1c1c; }
+            </style>
+            <div class="body">
+              <p id="sh-1">Volunteers gather every afternoon in the old schoolhouse to fold paper lanterns for the coming festival. The youngest helpers paint the <em>wooden frames</em> while the elders cut tissue paper into delicate shapes.</p>
+              <p id="sh-2">By evening the hall smells of glue and tea, and the first finished lanterns hang from the rafters like a small constellation.</p>
+              <slot></slot>
+            </div>`;
+        }
+      }
+      customElements.define('article-body', ArticleBody);
+    </script>
+  </body>
+</html>

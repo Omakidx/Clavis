@@ -147,9 +147,49 @@
     "message": "The explanation will appear here.",
     "description": "Temporary placeholder inside the toolbar card, shown after Listen or Explain is chosen. Replaced by real content in a later phase."
   },
-  "toolbarOverLimit": {
-    "message": "This selection is long. Only the first 2,000 characters would be used.",
-    "description": "Note in the toolbar card when the selected text is longer than the 2,000 character limit."
+  "toolbarWorking": {
+    "message": "Working on it…",
+    "description": "State line in the toolbar card while Listen or Explain is running. Also announced to screen readers."
+  },
+  "toolbarActionFailed": {
+    "message": "That didn't work. Press the button to try again.",
+    "description": "State line in the toolbar card, and screen reader announcement, when Listen or Explain failed."
+  },
+  "toolbarTooLong": {
+    "message": "Selection too long",
+    "description": "Heading shown in the toolbar when the selected text is longer than the limit Clavis can use at once."
+  },
+  "toolbarTooLongHint": {
+    "message": "Clavis can use up to $COUNT$ characters at a time.",
+    "description": "Explains the Selection too long state. $COUNT$ is the limit, already formatted, for example 2,000.",
+    "placeholders": { "COUNT": { "content": "$1" } }
+  },
+  "toolbarTooLongLive": {
+    "message": "Selection too long. Choose Use the first $COUNT$ characters to continue.",
+    "description": "Screen reader announcement when the toolbar shows the Selection too long state. $COUNT$ is the limit, already formatted, for example 2,000.",
+    "placeholders": { "COUNT": { "content": "$1" } }
+  },
+  "toolbarUseFirst": {
+    "message": "Use the first $COUNT$ characters",
+    "description": "Toolbar button for a selection that is too long: keeps only the beginning of it. $COUNT$ is the limit, already formatted, for example 2,000. Nothing is sent by pressing it.",
+    "placeholders": { "COUNT": { "content": "$1" } }
+  },
+  "toolbarTrimmed": {
+    "message": "Using the first $COUNT$ characters",
+    "description": "Heading above the shortened text after the user chose to use the beginning of a long selection, and its screen reader announcement. $COUNT$ is the length of the shortened text, already formatted.",
+    "placeholders": { "COUNT": { "content": "$1" } }
+  },
+  "toolbarTrimmedPreview": {
+    "message": "The text that will be used",
+    "description": "Accessible name of the scrollable box that shows the shortened text of a long selection."
+  },
+  "toolbarClose": {
+    "message": "Close",
+    "description": "Button that closes a short message shown by the Clavis toolbar."
+  },
+  "toolbarNoticeFrameAccess": {
+    "message": "Clavis can't read text inside this embedded frame without website access. Select text outside the frame, or turn on website access for Clavis in Settings.",
+    "description": "Message shown on a page when the user chose Explain with Clavis on selected text inside an embedded frame from another website, which Chrome does not let Clavis read when website access is off."
   },
   "toolbarCommandExplain": {
     "message": "Explain the selected text",

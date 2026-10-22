@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Hostile page (security regressions)</title>
+    <style>
+      body {
+        margin: 0;
+        font:
+          18px/1.6 Georgia,
+          serif;
+        padding: 40px;
+        max-width: 700px;
+      }
+    </style>
+    <script>
+      // Everything below runs in the PAGE world before the extension's content script.
+      const log = {
+        attachShadow: 0,
+        defined: [],
+        created: [],
+        upgraded: [],
+        added: [],
+        leaks: [],
+        secretSeen: [],
+      };
+      window.__log = log;
+      const realAttach = Element.prototype.attachShadow;
+      Element.prototype.attachShadow = function (init) {
+        log.attachShadow++;
+        return realAttach.call(this, init);
+      };
+      const realDefine = customElements.define.bind(customElements);
+      // Pre-define plausible host tag names; a plain div host is never upgraded.
+      for (const name of [
+        'clavis-toolbar',
+        'clavis-root',
+        'clavis-ui',
+        'clavis-host',
+        'clavis-selection',
+        'clavis-popup',
+      ]) {
+        class Spy extends HTMLElement {
+          constructor() {
+            super();
+            log.upgraded.push(name);
+            try {
+              const internals = this.attachInternals();
+              if (internals.shadowRoot) log.leaks.push('internals.shadowRoot on ' + name);
+            } catch (e) {
+              /* not attachable */
+            }
+          }
+        }
+        try {
+          realDefine(name, Spy);
+        } catch (e) {
+          /* ignore */
+        }
+      }
+      new MutationObserver((records) => {
+        // Ignore the parser building this very page; only later additions matter.
+        if (document.readyState === 'loading') return;
+        for (const record of records) {
+          for (const node of record.addedNodes) {
+            log.added.push(node.nodeName);
+            const text = (node.textContent || '') + (node.outerHTML || '');
+            if (/SECRET-WORDS/.test(text))
+              log.leaks.push('added node carried selected text: ' + node.nodeName);
+          }
+        }
+      }).observe(document, { childList: true, subtree: true });
+    </script>
+  </head>
+  <body>
+    <p id="victim">
+      The secret phrase SECRET-WORDS lives in this paragraph, and an ordinary visitor selects
+      another word here.
+    </p>
+    <p id="other">A second paragraph that a real user may select with the mouse.</p>
+    <p id="markup">
+      Beware of &lt;img src=x onerror="window.__xss=1"&gt; and &lt;b&gt;bold&lt;/b&gt; text in
+      selections.
+    </p>
+    <script>
+      const fire = (target, type, init) => {
+        const Ctor = type.startsWith('key')
+          ? KeyboardEvent
+          : type.startsWith('pointer')
+            ? PointerEvent
+            : MouseEvent;
+        target.dispatchEvent(
+          new Ctor(type, {
+            bubbles: true,
+            cancelable: true,
+            composed: true,
+            view: window,
+            ...init,
+          }),
+        );
+      };
+      /** A page-made selection followed by every synthetic event a script can produce. */
+      window.attackProgrammatically = () => {
+        const range = document.createRange();
+        range.selectNodeContents(document.getElementById('victim'));
+        getSelection().removeAllRanges();
+        getSelection().addRange(range);
+        for (const target of [document, document.body, document.getElementById('victim')]) {
+          for (const type of [
+            'pointerdown',
+            'mousedown',
+            'pointerup',
+            'mouseup',
+            'click',
+            'dblclick',
+          ])
+            fire(target, type, { clientX: 100, clientY: 100 });
+          for (const type of ['keydown', 'keyup'])
+            fire(target, type, { key: 'ArrowRight', shiftKey: true });
+        }
+      };
+      /** Look for the toolbar everywhere a script can look. */
+      window.attackToolbar = () => {
+        const result = {
+          hostShadowRoot: 'no host',
+          shadowRootsFound: 0,
+          elementsWithShadow: [],
+          hitInner: false,
+          hostHtml: '',
+          hostText: '',
+          pageAttach: log.attachShadow,
+        };
+        const host = document.querySelector(':root > div[popover]');
+        if (host) {
+          result.hostShadowRoot = String(host.shadowRoot);
+          result.hostHtml = host.innerHTML;
+          result.hostText = host.textContent;
+        }
+        for (const el of document.querySelectorAll('*')) {
+          if (el.shadowRoot) {
+            result.shadowRootsFound++;
+            result.elementsWithShadow.push(el.tagName);
+          }
+        }
+        // Whatever is under the toolbar's own buttons: the host only, never an inner element.
+        if (host) {
+          const rect = host.firstElementChild
+            ? host.firstElementChild.getBoundingClientRect()
+            : null;
+          result.hostChildren = host.children.length;
+          const probe = document.elementFromPoint(window.__probeX || 0, window.__probeY || 0);
+          result.hitTag = probe ? probe.tagName : null;
+          result.hitInner = !!(probe && probe.shadowRoot);
+        }
+        // Synthetic clicks and keys at everything.
+        const targets = [
+          host,
+          document.elementFromPoint(window.__probeX || 0, window.__probeY || 0),
+          document.body,
+          document,
+        ].filter(Boolean);
+        for (const target of targets) {
+          for (const type of ['pointerdown', 'mousedown', 'pointerup', 'mouseup', 'click'])
+            fire(target, type, { clientX: window.__probeX || 0, clientY: window.__probeY || 0 });
+          fire(target, 'keydown', { key: 'Escape' });
+          fire(target, 'keyup', { key: 'Escape' });
+          if (typeof target.click === 'function') target.click();
+        }
+        return result;
+      };
+    </script>
+  </body>
+</html>

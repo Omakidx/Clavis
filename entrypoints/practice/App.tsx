@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Button, LiveStatus } from '../../components/common/ui';
 import { Page } from '../../components/common/Page';
@@ -9,7 +9,7 @@ import {
   createSelectionController,
   type SelectionController,
 } from '../../lib/selection/controller';
-import type { ToolbarAction } from '../../lib/selection/ui-api';
+import type { RunContext, ToolbarActions } from '../../lib/selection/ui-api';
 import { api } from '../../lib/ui-client/api';
 import { Article } from './Article';
 import { ResultPanel } from './ResultPanel';
@@ -41,7 +41,7 @@ export function App() {
   const prefs = useRef<PracticePrefs>(FALLBACK_PREFS);
   /** Only the newest action may update the panel; an older, slower reply is dropped. */
   const latest = useRef(0);
-  const lastAction = useRef<ToolbarAction | null>(null);
+  const lastAction = useRef<{ action: 'listen' | 'explain'; context: RunContext } | null>(null);
 
   // The practice page works without any backend answer: defaults apply until preferences arrive.
   useEffect(() => {
@@ -60,18 +60,28 @@ export function App() {
     };
   }, []);
 
-  const perform = useCallback(async (event: ToolbarAction) => {
-    lastAction.current = event;
+  const perform = useCallback(async (action: 'listen' | 'explain', context: RunContext) => {
+    lastAction.current = { action, context };
     const id = ++latest.current;
-    const { snapshot } = event;
+    const { snapshot } = context;
     setHint(null);
-    setState({ kind: 'working', action: event.action, text: snapshot.text });
+    setState({ kind: 'working', action, text: snapshot.text });
     const next =
-      event.action === 'listen'
+      action === 'listen'
         ? await runListen(snapshot, prefs.current)
         : await runExplain(snapshot, prefs.current);
-    if (id === latest.current) setState(next);
+    // Superseded, replaced or dismissed while it ran: the toolbar aborted the signal.
+    if (id === latest.current && !context.signal.aborted) setState(next);
   }, []);
+
+  // The practice page implements the toolbar's action interface itself, against the real routes.
+  const actions = useMemo<ToolbarActions>(
+    () => ({
+      listen: (context) => void perform('listen', context),
+      explain: (context) => void perform('explain', context),
+    }),
+    [perform],
+  );
 
   const frameReady = frameDoc !== null;
   useEffect(() => {
@@ -82,14 +92,14 @@ export function App() {
       win,
       loadToolbar: (options) =>
         Promise.resolve(createToolbar(createPreactRenderer(), options, doc)),
-      onAction: (event) => void perform(event),
+      actions,
     });
     controller.current = selection;
     return () => {
       selection.stop();
       controller.current = null;
     };
-  }, [frameDoc, perform]);
+  }, [frameDoc, actions]);
 
   // Size the frame to its article so the page, not the frame, scrolls.
   useEffect(() => {
@@ -149,7 +159,9 @@ export function App() {
         state={state}
         onRetry={() => {
           const again = lastAction.current;
-          if (again) void perform(again);
+          // A retry is a new run: the old signal was aborted with the toolbar's dismissal.
+          if (again)
+            void perform(again.action, { ...again.context, signal: new AbortController().signal });
         }}
       />
     </Page>

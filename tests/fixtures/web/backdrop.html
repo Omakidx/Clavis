@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Global ::backdrop rule</title>
+    <style>
+      /* A site rule that dims whatever sits in the top layer (meant for its own modal dialogs). */
+      ::backdrop {
+        background: rgb(0 0 0 / 60%) !important;
+        backdrop-filter: blur(6px) !important;
+      }
+      body {
+        margin: 0;
+        padding: 1.5rem;
+        font:
+          18px/1.6 system-ui,
+          sans-serif;
+        background: #fff;
+        color: #222;
+      }
+      #swatch {
+        width: 200px;
+        height: 80px;
+        margin-top: 2rem;
+        background: #ffcc00;
+      }
+    </style>
+  </head>
+  <body>
+    <p id="p">Paragraph with the word anchor in it, on a page that dims its top layer.</p>
+    <div id="swatch"></div>
+  </body>
+</html>

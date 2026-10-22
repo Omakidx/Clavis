@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Text inside a scrolling container</title>
+    <style>
+      body {
+        margin: 0;
+        font:
+          17px/1.6 Georgia,
+          serif;
+        color: #222;
+        padding: 24px;
+      }
+      #scroller {
+        width: 520px;
+        height: 240px;
+        overflow: auto;
+        border: 2px solid #567;
+        padding: 8px 16px;
+      }
+      #scroller p {
+        margin: 0 0 18px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Reader pane</h1>
+    <div id="scroller">
+      <p id="sc-1">
+        Entry one describes the lighthouse keeper and the winter supplies that arrived late.
+      </p>
+      <p id="sc-2">Entry two lists the repairs made to the lantern room after the autumn gales.</p>
+      <p id="sc-3">Entry three records the visit of a surveyor who measured the tower twice.</p>
+      <p id="sc-4">Entry four explains why the foghorn was moved to the northern rocks.</p>
+      <p id="sc-5">Entry five thanks the volunteers who painted the gallery railing.</p>
+      <p id="sc-6">Entry six closes the register with a note about the spring inspection.</p>
+    </div>
+  </body>
+</html>

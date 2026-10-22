@@ -18,6 +18,8 @@ import { gotoSiteAccessStep } from './p3-ui-support/pages';
 //     xvfb-run -a -s "-screen 0 1920x1080x24" npx playwright test tests/e2e/spike-b-real-ui.spec.ts
 //
 // Opt-in because it needs a display, xdotool and ImageMagick's `import`; skipped otherwise.
+// Run with `--workers=1` (or one file at a time): xdotool drives the one X display, so two spec
+// files in parallel workers (this one and p4-matrix-realui.spec.ts) steal each other's context menu.
 test.skip(!realUiEnabled, 'opt-in: set CLAVIS_E2E_REAL_UI=1 and run under xvfb-run -a');
 
 let server: FixtureServer;

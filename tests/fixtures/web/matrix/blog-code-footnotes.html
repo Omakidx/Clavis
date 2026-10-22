@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Notes from the workshop: sorting by hand</title>
+    <style>
+      body {
+        margin: 0;
+        font:
+          18px/1.7 'Helvetica Neue',
+          Arial,
+          sans-serif;
+        color: #222;
+        background: #fdfdfb;
+      }
+      main {
+        max-width: 680px;
+        margin: 0 auto;
+        padding: 32px 20px 80px;
+      }
+      h1 {
+        font-size: 2.2rem;
+        line-height: 1.2;
+      }
+      pre {
+        background: #20242b;
+        color: #e6e6e6;
+        padding: 14px 16px;
+        border-radius: 6px;
+        overflow-x: auto;
+        font:
+          15px/1.5 'DejaVu Sans Mono',
+          monospace;
+      }
+      code {
+        background: #eee;
+        padding: 1px 5px;
+        border-radius: 3px;
+        font:
+          0.9em 'DejaVu Sans Mono',
+          monospace;
+      }
+      pre code {
+        background: none;
+        padding: 0;
+      }
+      sup a {
+        text-decoration: none;
+        color: #06c;
+      }
+      .footnotes {
+        border-top: 1px solid #ccc;
+        margin-top: 40px;
+        font-size: 15px;
+        color: #444;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Sorting a deck of cards by hand</h1>
+      <p id="intro">
+        Most programmers learn insertion sort from a textbook, but you can feel how it works with a
+        deck of ordinary playing cards<sup><a href="#fn1">1</a></sup
+        >. Hold the cards in your left hand and pick them up one at a time.
+      </p>
+      <p id="step">
+        Each new card slides left past every larger card until it finds its place, which is why the
+        method is quick on nearly sorted decks.
+      </p>
+      <pre><code>function insertionSort(items) {
+  for (let i = 1; i &lt; items.length; i++) {
+    const current = items[i];
+    let j = i - 1;
+    while (j &gt;= 0 &amp;&amp; items[j] &gt; current) {
+      items[j + 1] = items[j];
+      j--;
+    }
+    items[j + 1] = current;
+  }
+  return items;
+}</code></pre>
+      <p id="after">
+        The function above mirrors the hand movement exactly. Notice that the variable
+        <code>current</code> holds the card between your fingers while the loop shifts its
+        neighbours<sup><a href="#fn2">2</a></sup
+        >.
+      </p>
+      <div class="footnotes">
+        <p id="fn1"><sup>1</sup> Any shuffled deck will do; jokers are optional.</p>
+        <p id="fn2"><sup>2</sup> Beginners often forget to restore the card after the loop ends.</p>
+      </div>
+    </main>
+  </body>
+</html>

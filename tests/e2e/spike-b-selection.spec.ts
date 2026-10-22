@@ -310,22 +310,31 @@ test.describe('toolbar behaviour', () => {
     }
   });
 
-  test('stays above a fixed site header with an extreme z-index (top layer)', async () => {
+  test('stays on top of page elements with an extreme z-index (top layer) and keeps clear of a fixed header', async () => {
     const { page, dispose } = await open('fixed-header.html');
     try {
-      // Scroll so the first paragraph sits just under the 64px header: the toolbar then
-      // has room only ABOVE the text, i.e. on top of the header.
+      // The first paragraph sits just under the 64px header: there is room above the text only
+      // on top of the header, so the toolbar goes below the line instead of onto the header.
       await page.evaluate(() => scrollTo(0, 30));
       await dblclickText(page, page, 'harvest');
       await tb(page).waitShown();
       const box = await toolbarBox(page);
-      expect(box.y).toBeLessThan(64);
+      expect(box.y).toBeGreaterThanOrEqual(64);
+      await expectToolbarNearSelection(page);
+
+      // Top layer: a page element with the maximum z-index laid over the whole viewport still
+      // sits BELOW the toolbar.
+      await page.evaluate(() => {
+        const overlay = document.createElement('div');
+        overlay.style.cssText =
+          'position:fixed;inset:0;z-index:2147483647;background:rgb(255 0 0 / 10%)';
+        document.body.append(overlay);
+      });
       const topIsToolbarHost = await page.evaluate(
         ({ x, y }) => document.elementFromPoint(x, y)?.matches(':root > div[popover]') === true,
         { x: box.x + box.width / 2, y: box.y + box.height / 2 },
       );
       expect(topIsToolbarHost).toBe(true);
-      await expectToolbarNearSelection(page);
     } finally {
       await dispose();
     }

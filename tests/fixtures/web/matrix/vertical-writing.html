@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>縦書きのページ</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+      }
+      body {
+        font:
+          22px/2 'Noto Serif CJK JP',
+          'Noto Sans CJK JP',
+          'DejaVu Sans',
+          serif;
+        color: #222;
+        background: #fbf7ee;
+      }
+      .tategaki {
+        writing-mode: vertical-rl;
+        height: 600px;
+        padding: 24px 40px;
+        margin: 0 auto;
+        width: 800px;
+        box-sizing: border-box;
+        overflow: hidden;
+      }
+      .tategaki p {
+        margin: 0 0 0 1.2em;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="tategaki">
+      <p id="vt-1" lang="ja">
+        吾輩は猫である。名前はまだ無い。どこで生れたかとんと見当がつかぬ。何でも薄暗いじめじめした所でニャーニャー泣いていた事だけは記憶している。
+      </p>
+      <p id="vt-2" lang="ja">朝の光が障子を通して部屋に入り、畳の上に静かな模様を描いていた。</p>
+    </div>
+  </body>
+</html>

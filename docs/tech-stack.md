@@ -151,7 +151,7 @@ This is **illustrative**. Validate module availability and WXT config shape for 
 
 | Item | Target (revisit after Spike B) |
 | --- | --- |
-| Always-loaded observer | ≤ 15 KB gzipped; no framework; no work until a `selectionchange` |
+| Always-loaded observer (with the bundled Preact toolbar) | ≤ 18 KB gzipped (D-20; was 15 KB); no work until a `selectionchange` |
 | UI loaded on first qualifying selection | ≤ 60 KB gzipped including styles |
 | First toolbar on a page | ≤ 150 ms p95 from selection end, including UI load |
 | Later toolbars on the same page | ≤ 50 ms p95 |

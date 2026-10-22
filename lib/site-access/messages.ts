@@ -1,22 +1,16 @@
 import type { ScriptPublicPath } from 'wxt/utils/inject-script';
 import { MESSAGE_VERSION } from '../config/constants';
+import type { ShowNoticeMessage } from '../selection/notice';
 
 /**
- * Spike B internal messages between the observer, the background and the popup.
+ * Internal messages between the observer, the background and the popup.
  *
- * Deliberately plain objects (no zod): the observer bundle is budgeted at 15 KB
- * gzipped. Phase 3 folds these into the single message router and
- * `lib/contracts/messages.ts`; until then the background validates them with the
- * guards below and checks the sender.
+ * Deliberately plain objects (no zod): the observer bundle is budgeted at 18 KB gzipped
+ * (D-20). The background router (lib/router) validates them with the guards below and
+ * checks the sender for every route.
  */
 
-/** Observer -> background: inject the UI script into the sender's own frame (option a). */
-export interface InjectUiMessage {
-  v: typeof MESSAGE_VERSION;
-  type: 'CLAVIS_INJECT_UI';
-}
-
-/** Extension page -> background: inject observer + UI into a tab via `activeTab` (popup fallback). */
+/** Extension page -> background: inject the observer (which bundles the toolbar, D-08) into a tab via `activeTab` (popup fallback). */
 export interface InjectTabMessage {
   v: typeof MESSAGE_VERSION;
   type: 'CLAVIS_INJECT_TAB';
@@ -38,12 +32,11 @@ export type InjectResult = { ok: true; shown: boolean } | { ok: false; reason: I
 
 /** Build output paths. `*_FILE` is manifest-relative (registerContentScripts); `*_PATH` is root-relative (executeScript, getURL). */
 export const OBSERVER_SCRIPT_FILE = 'content-scripts/content.js';
-export const UI_SCRIPT_FILE = 'content-scripts/content-ui.js';
 export const OBSERVER_SCRIPT_PATH = `/${OBSERVER_SCRIPT_FILE}` as const satisfies ScriptPublicPath;
-export const UI_SCRIPT_PATH = `/${UI_SCRIPT_FILE}` as const satisfies ScriptPublicPath;
 
-export function injectUiMessage(): InjectUiMessage {
-  return { v: MESSAGE_VERSION, type: 'CLAVIS_INJECT_UI' };
+/** Background -> top-frame observer: show a notice instead of a toolbar (handled in lib/selection/notice.ts). */
+export function showNoticeMessage(reason: ShowNoticeMessage['reason']): ShowNoticeMessage {
+  return { v: MESSAGE_VERSION, type: 'CLAVIS_SHOW_NOTICE', reason };
 }
 
 export function injectTabMessage(tabId: number, url?: string): InjectTabMessage {
@@ -61,10 +54,6 @@ export function openSelectionMessage(focus = false): OpenSelectionMessage {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
-}
-
-export function isInjectUiMessage(value: unknown): value is InjectUiMessage {
-  return isRecord(value) && value['v'] === MESSAGE_VERSION && value['type'] === 'CLAVIS_INJECT_UI';
 }
 
 export function isInjectTabMessage(value: unknown): value is InjectTabMessage {

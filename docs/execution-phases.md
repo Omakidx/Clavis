@@ -1,9 +1,9 @@
 # Execution phases — Clavis
 
-**Document status:** v1 end-to-end implementation playbook (rev. 1.1 — decisions D-01 … D-19)  
+**Document status:** v1 end-to-end implementation playbook (rev. 1.1 — decisions D-01 … D-20)  
 **Baseline:** 2026-10-22 · **Goal:** deliver a privacy-conscious, production-ready Chrome MV3 extension with Groq BYOK, word/sentence pronunciation, contextual explanations, and a custom PDF reader.
 
-> Use this as the project's **build checklist and milestone tracker**. Feature IDs correspond to [requirements.md](requirements.md); implementation boundaries are in [architecture.md](architecture.md); approved tools are in [tech-stack.md](tech-stack.md). Product decisions D-01 … D-19 are in [requirements.md §11](requirements.md#11-product-decisions).
+> Use this as the project's **build checklist and milestone tracker**. Feature IDs correspond to [requirements.md](requirements.md); implementation boundaries are in [architecture.md](architecture.md); approved tools are in [tech-stack.md](tech-stack.md). Product decisions D-01 … D-20 are in [requirements.md §11](requirements.md#11-product-decisions).
 
 ## 0. Delivery philosophy and estimates
 
@@ -35,11 +35,11 @@ flowchart TD
 
 | Phase | Approx. effort | Exit gate |
 | --- | --- | --- |
-| 0 — Specification & risks | Done 2026-10-22 | Scope frozen, decisions D-01 … D-19 logged |
+| 0 — Specification & risks | Done 2026-10-22 | Scope frozen, decisions D-01 … D-20 logged |
 | 1 — Scaffold & CI | Done 2026-10-22 | Unpacked extension loads; lint/test/build pipeline works |
 | 2 — Feasibility spikes | Engineering done 2026-10-22; awaiting user runs | Groq call + model comparison, permission flow + toolbar latency, PDF viewer text layer and TTS capability proven |
 | 3 — Onboarding & BYOK | Done 2026-10-22 | Site access, valid/invalid keys, trusted storage and settings covered |
-| 4 — Web highlight toolbar | 3–5 days | Reliable selection/position/dismiss/keyboard behavior on both injection paths |
+| 4 — Web highlight toolbar | Done 2026-10-22 | Reliable selection/position/dismiss/keyboard behavior on both injection paths |
 | 5 — AI explanation | 3–4 days | Core request + Must tabs function with typed responses |
 | 6 — Listen/TTS | 1–3 days | Word + sentence playback with usable no-voice fallback |
 | 7 — Custom PDF reader | 3–5 days | Local PDF in viewer components + text selection + reader controls |
@@ -68,7 +68,7 @@ Effort counts are overlapping planning estimates, not additive deadlines; use th
 - [x] Select the target Chrome versions/OS testing matrix — Linux by hand, Windows/macOS automated, minimum Chrome tentatively 116, later set to 147 by D-18 ([platform matrix](requirements.md#platform-matrix-d-14), D-14).
 - [x] Record legal/privacy decisions and remaining open items — MIT license (D-13, `LICENSE` added), privacy policy on GitHub Pages with a [draft](privacy-policy.md) (D-15); publisher, support email and logo deferred to Phase 10 ([still open](requirements.md#still-open)).
 
-**Deliverables (done 2026-10-22):** approved scope and decisions D-01 … D-19 ([requirements.md §11](requirements.md#11-product-decisions)); ADRs A-001 … A-013 ([architecture.md §1](architecture.md#1-architectural-decisions-adrs)); requirement checklist, prioritized backlog and risk register ([backlog.md](backlog.md)); privacy policy draft ([privacy-policy.md](privacy-policy.md)).  
+**Deliverables (done 2026-10-22):** approved scope and decisions D-01 … D-20 ([requirements.md §11](requirements.md#11-product-decisions)); ADRs A-001 … A-013 ([architecture.md §1](architecture.md#1-architectural-decisions-adrs)); requirement checklist, prioritized backlog and risk register ([backlog.md](backlog.md)); privacy policy draft ([privacy-policy.md](privacy-policy.md)).  
 **Gate:** No launch-time features are ambiguous or promised beyond demonstrated browser capabilities. **Passed** — remaining unknowns are either Phase 2 spike outputs with defined decision criteria or Phase 10 publishing details.
 
 ## Phase 1 — Repository, WXT scaffold and developer tooling
@@ -192,22 +192,27 @@ Effort counts are overlapping planning estimates, not additive deadlines; use th
 
 **Tasks**
 
-- [ ] Build the framework-free DOM selection observer using `selectionchange` + mouseup/keyup with minimal debounce; keep it within the size budget.
-- [ ] Implement the UI loading option chosen in Spike B; load UI only on the first qualifying selection.
-- [ ] Skip collapsed selection, hidden/unsafe editable input, unsupported protocol, excluded host and disallowed page contexts. For over-limit selections, show **Use the first 2,000 characters**.
-- [ ] Classify selection (word/phrase/sentence/passage) and normalize whitespace without changing meaning.
-- [ ] Extract limited local semantic context from adjacent text only; never entire document.
-- [ ] Create `SelectionSnapshot` with selectionId and optional PDF metadata.
-- [ ] Position toolbar near selected Range rect while avoiding clipping/covered text.
-- [ ] Use Shadow DOM CSS isolation; test website CSS conflicts and z-index collisions.
-- [ ] Preserve snapshot through toolbar button interaction (avoid browser selection collapse bug).
-- [ ] Add close/Escape/outside click, keyboard focus, reduced-motion and proper aria labels.
-- [ ] Implement runtime registration on permission grant, unregistration on revoke, and the per-site disable setting (D-02).
-- [ ] Implement the **Explain with Clavis** context menu and toolbar-icon injection for tabs without site access (FR-018).
-- [ ] Check **network: no AI call when selecting text alone**.
-- [ ] Browser E2E against complex long-form sites, multi-column, nested HTML and narrow viewports, with site access granted and declined.
+- [x] Production observer with the bundled Preact toolbar (D-08); the Spike B variant switch and UI-injection path are removed. Observer budget raised to 18 KB gzip (D-20) so pinch-zoom support didn't have to be cut.
+- [x] Skips collapsed, hidden, editable/password, unsupported-protocol, disabled-site and restricted contexts. Over-limit selections show **Selection too long** with **Use the first 2,000 characters** (word-boundary and surrogate safe; nothing sent).
+- [x] Classification, whitespace normalisation and bounded local context (hidden text excluded).
+- [x] Selections in open shadow roots (`getComposedRanges`), modal `<dialog>` (host mounted inside the dialog), same-origin iframes, RTL and vertical writing modes, zoomed/transformed content.
+- [x] Placement near the selection end without covering it; viewport collisions, fixed/sticky headers, scroll/resize, 320 px; vertical-text placement fixed after the acceptance suite found it covered the text.
+- [x] Closed Shadow DOM, trusted events only (HIGH-1), snapshot preserved through toolbar interaction.
+- [x] Accessibility: roving focus, Alt+Shift+E into the toolbar, Escape returns focus, live region, forced colors, reduced motion, 32 px targets; axe reports no violations.
+- [x] Typed `ToolbarActions` interface (listen, explain, trim, dismiss) for Phases 5–6; Phase 4 drives local states only.
+- [x] Cross-origin iframe under activeTab: a notice in the top frame instead of silent failure.
+- [x] No network or AI/TTS messages on selection (FR-017).
+- [x] Independent acceptance suite ([report](decisions/p4-acceptance-matrix.md)): 26 real-world-style fixtures, **100% detection (235/235)**, FR-010–FR-018 covered.
+- [x] Latency re-measured on the production build (machine load ~13 on 16 cores): first toolbar p95 41.5–71.6 ms at 1× CPU, repeat p95 29.5–36.7 ms — within budget. At 4× CPU most runs were within budget (first p95 119.8–133.9 ms), but one run showed outliers (first p95 219.6 ms, repeat 89.4 ms) with unchanged medians; confirm on a quiet machine before relying on the 4× figure (Phase 9).
+- [x] Real-browser UI tests (permission prompt, popup, context menu, shortcut) added to CI as an informational job.
 
-**Deliverables:** Stable tooltip with Listen and Explain actions on both injection paths, local states only.  
+**Phase 4 follow-ups:**
+
+- Phase 5: the explanation card loads separately on the first Explain (keep the observer under 18 KB, D-20). The spike's UI-injection route was removed in Phase 4, so Phase 5 must add a loading path (background `scripting.executeScript` of a card script into the sender's frame, or a dynamic import) and a size-budget entry for the card in `scripts/size-budgets.json`. Implement `ToolbarActions.explain` (with its `AbortSignal`) in `entrypoints/content.ts`.
+- Phase 6: implement `ToolbarActions.listen`.
+- Phase 9: latency on a quiet reference machine; real browser zoom, touch selection handles, screen reader pass; make the real-UI CI job blocking once stable.
+
+**Deliverables (2026-10-22):** stable toolbar with Listen and Explain actions on both injection paths, local states only.  
 **Gate:** FR-010–018 acceptance tests pass on supported website fixtures; first-selection latency within budget.
 
 ## Phase 5 — Groq-powered language intelligence

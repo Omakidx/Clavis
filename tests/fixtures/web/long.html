@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Long selections</title>
+    <style>
+      body {
+        margin: 0;
+        font:
+          18px/1.6 Georgia,
+          serif;
+        color: #222;
+      }
+      main {
+        max-width: 42rem;
+        margin: 0 auto;
+        padding: 2rem 1rem 6rem;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1 id="title">Selections longer than the limit</h1>
+      <p id="short">A short paragraph before the long one, with the word preamble in it.</p>
+      <p id="huge"></p>
+      <p id="after">A short paragraph after the long one, with the word epilogue in it.</p>
+      <div id="rest"></div>
+    </main>
+    <script>
+      // Deterministic text: word0 word1 ... so tests can check exactly what a trim keeps.
+      const words = Array.from({ length: 600 }, (_, i) => `word${i}`);
+      document.getElementById('huge').textContent = words.join(' ');
+      const rest = document.getElementById('rest');
+      for (let i = 0; i < 12; i++) {
+        const p = document.createElement('p');
+        p.id = `r${i}`;
+        p.textContent = `Paragraph ${i}. ${'The river kept moving past the empty steps of the old building. '.repeat(4)}`;
+        rest.append(p);
+      }
+    </script>
+  </body>
+</html>

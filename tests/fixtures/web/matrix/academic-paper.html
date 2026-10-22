@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Preprint: damping in coupled oscillators</title>
+    <style>
+      body {
+        margin: 0;
+        font:
+          17px/1.55 'Times New Roman',
+          Times,
+          serif;
+        color: #111;
+        background: #fff;
+      }
+      main {
+        max-width: 700px;
+        margin: 0 auto;
+        padding: 32px 20px 80px;
+        text-align: justify;
+      }
+      h1 {
+        text-align: center;
+        font-size: 1.7rem;
+        margin-bottom: 4px;
+      }
+      .authors {
+        text-align: center;
+        font-style: italic;
+        margin-bottom: 20px;
+      }
+      .abstract {
+        margin: 0 2em 20px;
+        font-size: 15px;
+      }
+      var {
+        font-style: italic;
+      }
+      .eq {
+        text-align: center;
+        margin: 14px 0;
+      }
+      .cite {
+        color: #004a99;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Weak damping in coupled oscillator chains</h1>
+      <div class="authors">A. Sorensen<sup>1</sup> and K. Mbeki<sup>2</sup></div>
+      <div class="abstract">
+        <b>Abstract.</b>
+        <span id="ac-abs"
+          >We study a chain of <var>N</var> identical oscillators and show that weak damping
+          produces a slow decay rate that scales with the inverse of <var>N</var><sup>2</sup>.</span
+        >
+      </div>
+      <p id="ac-p1">
+        Consider the displacement <var>x</var><sub>i</sub> of the <var>i</var>-th oscillator,
+        obeying the equation of motion below <span class="cite">[3]</span>. The coupling constant
+        <var>k</var> is assumed uniform, and damping enters only through the friction coefficient
+        <var>γ</var>.
+      </p>
+      <div class="eq">
+        <var>ẍ</var><sub>i</sub> + <var>γ</var><var>ẋ</var><sub>i</sub> = <var>k</var>(<var>x</var
+        ><sub>i+1</sub> − 2<var>x</var><sub>i</sub> + <var>x</var><sub>i−1</sub>)
+      </div>
+      <p id="ac-p2">
+        The eigenfrequencies follow from a standard Fourier ansatz, giving ω<sup>2</sup> = 4<var
+          >k</var
+        >
+        sin<sup>2</sup>(<var>q</var>/2) for each wave number <var>q</var>. Lower modes therefore
+        decay slowly, which explains the long ringing observed in the experiment<span class="cite">
+          [5]</span
+        >.
+      </p>
+    </main>
+  </body>
+</html>

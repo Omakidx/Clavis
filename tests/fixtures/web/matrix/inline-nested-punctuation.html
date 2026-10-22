@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Nested inline markup and punctuation</title>
+    <style>
+      body {
+        margin: 0;
+        font:
+          18px/1.7 Georgia,
+          serif;
+        color: #222;
+      }
+      main {
+        max-width: 700px;
+        margin: 0 auto;
+        padding: 32px 20px 80px;
+      }
+      a {
+        color: #0645ad;
+      }
+      mark {
+        background: #fff3a3;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Words, marks and markup</h1>
+      <p id="np-1">
+        The editor read the
+        <b
+          >very <i>careful <u>nested</u></i> markup</b
+        >
+        twice, then wrote “it’s <em>almost</em> perfect” in the margin — a verdict she rarely gave.
+      </p>
+      <p id="np-2">
+        Visit <a href="#">the <span>project</span> homepage</a> or ask the team (they answer
+        quickly); alternatively, skim the changelog… then decide.
+      </p>
+      <p id="np-3">
+        Spaces collapse,&nbsp;even&nbsp;non&#8209;breaking ones, and a soft hy&shy;phen should never
+        leak into the captured text.
+      </p>
+      <p id="np-4">She said, "Wait, really?" and he replied, "Yes - really!" before leaving.</p>
+      <p id="np-5">
+        Prices rose by 3.5% in <mark>March</mark>, according to the ministry's own figures;
+        economists were unsurprised.
+      </p>
+    </main>
+  </body>
+</html>

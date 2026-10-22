@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Dense fixed header</title>
+    <style>
+      body {
+        margin: 0;
+        font:
+          16px/1.6 Arial,
+          sans-serif;
+        color: #222;
+      }
+      .bar1 {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 44px;
+        background: #111;
+        color: #fff;
+        z-index: 2147483647;
+        display: flex;
+        align-items: center;
+        padding: 0 16px;
+        gap: 20px;
+      }
+      .bar2 {
+        position: fixed;
+        top: 44px;
+        left: 0;
+        right: 0;
+        height: 36px;
+        background: #333;
+        color: #ddd;
+        z-index: 2147483646;
+        display: flex;
+        align-items: center;
+        padding: 0 16px;
+        gap: 16px;
+        font-size: 13px;
+      }
+      .bar3 {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        height: 48px;
+        background: #0a58ca;
+        color: #fff;
+        z-index: 2147483645;
+        display: flex;
+        align-items: center;
+        padding: 0 16px;
+      }
+      main {
+        max-width: 720px;
+        margin: 0 auto;
+        padding: 110px 20px 120px;
+      }
+      p {
+        margin: 0 0 1.2em;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="bar1">
+      <b>BigNews</b><span>World</span><span>Business</span><span>Science</span><span>Culture</span>
+    </div>
+    <div class="bar2"><span>Live updates</span><span>Weather</span><span>Markets</span></div>
+    <div class="bar3">Subscribe for unlimited access</div>
+    <main>
+      <h1>Why stacked headers matter</h1>
+      <p id="dh-1">
+        Three overlapping fixed bars reduce the visible reading area to a narrow strip, so any
+        floating control has to avoid them as well as the selection itself.
+      </p>
+      <p id="dh-2">
+        Designers add banners one at a time, and nobody measures the combined height until a reader
+        complains about the cramped space left over for the actual story.
+      </p>
+      <p id="dh-3">
+        A good extension treats the viewport as the only reliable coordinate space and never assumes
+        that the top of the window is free.
+      </p>
+      <p id="dh-4">
+        Filler paragraph so the page can scroll: the harbour was quiet, the tide was out, and the
+        gulls stood in neat rows along the breakwater waiting for something to happen.
+      </p>
+      <p id="dh-5">
+        Another filler paragraph with a few more words to extend the page, since scrolling behaviour
+        is exactly where placement code tends to fail.
+      </p>
+      <p id="dh-6">
+        The last paragraph closes the article with a gentle reminder that headers should serve
+        readers, not the other way around.
+      </p>
+    </main>
+  </body>
+</html>

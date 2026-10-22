@@ -1,0 +1,1055 @@
+{
+  "version": 1,
+  "description": "Clavis Phase 4 acceptance matrix: self-contained static pages and the selection targets used to measure the basic selection detection rate (requirements.md section 1) and the FR-010..FR-018 acceptance tests. Targets: kind is the expected product classification (string or list of acceptable kinds). \"context\" is a unique string in the page text that contains \"text\" (default: text). \"paragraph\" targets are selected with a triple click and compared with the normalised paragraph text. Methods default by kind: word -> dblclick,keyboard; phrase/sentence -> drag,keyboard; passage or paragraph -> triple.",
+  "support": [
+    "matrix-iframe-inner.html",
+    "placement-corners.html",
+    "selection-clearing.html",
+    "sec-hostile.html",
+    "limit-boundary.html",
+    "iframe-cross-origin.html",
+    "scroll-container.html"
+  ],
+  "fixtures": [
+    {
+      "id": "news-article",
+      "file": "news-article.html",
+      "title": "News article with sidebar and ad-like boxes",
+      "layout": "flex two-column, aside, dashed ad boxes, share buttons, blockquote",
+      "targets": [
+        {
+          "id": "w1",
+          "kind": "word",
+          "text": "propeller",
+          "context": "new propeller shaft"
+        },
+        {
+          "id": "w2",
+          "kind": "word",
+          "text": "bearings",
+          "context": "replacement bearings,"
+        },
+        {
+          "id": "p1",
+          "kind": "phrase",
+          "text": "full timetable",
+          "context": "resume its full timetable on"
+        },
+        {
+          "id": "s1",
+          "kind": "sentence",
+          "text": "Engineers completed the final inspection of the new propeller shaft late on Thursday evening."
+        },
+        {
+          "id": "g1",
+          "kind": "passage",
+          "paragraph": "#body1",
+          "startsWith": "Council officials said"
+        }
+      ]
+    },
+    {
+      "id": "blog-code-footnotes",
+      "file": "blog-code-footnotes.html",
+      "title": "Blog post with code block and footnotes",
+      "layout": "single column, pre/code block, inline code, superscript footnote links",
+      "targets": [
+        {
+          "id": "w1",
+          "kind": "word",
+          "text": "insertion",
+          "context": "learn insertion sort"
+        },
+        {
+          "id": "w2",
+          "kind": "word",
+          "text": "loop",
+          "context": "while the loop shifts"
+        },
+        {
+          "id": "p1",
+          "kind": "phrase",
+          "text": "ordinary playing cards",
+          "context": "with a deck of ordinary playing cards"
+        },
+        {
+          "id": "s1",
+          "kind": "sentence",
+          "text": "Hold the cards in your left hand and pick them up one at a time."
+        },
+        {
+          "id": "g1",
+          "kind": "passage",
+          "paragraph": "#intro",
+          "startsWith": "Most programmers learn"
+        }
+      ]
+    },
+    {
+      "id": "docs-site",
+      "file": "docs-site.html",
+      "title": "Documentation site with fixed header, left nav and anchor headings",
+      "layout": "fixed header + fixed left nav + anchored sections",
+      "targets": [
+        {
+          "id": "w1",
+          "kind": "word",
+          "text": "administrator",
+          "context": "require administrator rights"
+        },
+        {
+          "id": "w2",
+          "kind": "word",
+          "text": "discover",
+          "context": "will discover it automatically"
+        },
+        {
+          "id": "p1",
+          "kind": "phrase",
+          "text": "sensible default",
+          "context": "has a sensible default"
+        },
+        {
+          "id": "s1",
+          "kind": "sentence",
+          "text": "Changes to the file take effect after the next restart."
+        },
+        {
+          "id": "g1",
+          "kind": "passage",
+          "paragraph": "#plugins-text",
+          "startsWith": "A plugin is a small folder"
+        }
+      ]
+    },
+    {
+      "id": "wiki-infobox",
+      "file": "wiki-infobox.html",
+      "title": "Wiki-style page with infobox and tables",
+      "layout": "floated infobox table, data table, table of contents box",
+      "targets": [
+        {
+          "id": "w1",
+          "kind": "word",
+          "text": "wrought",
+          "context": "is a wrought iron arch"
+        },
+        {
+          "id": "w2",
+          "kind": "word",
+          "text": "Rivets",
+          "context": "Rivets used",
+          "note": "table cell text"
+        },
+        {
+          "id": "p1",
+          "kind": "phrase",
+          "text": "previous timber crossing",
+          "context": "after the previous timber crossing was"
+        },
+        {
+          "id": "s1",
+          "kind": "sentence",
+          "text": "Local ironworks supplied nearly all of the structural members."
+        },
+        {
+          "id": "g1",
+          "kind": "passage",
+          "paragraph": "#wiki-legacy",
+          "startsWith": "The bridge was closed"
+        }
+      ]
+    },
+    {
+      "id": "multicolumn",
+      "file": "multicolumn.html",
+      "title": "Multi-column (CSS columns) essay",
+      "layout": "column-count 3 with justified text and rules",
+      "targets": [
+        {
+          "id": "w1",
+          "kind": "word",
+          "text": "sleeper",
+          "context": "overnight sleeper was written"
+        },
+        {
+          "id": "w2",
+          "kind": "word",
+          "text": "bunk",
+          "context": "A narrow bunk,"
+        },
+        {
+          "id": "p1",
+          "kind": "phrase",
+          "text": "airport queues",
+          "context": "without airport queues or"
+        },
+        {
+          "id": "s1",
+          "kind": "sentence",
+          "text": "Ministries that once talked about closing lines now speak about timetables, ticket prices and the cross-border agreements needed to make a continental network work smoothly."
+        },
+        {
+          "id": "g1",
+          "kind": "passage",
+          "paragraph": "#mc2",
+          "startsWith": "Their patience is now"
+        }
+      ]
+    },
+    {
+      "id": "grid-magazine",
+      "file": "grid-magazine.html",
+      "title": "CSS grid magazine front page",
+      "layout": "grid with spanning cards, tags and different backgrounds",
+      "targets": [
+        {
+          "id": "w1",
+          "kind": "word",
+          "text": "orchards",
+          "context": "tiny orchards. Residents"
+        },
+        {
+          "id": "w2",
+          "kind": "word",
+          "text": "potter",
+          "context": "A potter with patience"
+        },
+        {
+          "id": "p1",
+          "kind": "phrase",
+          "text": "flasks of coffee",
+          "context": "Window seats, flasks of coffee and"
+        },
+        {
+          "id": "s1",
+          "kind": "sentence",
+          "text": "Ines Calloway fires every bowl twice and sells them only at the Saturday market, where regulars line up before sunrise."
+        },
+        {
+          "id": "g1",
+          "kind": "passage",
+          "paragraph": "#hero-text",
+          "startsWith": "Architects in the northern"
+        }
+      ]
+    },
+    {
+      "id": "sticky-share-bar",
+      "file": "sticky-share-bar.html",
+      "title": "Long-form with sticky header and floating share bar",
+      "layout": "sticky header, fixed floating share column, long paragraphs",
+      "targets": [
+        {
+          "id": "w1",
+          "kind": "word",
+          "text": "almanac",
+          "context": "produced the almanac and"
+        },
+        {
+          "id": "w2",
+          "kind": "word",
+          "text": "causeway",
+          "context": "the causeway will be dry"
+        },
+        {
+          "id": "p1",
+          "kind": "phrase",
+          "text": "retired teacher",
+          "context": "a retired teacher produced"
+        },
+        {
+          "id": "s1",
+          "kind": "sentence",
+          "text": "Visitors find the habit quaint."
+        },
+        {
+          "id": "g1",
+          "kind": "passage",
+          "paragraph": "#lr4",
+          "startsWith": "Every January the printers"
+        }
+      ]
+    },
+    {
+      "id": "forum-thread",
+      "file": "forum-thread.html",
+      "title": "Forum thread with nested quotes",
+      "layout": "avatar column + message column, nested blockquotes, signature",
+      "targets": [
+        {
+          "id": "w1",
+          "kind": "word",
+          "text": "posture",
+          "context": "bad posture."
+        },
+        {
+          "id": "w2",
+          "kind": "word",
+          "text": "Congratulations",
+          "context": "Congratulations! Aching"
+        },
+        {
+          "id": "p1",
+          "kind": "phrase",
+          "text": "Aching fingers",
+          "context": "Aching fingers are very common"
+        },
+        {
+          "id": "s1",
+          "kind": "sentence",
+          "text": "Even three lessons will save you months of bad habits, and renting is a wise way to begin."
+        },
+        {
+          "id": "g1",
+          "kind": "passage",
+          "paragraph": "#f-reply1",
+          "startsWith": "Congratulations! Aching fingers"
+        }
+      ]
+    },
+    {
+      "id": "product-tabs",
+      "file": "product-tabs.html",
+      "title": "E-commerce product description with tabs",
+      "layout": "two-column product, ARIA tablist with hidden panels",
+      "targets": [
+        {
+          "id": "w1",
+          "kind": "word",
+          "text": "enamelled",
+          "context": "Hand finished in enamelled steel"
+        },
+        {
+          "id": "w2",
+          "kind": "word",
+          "text": "whistles",
+          "context": "kettle whistles gently"
+        },
+        {
+          "id": "p1",
+          "kind": "phrase",
+          "text": "wooden handle",
+          "context": "The wooden handle stays cool"
+        },
+        {
+          "id": "s1",
+          "kind": "sentence",
+          "text": "The wooden handle stays cool, so pouring is safe even when the kitchen is busy."
+        },
+        {
+          "id": "g1",
+          "kind": "passage",
+          "paragraph": "#pd-desc",
+          "startsWith": "Hand finished in enamelled"
+        }
+      ]
+    },
+    {
+      "id": "academic-paper",
+      "file": "academic-paper.html",
+      "title": "Academic paper with math-like inline spans and superscripts",
+      "layout": "justified text, var/sup/sub, citations, equation line",
+      "targets": [
+        {
+          "id": "w1",
+          "kind": "word",
+          "text": "eigenfrequencies",
+          "context": "The eigenfrequencies follow"
+        },
+        {
+          "id": "w2",
+          "kind": "word",
+          "text": "uniform",
+          "context": "is assumed uniform,"
+        },
+        {
+          "id": "p1",
+          "kind": "phrase",
+          "text": "weak damping",
+          "context": "show that weak damping produces"
+        },
+        {
+          "id": "s1",
+          "kind": "sentence",
+          "text": "Lower modes therefore decay slowly, which explains the long ringing observed in the experiment [5]."
+        },
+        {
+          "id": "g1",
+          "kind": "passage",
+          "paragraph": "#ac-p1",
+          "startsWith": "Consider the displacement"
+        }
+      ]
+    },
+    {
+      "id": "rtl-arabic",
+      "file": "rtl-arabic.html",
+      "title": "RTL Arabic article",
+      "layout": "dir=rtl, lang=ar, paragraphs",
+      "dir": "rtl",
+      "forwardKey": "ArrowLeft",
+      "targets": [
+        {
+          "id": "w1",
+          "kind": "word",
+          "text": "الحديقة",
+          "context": "كانت الحديقة تقع"
+        },
+        {
+          "id": "w2",
+          "kind": "word",
+          "text": "الهدوء",
+          "context": "هو الهدوء الذي"
+        },
+        {
+          "id": "p1",
+          "kind": "phrase",
+          "text": "وسط المدينة",
+          "context": "في وسط المدينة،"
+        },
+        {
+          "id": "s1",
+          "kind": "sentence",
+          "text": "يقول أحد السكان إن أجمل ما في المكان هو الهدوء الذي يسبق غروب الشمس."
+        },
+        {
+          "id": "g1",
+          "kind": "sentence",
+          "paragraph": "#ar-2",
+          "startsWith": "قرر المجلس البلدي"
+        }
+      ]
+    },
+    {
+      "id": "rtl-hebrew",
+      "file": "rtl-hebrew.html",
+      "title": "RTL Hebrew article with embedded Latin run",
+      "layout": "dir=rtl, lang=he, isolated LTR span",
+      "dir": "rtl",
+      "forwardKey": "ArrowLeft",
+      "targets": [
+        {
+          "id": "w1",
+          "kind": "word",
+          "text": "השוק",
+          "context": "השוק הישן נפתח"
+        },
+        {
+          "id": "w2",
+          "kind": "word",
+          "text": "הקטן",
+          "context": "מהדוכן הקטן בפינה"
+        },
+        {
+          "id": "p1",
+          "kind": "phrase",
+          "text": "הפירות על הדוכנים",
+          "context": "מסדרים את הפירות על הדוכנים"
+        },
+        {
+          "id": "s1",
+          "kind": "sentence",
+          "text": "תיירים רבים מגיעים לטעום את החומוס המפורסם, אבל התושבים המקומיים מעדיפים את הפלאפל מהדוכן הקטן בפינה."
+        },
+        {
+          "id": "p2",
+          "kind": "phrase",
+          "text": "City Sound Library",
+          "context": "בארכיון City Sound Library מאז",
+          "methods": ["drag"],
+          "note": "LTR run inside RTL text (bidi caret movement is browser-specific, so no keyboard method)"
+        },
+        {
+          "id": "g1",
+          "kind": "sentence",
+          "paragraph": "#he-2",
+          "startsWith": "תיירים רבים מגיעים"
+        }
+      ]
+    },
+    {
+      "id": "cjk-latin-mixed",
+      "file": "cjk-latin-mixed.html",
+      "title": "Mixed CJK and Latin text",
+      "layout": "ja/zh/en paragraphs; unspaced scripts",
+      "targets": [
+        {
+          "id": "w1",
+          "kind": "word",
+          "text": "conference",
+          "context": "The conference badge read"
+        },
+        {
+          "id": "w2",
+          "kind": "word",
+          "text": "patiently",
+          "context": "both versions patiently."
+        },
+        {
+          "id": "p1",
+          "kind": "phrase",
+          "text": "Tokyo Metropolitan Station",
+          "context": "read Tokyo Metropolitan Station in English"
+        },
+        {
+          "id": "p2",
+          "kind": ["word", "phrase"],
+          "text": "東京都庁前駅",
+          "context": "said 東京都庁前駅 in Japanese",
+          "methods": ["drag", "keyboard"],
+          "note": "unspaced script: word segmentation is ICU-dependent"
+        },
+        {
+          "id": "s1",
+          "kind": "sentence",
+          "text": "京都の朝は静かで、古い寺の鐘の音がゆっくりと街に広がります。"
+        },
+        {
+          "id": "s2",
+          "kind": "sentence",
+          "text": "我们在上海的老街散步，路边的小店卖着各种热腾腾的包子。"
+        },
+        {
+          "id": "g1",
+          "kind": "passage",
+          "paragraph": "#cj-ja",
+          "startsWith": "京都の朝は静かで"
+        }
+      ]
+    },
+    {
+      "id": "vertical-writing",
+      "file": "vertical-writing.html",
+      "title": "Vertical writing mode (vertical-rl)",
+      "layout": "writing-mode: vertical-rl, Japanese prose",
+      "dir": "vertical",
+      "forwardKey": "ArrowDown",
+      "targets": [
+        {
+          "id": "s1",
+          "kind": "sentence",
+          "text": "吾輩は猫である。"
+        },
+        {
+          "id": "s2",
+          "kind": "sentence",
+          "text": "朝の光が障子を通して部屋に入り、畳の上に静かな模様を描いていた。"
+        },
+        {
+          "id": "p1",
+          "kind": ["word", "phrase"],
+          "text": "障子を通して",
+          "context": "障子を通して部屋に入り",
+          "methods": ["drag", "keyboard"]
+        },
+        {
+          "id": "g1",
+          "kind": "sentence",
+          "paragraph": "#vt-2",
+          "startsWith": "朝の光が障子"
+        }
+      ]
+    },
+    {
+      "id": "webcomponent-shadow",
+      "file": "webcomponent-shadow.html",
+      "title": "Open web component (shadow DOM) article body",
+      "layout": "light-DOM headline; article body inside an open shadow root",
+      "targets": [
+        {
+          "id": "w1",
+          "kind": "word",
+          "text": "ordinary",
+          "context": "is ordinary light DOM",
+          "note": "light DOM control"
+        },
+        {
+          "id": "w2",
+          "kind": "word",
+          "text": "schoolhouse",
+          "context": "old schoolhouse to",
+          "note": "inside open shadow root"
+        },
+        {
+          "id": "p1",
+          "kind": "phrase",
+          "text": "paper lanterns",
+          "context": "fold paper lanterns for",
+          "note": "inside open shadow root"
+        },
+        {
+          "id": "s1",
+          "kind": "sentence",
+          "text": "By evening the hall smells of glue and tea, and the first finished lanterns hang from the rafters like a small constellation.",
+          "note": "inside open shadow root"
+        },
+        {
+          "id": "g1",
+          "kind": "passage",
+          "paragraph": "#sh-1",
+          "startsWith": "Volunteers gather every",
+          "note": "inside open shadow root"
+        }
+      ]
+    },
+    {
+      "id": "iframe-same-origin",
+      "file": "iframe-same-origin.html",
+      "title": "Same-origin iframe content",
+      "layout": "outer document + same-origin iframe with own scroll and selection",
+      "frames": {
+        "inner": "/matrix-iframe-inner.html"
+      },
+      "targets": [
+        {
+          "id": "w1",
+          "kind": "word",
+          "text": "introduces",
+          "context": "page introduces a small"
+        },
+        {
+          "id": "w2",
+          "kind": "word",
+          "text": "toolbar",
+          "context": "raise the toolbar in this frame",
+          "frame": "inner"
+        },
+        {
+          "id": "p1",
+          "kind": "phrase",
+          "text": "own scroll position",
+          "context": "keeps its own scroll position and",
+          "frame": "inner"
+        },
+        {
+          "id": "s1",
+          "kind": "sentence",
+          "text": "Pressing a word here must raise the toolbar in this frame, next to the word.",
+          "frame": "inner"
+        },
+        {
+          "id": "g1",
+          "kind": "sentence",
+          "paragraph": "#if-inner-1",
+          "startsWith": "The embedded document keeps",
+          "frame": "inner"
+        }
+      ]
+    },
+    {
+      "id": "dialog-modal",
+      "file": "dialog-modal.html#open",
+      "title": "Modal dialog containing text",
+      "layout": "native dialog opened with showModal() (page behind is inert)",
+      "modal": true,
+      "targets": [
+        {
+          "id": "w1",
+          "kind": "word",
+          "text": "gentle",
+          "context": "volume with gentle care"
+        },
+        {
+          "id": "p1",
+          "kind": "phrase",
+          "text": "three weeks",
+          "context": "within three weeks and"
+        },
+        {
+          "id": "s1",
+          "kind": "sentence",
+          "text": "Late returns are forgiven when the weather is dreadful."
+        },
+        {
+          "id": "g1",
+          "kind": "passage",
+          "paragraph": "#dlg-text",
+          "startsWith": "Members agree to return"
+        }
+      ]
+    },
+    {
+      "id": "transformed-zoom",
+      "file": "transformed-zoom.html",
+      "title": "CSS zoom, transform scale and rotation",
+      "layout": "zoom: 1.6, transform: scale(1.4), rotate(-3deg)",
+      "targets": [
+        {
+          "id": "w1",
+          "kind": "word",
+          "text": "renders",
+          "context": "zoomed container renders larger"
+        },
+        {
+          "id": "w2",
+          "kind": "word",
+          "text": "transform",
+          "context": "uses a transform, which"
+        },
+        {
+          "id": "p1",
+          "kind": "phrase",
+          "text": "client rectangle",
+          "context": "every client rectangle without"
+        },
+        {
+          "id": "s1",
+          "kind": "sentence",
+          "text": "Slightly rotated paragraphs are common in magazine layouts and decorative banners, and they are still perfectly selectable."
+        },
+        {
+          "id": "g1",
+          "kind": "sentence",
+          "paragraph": "#tz-scale",
+          "startsWith": "A scaled block uses"
+        }
+      ]
+    },
+    {
+      "id": "infinite-scroll",
+      "file": "infinite-scroll.html",
+      "title": "Infinite-scroll-like dynamic insertion",
+      "layout": "items appended by script after load and when the sentinel intersects",
+      "ready": "#item-2",
+      "targets": [
+        {
+          "id": "w1",
+          "kind": "word",
+          "text": "bakery",
+          "context": "glove to the bakery,"
+        },
+        {
+          "id": "p1",
+          "kind": "phrase",
+          "text": "warm cinnamon roll",
+          "context": "with a warm cinnamon roll"
+        },
+        {
+          "id": "s1",
+          "kind": "sentence",
+          "text": "The library introduced a quiet hour for tired parents, complete with soft chairs and a very small kettle."
+        },
+        {
+          "id": "g1",
+          "kind": "sentence",
+          "paragraph": "#item-0 p",
+          "startsWith": "Morning markets opened"
+        }
+      ]
+    },
+    {
+      "id": "dark-mode",
+      "file": "dark-mode.html",
+      "title": "Dark theme page",
+      "layout": "dark colours, custom ::selection, inline code and link",
+      "targets": [
+        {
+          "id": "w1",
+          "kind": "word",
+          "text": "observatory",
+          "context": "The observatory keeps"
+        },
+        {
+          "id": "w2",
+          "kind": "word",
+          "text": "exposure",
+          "context": "exposure setting stays fixed"
+        },
+        {
+          "id": "p1",
+          "kind": "phrase",
+          "text": "thin red lamp",
+          "context": "A thin red lamp guides"
+        },
+        {
+          "id": "s1",
+          "kind": "sentence",
+          "text": "Tonight's target is a faint galaxy that only appears after an hour of patient exposure."
+        },
+        {
+          "id": "g1",
+          "kind": "passage",
+          "paragraph": "#dk-1",
+          "startsWith": "The observatory keeps its lights"
+        }
+      ]
+    },
+    {
+      "id": "very-long",
+      "file": "very-long.html",
+      "title": "Very long page (more than ten screens)",
+      "layout": "24 sections of 480px+ each",
+      "targets": [
+        {
+          "id": "w1",
+          "kind": "word",
+          "text": "travellers",
+          "context": "First stretch: The valley road follows the river for most of its length, and travellers rarely"
+        },
+        {
+          "id": "w2",
+          "kind": "word",
+          "text": "photographers",
+          "context": "Twenty-fourth stretch: In autumn the hills glow orange, and photographers"
+        },
+        {
+          "id": "p1",
+          "kind": "phrase",
+          "text": "photographers arrive",
+          "context": "Twenty-fourth stretch: In autumn the hills glow orange, and photographers arrive with tripods"
+        },
+        {
+          "id": "s1",
+          "kind": "sentence",
+          "text": "In autumn the hills glow orange, and photographers arrive with tripods before dawn.",
+          "context": "Twenty-fourth stretch: In autumn the hills glow orange, and photographers arrive with tripods before dawn."
+        },
+        {
+          "id": "g1",
+          "kind": "passage",
+          "paragraph": "#vl-24",
+          "startsWith": "Twenty-fourth stretch: In autumn"
+        }
+      ]
+    },
+    {
+      "id": "narrow-mobile",
+      "file": "narrow-mobile.html",
+      "title": "Narrow mobile-like layout (375 px wide)",
+      "layout": "sticky app bar, bordered cards, 375x667 viewport",
+      "viewport": {
+        "width": 375,
+        "height": 667
+      },
+      "targets": [
+        {
+          "id": "w1",
+          "kind": "word",
+          "text": "stream",
+          "context": "followed the stream upward"
+        },
+        {
+          "id": "w2",
+          "kind": "word",
+          "text": "ridge",
+          "context": "above the ridge."
+        },
+        {
+          "id": "p1",
+          "kind": "phrase",
+          "text": "warm hat",
+          "context": "Bring a warm hat"
+        },
+        {
+          "id": "s1",
+          "kind": "sentence",
+          "text": "Clouds gathered by noon, but the rain held off until we reached the shelter."
+        },
+        {
+          "id": "g1",
+          "kind": "sentence",
+          "paragraph": "#mb-2",
+          "startsWith": "Bring a warm hat"
+        }
+      ]
+    },
+    {
+      "id": "inline-nested-punctuation",
+      "file": "inline-nested-punctuation.html",
+      "title": "Nested inline markup, punctuation and special spaces",
+      "layout": "b/i/u/em/mark nesting, curly quotes, dashes, NBSP, soft hyphen, ellipsis",
+      "targets": [
+        {
+          "id": "w1",
+          "kind": "word",
+          "text": "nested",
+          "context": "careful nested markup",
+          "note": "inside b > i > u"
+        },
+        {
+          "id": "w2",
+          "kind": "word",
+          "text": "almost",
+          "context": "it’s almost perfect",
+          "note": "inside em"
+        },
+        {
+          "id": "p1",
+          "kind": "phrase",
+          "text": "very careful nested markup",
+          "context": "very careful nested markup twice",
+          "note": "spans b, i, u boundaries"
+        },
+        {
+          "id": "p2",
+          "kind": "phrase",
+          "text": "“it’s almost perfect”",
+          "context": "“it’s almost perfect” in",
+          "note": "curly quotes and apostrophe"
+        },
+        {
+          "id": "s1",
+          "kind": "sentence",
+          "text": "Prices rose by 3.5% in March, according to the ministry's own figures; economists were unsurprised."
+        },
+        {
+          "id": "s2",
+          "kind": "sentence",
+          "text": "Spaces collapse, even non‑breaking ones, and a soft hyphen should never leak into the captured text.",
+          "context": "Spaces collapse, even non‑breaking ones, and a soft hyphen should never leak into the captured text.",
+          "note": "NBSP, U+2011 and soft hyphen in the DOM"
+        },
+        {
+          "id": "s3",
+          "kind": ["sentence", "passage"],
+          "text": "She said, \"Wait, really?\" and he replied, \"Yes - really!\" before leaving.",
+          "note": "terminal marks inside quotes: heuristic may split"
+        },
+        {
+          "id": "g1",
+          "kind": "sentence",
+          "paragraph": "#np-5",
+          "startsWith": "Prices rose by"
+        }
+      ]
+    },
+    {
+      "id": "dense-fixed-header",
+      "file": "dense-fixed-header.html",
+      "title": "Dense fixed header (three stacked fixed bars)",
+      "layout": "two fixed top bars and a fixed bottom bar with max z-index",
+      "targets": [
+        {
+          "id": "w1",
+          "kind": "word",
+          "text": "extension",
+          "context": "A good extension treats"
+        },
+        {
+          "id": "w2",
+          "kind": "word",
+          "text": "complains",
+          "context": "a reader complains about"
+        },
+        {
+          "id": "p1",
+          "kind": "phrase",
+          "text": "reliable coordinate space",
+          "context": "only reliable coordinate space"
+        },
+        {
+          "id": "s1",
+          "kind": "sentence",
+          "text": "A good extension treats the viewport as the only reliable coordinate space and never assumes that the top of the window is free."
+        },
+        {
+          "id": "g1",
+          "kind": "sentence",
+          "paragraph": "#dh-2",
+          "startsWith": "Designers add banners"
+        }
+      ]
+    },
+    {
+      "id": "plain-baseline",
+      "file": "plain-baseline.html",
+      "title": "Plain essay (control)",
+      "layout": "one column of serif prose with polysemous word, idiom and technical terms",
+      "targets": [
+        {
+          "id": "w1",
+          "kind": "word",
+          "text": "bank",
+          "context": "sat on the bank of the river"
+        },
+        {
+          "id": "w2",
+          "kind": "word",
+          "text": "idempotent",
+          "context": "such as idempotent or"
+        },
+        {
+          "id": "p1",
+          "kind": "phrase",
+          "text": "broke the ice",
+          "context": "finally broke the ice by"
+        },
+        {
+          "id": "p2",
+          "kind": "phrase",
+          "text": "half finished thought",
+          "context": "the half finished thought you"
+        },
+        {
+          "id": "s1",
+          "kind": "sentence",
+          "text": "She finally broke the ice by reading aloud a single line, and the room relaxed immediately."
+        },
+        {
+          "id": "g1",
+          "kind": "passage",
+          "paragraph": "#pb-2",
+          "startsWith": "A notebook is a patient"
+        }
+      ]
+    },
+    {
+      "id": "long-passage",
+      "file": "long-passage.html",
+      "title": "Long passage over the 2,000 character limit",
+      "layout": "one 2,637 character paragraph with an astral emoji straddling the 2,000 cap",
+      "targets": [
+        {
+          "id": "s0",
+          "kind": "sentence",
+          "text": "This short paragraph sits before the long one."
+        },
+        {
+          "id": "g1",
+          "kind": "passage",
+          "paragraph": "#lp-long",
+          "startsWith": "The valley road follows the river for most of its length, and travellers rarely hurry along it (note 1).",
+          "overLimit": true
+        }
+      ]
+    }
+  ],
+  "negatives": {
+    "fixture": "editable-fields.html",
+    "targets": [
+      {
+        "id": "ef-ok",
+        "description": "ordinary paragraph next to fields is still detected",
+        "kind": "word",
+        "text": "paragraph",
+        "context": "Ordinary paragraph text",
+        "expect": "toolbar"
+      },
+      {
+        "id": "ef-text",
+        "description": "text input value",
+        "selector": "#ef-text",
+        "expect": "none"
+      },
+      {
+        "id": "ef-pass",
+        "description": "password input",
+        "selector": "#ef-pass",
+        "expect": "none"
+      },
+      {
+        "id": "ef-area",
+        "description": "textarea",
+        "selector": "#ef-area",
+        "expect": "none"
+      },
+      {
+        "id": "ef-editable",
+        "description": "contenteditable region",
+        "selector": "#editable",
+        "expect": "none"
+      }
+    ]
+  }
+}

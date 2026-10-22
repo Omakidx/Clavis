@@ -6,15 +6,11 @@ import { chromium, type BrowserContext, type Worker } from '@playwright/test';
 
 const repoRoot = fileURLToPath(new URL('../../../', import.meta.url));
 
-/** Default build used by the functional specs (variant a). */
+/** Default build used by the specs; `CLAVIS_EXTENSION_DIR` points them at another build. */
 export const defaultBuildDir = path.resolve(
   repoRoot,
   process.env['CLAVIS_EXTENSION_DIR'] ?? '.output/chrome-mv3',
 );
-
-export function buildDirFor(variant: 'a' | 'b' | 'c'): string {
-  return path.resolve(repoRoot, `.output-spike-b-${variant}/chrome-mv3`);
-}
 
 export interface ExtensionOptions {
   /** Unpacked build to load. */
@@ -26,11 +22,9 @@ export interface ExtensionOptions {
    * (permissions.contains, registerContentScripts, injection) is the real code.
    */
   grantedSiteAccess?: boolean;
-  /** Declare the UI chunk as web-accessible with use_dynamic_url (option b). */
-  webAccessibleUi?: boolean;
   /**
-   * Declare the proposed `explain-selection` keyboard command (Alt+Shift+E) in the test copy.
-   * The shipped manifest does not have it yet: wxt.config.ts is the manager's file.
+   * Declare the `explain-selection` keyboard command (Alt+Shift+E) in the test copy. The shipped
+   * manifest has it since Phase 4 preparation, so this is a no-op kept for older specs.
    */
   command?: boolean;
   /**
@@ -51,7 +45,6 @@ export interface LaunchedExtension {
 type Manifest = {
   host_permissions?: string[];
   optional_host_permissions?: string[];
-  web_accessible_resources?: unknown[];
   commands?: Record<string, unknown>;
   [key: string]: unknown;
 };
@@ -70,15 +63,6 @@ async function prepareCopy(
     const origins = manifest.optional_host_permissions ?? [];
     manifest.host_permissions = [...(manifest.host_permissions ?? []), ...origins];
     delete manifest.optional_host_permissions;
-  }
-  if (options.webAccessibleUi === true) {
-    manifest.web_accessible_resources = [
-      {
-        resources: ['content-scripts/content-ui.js'],
-        matches: ['http://*/*', 'https://*/*'],
-        use_dynamic_url: true,
-      },
-    ];
   }
   if (options.command === true) {
     manifest.commands = {

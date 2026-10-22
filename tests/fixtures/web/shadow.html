@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Open shadow roots</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 1.5rem;
+        font:
+          18px/1.6 system-ui,
+          sans-serif;
+      }
+    </style>
+  </head>
+  <body>
+    <p id="light">Light DOM paragraph with the word anchor in it.</p>
+    <article-card id="open"></article-card>
+    <article-card id="nested-host" data-nested></article-card>
+    <div id="closed-host"></div>
+    <script>
+      class ArticleCard extends HTMLElement {
+        connectedCallback() {
+          const root = this.attachShadow({ mode: 'open' });
+          root.innerHTML = `
+            <style>p { font: 18px/1.6 system-ui, sans-serif; margin: 0.5rem 0; }</style>
+            <p id="sp">Shadow paragraph where the word harbour lives and a second sentence follows here.</p>
+            <input id="field" value="typed secret words" />
+            <div id="inner"></div>`;
+          if (this.hasAttribute('data-nested')) {
+            const inner = root.getElementById('inner').attachShadow({ mode: 'open' });
+            inner.innerHTML =
+              '<p id="np">Nested shadow paragraph with the word lighthouse inside.</p>';
+          }
+        }
+      }
+      customElements.define('article-card', ArticleCard);
+      const closed = document.getElementById('closed-host').attachShadow({ mode: 'closed' });
+      closed.innerHTML = '<p id="cp">Closed shadow paragraph with the word secretive inside.</p>';
+    </script>
+  </body>
+</html>

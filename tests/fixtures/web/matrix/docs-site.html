@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Lumen Docs: configuration</title>
+    <style>
+      body {
+        margin: 0;
+        font:
+          16px/1.6 system-ui,
+          sans-serif;
+        color: #1f2933;
+      }
+      header {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 56px;
+        background: #0b3d5c;
+        color: #fff;
+        display: flex;
+        align-items: center;
+        padding: 0 20px;
+        font-weight: 600;
+        z-index: 50;
+      }
+      nav {
+        position: fixed;
+        top: 56px;
+        left: 0;
+        bottom: 0;
+        width: 220px;
+        background: #f0f4f8;
+        padding: 16px;
+        overflow: auto;
+        box-sizing: border-box;
+        font-size: 14px;
+      }
+      nav a {
+        display: block;
+        padding: 4px 0;
+        color: #0b3d5c;
+        text-decoration: none;
+      }
+      main {
+        margin: 56px 0 0 220px;
+        padding: 24px 40px 120px;
+        max-width: 760px;
+      }
+      h2 {
+        scroll-margin-top: 72px;
+        border-bottom: 1px solid #d9e2ec;
+        padding-bottom: 4px;
+      }
+      h2 a.anchor {
+        color: #9aa5b1;
+        margin-left: 8px;
+        text-decoration: none;
+        font-weight: 400;
+      }
+      .note {
+        background: #fff8e1;
+        border-left: 4px solid #f0b429;
+        padding: 8px 14px;
+      }
+      section {
+        min-height: 520px;
+      }
+    </style>
+  </head>
+  <body>
+    <header>Lumen Docs</header>
+    <nav>
+      <a href="#install">Installation</a><a href="#config">Configuration</a
+      ><a href="#plugins">Plugins</a><a href="#faq">FAQ</a>
+    </nav>
+    <main>
+      <section id="install">
+        <h2>Installation<a class="anchor" href="#install">#</a></h2>
+        <p id="install-text">
+          Download the archive for your platform and unpack it into any folder you like. The
+          installer does not require administrator rights and leaves your existing settings
+          untouched.
+        </p>
+      </section>
+      <section id="config">
+        <h2>Configuration<a class="anchor" href="#config">#</a></h2>
+        <p id="config-text">
+          Lumen reads a single configuration file when it starts. Every option has a sensible
+          default, so a minimal file can be completely empty.
+        </p>
+        <p class="note" id="note">Changes to the file take effect after the next restart.</p>
+      </section>
+      <section id="plugins">
+        <h2>Plugins<a class="anchor" href="#plugins">#</a></h2>
+        <p id="plugins-text">
+          A plugin is a small folder that contains a manifest and one or more scripts. Place the
+          folder inside the extensions directory and Lumen will discover it automatically at launch.
+        </p>
+      </section>
+      <section id="faq">
+        <h2>Frequently asked questions<a class="anchor" href="#faq">#</a></h2>
+        <p id="faq-text">
+          Does Lumen send any usage data? No. The application never contacts a server unless you
+          explicitly request an update check.
+        </p>
+      </section>
+    </main>
+  </body>
+</html>

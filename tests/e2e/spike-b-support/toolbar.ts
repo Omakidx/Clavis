@@ -19,12 +19,26 @@ interface DomNode {
   documentURL?: string;
 }
 
+export type ActionName = 'listen' | 'explain' | 'trim' | 'close';
+
+/** Selectors inside the closed root. Stable contract of the production toolbar (components/tooltip/view.ts). */
 export const SEL = {
   panel: '[data-clavis="panel"]',
   toolbar: '[data-clavis="toolbar"]',
+  /** After Listen or Explain: the state line (`card-note`) and the captured text (`card-text`). */
   card: '[data-clavis="card"]',
+  cardNote: '[data-clavis="card-note"]',
   cardText: '[data-clavis="card-text"]',
-  action: (name: 'listen' | 'explain') => `[data-action="${name}"]`,
+  /** "Selection too long" message; the single action is `action('trim')`. */
+  limit: '[data-clavis="limit"]',
+  /** After the trim action: the exact text that will be used. */
+  trimmed: '[data-clavis="trimmed"]',
+  trimmedText: '[data-clavis="trimmed-text"]',
+  /** A message that is not about a selection (cross-origin frame notice). */
+  notice: '[data-clavis="notice"]',
+  /** Visually hidden polite live region. */
+  live: '[data-clavis="live"]',
+  action: (name: ActionName) => `[data-action="${name}"]`,
 } as const;
 
 const sessions = new WeakMap<object, Promise<{ session: CDPSession; viaFrame: boolean }>>();
@@ -52,11 +66,12 @@ async function sessionFor(
   return cached;
 }
 
+/** The host is a child of <html>, or of the open modal <dialog> that holds the selection. */
 const isHostElement = (node: DomNode, parentName: string): boolean => {
   const attrs = node.attributes ?? [];
   return (
     node.nodeName === 'DIV' &&
-    parentName === 'HTML' &&
+    (parentName === 'HTML' || parentName === 'DIALOG') &&
     attrs[attrs.indexOf('popover') + 1] === 'manual' &&
     attrs.includes('popover')
   );
@@ -69,7 +84,7 @@ export class ToolbarProbe {
     return 'mouse' in this.target ? this.target : this.target.page();
   }
 
-  /** Every Clavis host (`:root > div[popover=manual]`) in this frame's own document. */
+  /** Every Clavis host (`:root > div[popover=manual]`, or inside a modal dialog) in this frame's own document. */
   private async hosts(): Promise<{ session: CDPSession; hosts: DomNode[] }> {
     const { session, viaFrame } = await sessionFor(this.target);
     await session.send('DOM.enable');
@@ -126,7 +141,9 @@ export class ToolbarProbe {
   /** The host's own `shadowRoot` as the PAGE sees it: must be null. */
   async pageSeesShadowRoot(): Promise<boolean | undefined> {
     return this.target.evaluate(() => {
-      const host = document.querySelector(':root > div[popover]') as HTMLElement | null;
+      const host = document.querySelector(
+        ':is(:root, dialog) > div[popover]',
+      ) as HTMLElement | null;
       return host === null ? undefined : host.shadowRoot !== null;
     });
   }
@@ -146,7 +163,12 @@ export class ToolbarProbe {
   private async poll(done: () => Promise<boolean>, timeout: number, what: string): Promise<void> {
     const deadline = Date.now() + timeout;
     for (;;) {
-      if (await done()) return;
+      try {
+        if (await done()) return;
+      } catch (error) {
+        // The page can move or re-render the host between two CDP calls (a node id goes stale): retry.
+        if (!/Could not find node|No node with given id/.test(String(error))) throw error;
+      }
       if (Date.now() > deadline) throw new Error(`timed out waiting for ${what}`);
       await new Promise((resolve) => setTimeout(resolve, 60));
     }
@@ -194,7 +216,7 @@ export class ToolbarProbe {
   }
 
   /** Real (trusted) mouse click on an action button. */
-  async click(action: 'listen' | 'explain'): Promise<void> {
+  async click(action: ActionName): Promise<void> {
     const box = await this.box(SEL.action(action));
     let offsetX = 0;
     let offsetY = 0;
@@ -206,8 +228,21 @@ export class ToolbarProbe {
     await this.page.mouse.click(offsetX + box.x + box.width / 2, offsetY + box.y + box.height / 2);
   }
 
-  async focusAction(action: 'listen' | 'explain'): Promise<void> {
+  async focusAction(action: ActionName): Promise<void> {
     await this.evalIn(SEL.action(action), `function () { this.focus(); }`);
+  }
+
+  /** Text of the live region (what a screen reader would be told). */
+  live(): Promise<string | undefined> {
+    return this.text(SEL.live);
+  }
+
+  /** Tag name of the host element's parent as the PAGE sees it: `html`, or `dialog` inside a modal dialog. */
+  async hostParent(): Promise<string | undefined> {
+    return this.target.evaluate(() => {
+      const host = document.querySelector(':is(:root, dialog) > div[popover]');
+      return host?.parentElement?.localName;
+    });
   }
 
   focusedAction(): Promise<string | null | undefined> {

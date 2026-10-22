@@ -6,13 +6,8 @@ import {
   type PrivilegedMessage,
   type PublicMessage,
 } from '../contracts';
-import { injectTabForPopup, injectUiForSender, type InjectionDeps } from '../site-access/injection';
-import {
-  isInjectTabMessage,
-  isInjectUiMessage,
-  type InjectTabMessage,
-  type InjectUiMessage,
-} from '../site-access/messages';
+import { injectTabForPopup, type InjectionDeps } from '../site-access/injection';
+import { isInjectTabMessage, type InjectTabMessage } from '../site-access/messages';
 import {
   type OffscreenEventMessage,
   offscreenEventSchema,
@@ -174,23 +169,6 @@ export function buildRoutes(services: RouteServices): Route[] {
     ),
 
     // ---- internal: site access (Spike B messages, plain objects by design) ------
-    defineRoute<InjectUiMessage>({
-      type: 'CLAVIS_INJECT_UI',
-      // Observer -> background, from the website's frame. Nothing else sends it.
-      allow: { content: true },
-      parse: parseWith<InjectUiMessage>((raw) =>
-        isInjectUiMessage(raw) ? { success: true, data: raw } : { success: false },
-      ),
-      handle: (_message, { sender }) =>
-        sender.tabId === undefined
-          ? injectRejected()
-          : injectUiForSender(injection, {
-              tabId: sender.tabId,
-              frameId: sender.frameId,
-              url: sender.url,
-            }),
-      reject: injectRejected,
-    }),
     defineRoute<InjectTabMessage>({
       type: 'CLAVIS_INJECT_TAB',
       // Popup "Explain on this page" (activeTab). It can inject into any tab, so popup only.

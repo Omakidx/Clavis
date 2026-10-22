@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Mobile-style layout</title>
+    <style>
+      body {
+        margin: 0;
+        font:
+          16px/1.5 -apple-system,
+          Arial,
+          sans-serif;
+        color: #222;
+        background: #fff;
+      }
+      .bar {
+        position: sticky;
+        top: 0;
+        background: #1a73e8;
+        color: #fff;
+        padding: 12px 14px;
+        font-weight: 600;
+      }
+      main {
+        padding: 14px;
+      }
+      .card {
+        border: 1px solid #dadce0;
+        border-radius: 10px;
+        padding: 12px 14px;
+        margin-bottom: 14px;
+      }
+      h2 {
+        font-size: 18px;
+        margin: 0 0 6px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="bar">Trail Notes</div>
+    <main>
+      <div class="card">
+        <h2>Saturday hike</h2>
+        <p id="mb-1">
+          We left the car park at seven and followed the stream upward until the pines gave way to
+          open rock.
+        </p>
+      </div>
+      <div class="card">
+        <h2>Gear list</h2>
+        <p id="mb-2">
+          Bring a warm hat, two litres of water and a paper map because the signal disappears above
+          the ridge.
+        </p>
+      </div>
+      <div class="card">
+        <h2>Weather</h2>
+        <p id="mb-3">
+          Clouds gathered by noon, but the rain held off until we reached the shelter.
+        </p>
+      </div>
+    </main>
+  </body>
+</html>

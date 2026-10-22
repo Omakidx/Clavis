@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Fields and hidden text (must not be captured)</title>
+    <style>
+      body {
+        margin: 0;
+        font:
+          17px/1.6 Arial,
+          sans-serif;
+        padding: 24px;
+        max-width: 700px;
+      }
+      input,
+      textarea {
+        font: 17px Arial;
+        width: 420px;
+        display: block;
+        margin: 8px 0;
+      }
+      #editable {
+        border: 1px solid #999;
+        padding: 8px;
+      }
+      .gone {
+        display: none;
+      }
+      .invisible {
+        visibility: hidden;
+      }
+    </style>
+  </head>
+  <body>
+    <p id="ef-ok">Ordinary paragraph text next to the form fields remains selectable.</p>
+    <input id="ef-text" type="text" value="secret input value here" />
+    <input id="ef-pass" type="password" value="hunter2hunter2" />
+    <textarea id="ef-area" rows="3">textarea content for typing words</textarea>
+    <div id="editable" contenteditable="true">editable region with draft words</div>
+    <div class="gone" id="ef-gone">display none hidden words</div>
+    <div class="invisible" id="ef-invisible">visibility hidden words</div>
+  </body>
+</html>

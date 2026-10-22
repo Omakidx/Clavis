@@ -20,17 +20,27 @@ export function deepActiveElement(doc: Document): Element | null {
   return active;
 }
 
-function isEditableElement(el: Element | null): boolean {
-  return el !== null && el.closest(EDITABLE_SELECTOR) !== null;
+/** `closest` that continues out of shadow roots: an editing host editable-izes its shadow content. */
+function isEditableElement(start: Element | null): boolean {
+  for (let el = start; el !== null;) {
+    if (el.matches(EDITABLE_SELECTOR)) return true;
+    // `host` exists on shadow roots only (and works across frames, unlike `instanceof ShadowRoot`).
+    el = el.parentElement ?? (el.getRootNode() as Partial<ShadowRoot>).host ?? null;
+  }
+  return false;
 }
 
-/** True when the selection sits in (or focus is on) a field the user types into. */
-export function isEditableSelection(selection: Selection, doc: Document): boolean {
+/**
+ * True when the selection sits in (or focus is on) a field the user types into. `range` is the
+ * resolved range (it can be inside an open shadow root, where the Selection's own nodes are hosts).
+ */
+export function isEditableSelection(selection: Selection, doc: Document, range?: Range): boolean {
   if (doc.designMode === 'on') return true;
   if (isEditableElement(deepActiveElement(doc))) return true;
   return (
     isEditableElement(elementOf(selection.anchorNode)) ||
-    isEditableElement(elementOf(selection.focusNode))
+    isEditableElement(elementOf(selection.focusNode)) ||
+    (range !== undefined && isEditableElement(elementOf(range.commonAncestorContainer)))
   );
 }
 

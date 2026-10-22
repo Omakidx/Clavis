@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Page with a modal dialog</title>
+    <style>
+      body {
+        margin: 0;
+        font:
+          17px/1.6 Georgia,
+          serif;
+        color: #222;
+      }
+      main {
+        max-width: 700px;
+        margin: 0 auto;
+        padding: 24px 20px;
+      }
+      dialog {
+        width: 460px;
+        max-width: 90vw;
+        border: 1px solid #888;
+        border-radius: 8px;
+        padding: 20px 24px;
+        font:
+          16px/1.55 Arial,
+          sans-serif;
+      }
+      dialog::backdrop {
+        background: rgba(0, 0, 0, 0.45);
+      }
+      button {
+        font-size: 15px;
+        padding: 6px 14px;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Cookie policy preview</h1>
+      <p id="dlg-page">
+        This background paragraph sits behind the dialog and becomes inert while the dialog is open.
+      </p>
+      <button id="open" type="button">Open terms</button>
+    </main>
+    <dialog id="terms" aria-labelledby="terms-title">
+      <h2 id="terms-title">Terms of the reading club</h2>
+      <p id="dlg-text">
+        Members agree to return borrowed books within three weeks and to treat every volume with
+        gentle care. Late returns are forgiven when the weather is dreadful.
+      </p>
+      <form method="dialog"><button>Close</button></form>
+    </dialog>
+    <script>
+      document
+        .getElementById('open')
+        .addEventListener('click', () => document.getElementById('terms').showModal());
+      // Deterministic hook for tests: open the dialog when the URL has #open.
+      if (location.hash === '#open') document.getElementById('terms').showModal();
+    </script>
+  </body>
+</html>

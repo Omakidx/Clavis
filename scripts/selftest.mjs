@@ -474,13 +474,6 @@ function sizeCase(name, files, wantCode, wantText) {
           maxGzipBytes: 15360,
           required: true,
         },
-        {
-          id: 'lazy',
-          files: ['content-scripts/content-ui*.js', 'content-scripts/content-ui*.css'],
-          maxGzipBytes: 61440,
-          required: false,
-          aggregate: true,
-        },
       ],
     }),
   );
@@ -493,10 +486,10 @@ function sizeCase(name, files, wantCode, wantText) {
   );
 }
 sizeCase(
-  'small observer passes, lazy UI skipped',
+  'small observer passes',
   { 'content-scripts/content.js': 'console.warn(1);' },
   0,
-  'skipped (absent)',
+  'all content-script budgets hold',
 );
 sizeCase(
   'observer over 15 KB gzip fails',
@@ -506,17 +499,12 @@ sizeCase(
 );
 sizeCase('required content script missing fails', { 'background.js': 'x' }, 1, 'MISSING');
 sizeCase(
-  'lazy UI over 60 KB gzip fails',
+  'larger observer within the 15 KB gzip budget passes',
   {
-    'content-scripts/content.js': 'x',
-    'content-scripts/content-ui.js': randomBytes(62 * 1024).toString('base64'),
+    'content-scripts/content.js': randomBytes(7 * 1024)
+      .toString('hex')
+      .slice(0, 14 * 1024),
   },
-  1,
-  'content-ui.js',
-);
-sizeCase(
-  'lazy UI within budget passes',
-  { 'content-scripts/content.js': 'x', 'content-scripts/content-ui.js': 'y'.repeat(2000) },
   0,
   'all content-script budgets hold',
 );

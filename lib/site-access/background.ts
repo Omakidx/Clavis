@@ -1,10 +1,8 @@
 import { browser } from 'wxt/browser';
 import { t } from '../i18n';
-import { toolbarVariant } from '../selection/variant';
 import { createSiteAccessController, type SiteAccessController } from './controller';
 import {
   CONTEXT_MENU_ID,
-  filesForVariant,
   handleCommand,
   handleContextMenuClick,
   type InjectionDeps,
@@ -50,7 +48,7 @@ export interface SiteAccess {
  * injection into already-open tabs after a grant.
  *
  * Registers every NON-message listener, once, synchronously from the background service
- * worker at startup (MV3 requirement). Its messages (CLAVIS_INJECT_UI / _TAB) are routes
+ * worker at startup (MV3 requirement). Its messages (CLAVIS_INJECT_TAB) are routes
  * in the single router (lib/router); this module no longer listens for runtime messages.
  */
 export function registerSiteAccess(options: SiteAccessOptions): SiteAccess {
@@ -61,7 +59,6 @@ export function registerSiteAccess(options: SiteAccessOptions): SiteAccess {
   const injection: InjectionDeps = {
     scripting: browser.scripting,
     tabs: browser.tabs,
-    files: filesForVariant(toolbarVariant()),
   };
   const controller = createSiteAccessController({
     registration,
