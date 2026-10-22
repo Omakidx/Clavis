@@ -1,9 +1,9 @@
 # Execution phases — Clavis
 
-**Document status:** v1 end-to-end implementation playbook (rev. 1.1 — decisions D-01 … D-18)  
+**Document status:** v1 end-to-end implementation playbook (rev. 1.1 — decisions D-01 … D-19)  
 **Baseline:** 2026-10-22 · **Goal:** deliver a privacy-conscious, production-ready Chrome MV3 extension with Groq BYOK, word/sentence pronunciation, contextual explanations, and a custom PDF reader.
 
-> Use this as the project's **build checklist and milestone tracker**. Feature IDs correspond to [requirements.md](requirements.md); implementation boundaries are in [architecture.md](architecture.md); approved tools are in [tech-stack.md](tech-stack.md). Product decisions D-01 … D-18 are in [requirements.md §11](requirements.md#11-product-decisions).
+> Use this as the project's **build checklist and milestone tracker**. Feature IDs correspond to [requirements.md](requirements.md); implementation boundaries are in [architecture.md](architecture.md); approved tools are in [tech-stack.md](tech-stack.md). Product decisions D-01 … D-19 are in [requirements.md §11](requirements.md#11-product-decisions).
 
 ## 0. Delivery philosophy and estimates
 
@@ -35,10 +35,10 @@ flowchart TD
 
 | Phase | Approx. effort | Exit gate |
 | --- | --- | --- |
-| 0 — Specification & risks | Done 2026-10-22 | Scope frozen, decisions D-01 … D-18 logged |
+| 0 — Specification & risks | Done 2026-10-22 | Scope frozen, decisions D-01 … D-19 logged |
 | 1 — Scaffold & CI | Done 2026-10-22 | Unpacked extension loads; lint/test/build pipeline works |
 | 2 — Feasibility spikes | Engineering done 2026-10-22; awaiting user runs | Groq call + model comparison, permission flow + toolbar latency, PDF viewer text layer and TTS capability proven |
-| 3 — Onboarding & BYOK | 2–4 days | Site access, valid/invalid keys, trusted storage and settings covered |
+| 3 — Onboarding & BYOK | Done 2026-10-22 | Site access, valid/invalid keys, trusted storage and settings covered |
 | 4 — Web highlight toolbar | 3–5 days | Reliable selection/position/dismiss/keyboard behavior on both injection paths |
 | 5 — AI explanation | 3–4 days | Core request + Must tabs function with typed responses |
 | 6 — Listen/TTS | 1–3 days | Word + sentence playback with usable no-voice fallback |
@@ -68,7 +68,7 @@ Effort counts are overlapping planning estimates, not additive deadlines; use th
 - [x] Select the target Chrome versions/OS testing matrix — Linux by hand, Windows/macOS automated, minimum Chrome tentatively 116, later set to 147 by D-18 ([platform matrix](requirements.md#platform-matrix-d-14), D-14).
 - [x] Record legal/privacy decisions and remaining open items — MIT license (D-13, `LICENSE` added), privacy policy on GitHub Pages with a [draft](privacy-policy.md) (D-15); publisher, support email and logo deferred to Phase 10 ([still open](requirements.md#still-open)).
 
-**Deliverables (done 2026-10-22):** approved scope and decisions D-01 … D-18 ([requirements.md §11](requirements.md#11-product-decisions)); ADRs A-001 … A-013 ([architecture.md §1](architecture.md#1-architectural-decisions-adrs)); requirement checklist, prioritized backlog and risk register ([backlog.md](backlog.md)); privacy policy draft ([privacy-policy.md](privacy-policy.md)).  
+**Deliverables (done 2026-10-22):** approved scope and decisions D-01 … D-19 ([requirements.md §11](requirements.md#11-product-decisions)); ADRs A-001 … A-013 ([architecture.md §1](architecture.md#1-architectural-decisions-adrs)); requirement checklist, prioritized backlog and risk register ([backlog.md](backlog.md)); privacy policy draft ([privacy-policy.md](privacy-policy.md)).  
 **Gate:** No launch-time features are ambiguous or promised beyond demonstrated browser capabilities. **Passed** — remaining unknowns are either Phase 2 spike outputs with defined decision criteria or Phase 10 publishing details.
 
 ## Phase 1 — Repository, WXT scaffold and developer tooling
@@ -162,18 +162,28 @@ Effort counts are overlapping planning estimates, not additive deadlines; use th
 
 **Tasks**
 
-- [ ] Build welcome/onboarding wizard: purpose -> privacy disclosure -> **Enable Clavis on websites** (optional permission) -> Get Groq Key -> Connect -> Preferences -> guided demo on a bundled practice page.
-- [ ] Settings: show site-access status with Grant / Revoke, and a per-site disable list (FR-009).
-- [ ] Build key input with masked characters and deliberate submit.
-- [ ] Implement key storage and sender checks exactly as specified in the [secret boundary](architecture.md#secret-boundary-normative) (persistent and session-only options).
-- [ ] Implement model-list/test-connection path; distinguish authentication error from network error.
-- [ ] Display model selector from compatible available models, noting any account quota limitations.
-- [ ] Add Settings to change key, test again, remove key and choose speech locale/rate/reading level.
-- [ ] Add privacy and help links plus explicit disclosure that Groq receives selected text/context after Explain.
-- [ ] Add simple 'not connected' mode: PDF reader + detected TTS remain available; AI actions ask for setup.
-- [ ] Unit/integration tests for settings persistence, key inaccessibility from content script and clear-data behavior.
+- [x] Welcome wizard: purpose → data disclosure (D-16 copy) → **Enable Clavis on websites** → Get Groq key → Connect → Preferences → practice page → done; "Set up later" path.
+- [x] Settings: API key, model, preferences with reset, site access (grant / remove / per-site disable), privacy (clear all data), help.
+- [x] Masked key input with deliberate submit; uncontrolled so the key never sits in the DOM; last4 only.
+- [x] Key storage and sender checks per the [secret boundary](architecture.md#secret-boundary-normative): local or session (never both), metadata beside the key, fail-closed on lockdown, key routes only from `/options.html` and `/onboarding.html`.
+- [x] Test connection distinguishes invalid (401/403) from not verified (network/timeout).
+- [x] Model selector from the key's available models; FR-005 fallback when the saved model is missing (never auto-switches).
+- [x] Change key, test again, remove key; speech language/rate and reading level.
+- [x] Privacy and help links; disclosure that Groq receives selected text/context after Explain.
+- [x] "Not connected" mode: reader and TTS stay available; AI actions return SETUP_REQUIRED with a Connect action.
+- [x] One background router (single listener, per-route sender checks), per-tab rate limit and one in-flight AI request; open tabs get the observer right after a grant; per-site disable via `excludeMatches`; on-demand mode.
+- [x] Unit tests (router sender matrix, storage, key lifecycle, limiter, UI client and screens) and E2E (key boundary from a content script, key lifecycle, settings persistence, clear data, onboarding, settings, popup, practice page).
+- [x] [Security review](decisions/phase-3-security-review.md): no Critical/High/Medium; Low findings fixed.
 
-**Deliverables:** Usable first-run setup, working provider status, no secret leakage in test traces.  
+**Phase 3 follow-ups:**
+
+- Phase 5: first-send confirmation from the content-side card needs a public route (ACCEPT_DISCLOSURE is privileged) or an extension-page confirmation; reuse `retry: false` for paid routes; the practice page panel becomes the real card.
+- Phase 6: remove `SPEECH_DIAGNOSE`; tighten the offscreen listener to the worker's URL.
+- Phase 7: rename the reader components' legacy classes (`.button`, `.page__actions`) to `clavis-*` and drop the aliases in `page.css`.
+- Phase 9: profile-restart E2E for the storage access level; headed check that Chrome's password manager doesn't offer to save the key.
+- Later: consider sandboxing the PDF viewer (a compromised reader page is a trusted context).
+
+**Deliverables (2026-10-22):** usable first-run setup, working provider status, no secret leakage in test traces.  
 **Gate:** A fresh user can grant or decline site access and set up, validate, change and remove a Groq key without developer assistance (FR-001–009, FR-070–073).
 
 ## Phase 4 — Production webpage selection and toolbar

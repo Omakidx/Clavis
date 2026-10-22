@@ -104,8 +104,9 @@ This table is the single source of truth for permissions; the privacy policy, st
 1. The manifest declares **no** static website `content_scripts`, so installation shows no "read and change all your data on all websites" warning.
 2. The onboarding page calls `chrome.permissions.request({ origins: ['http://*/*', 'https://*/*'] })` from a button click.
 3. The background listens to `chrome.permissions.onAdded` / `onRemoved` and calls `chrome.scripting.registerContentScripts` / `unregisterContentScripts` for the observer (`allFrames: true`, `runAt: 'document_idle'`, `persistAcrossSessions: true`). On startup it reconciles registration with `chrome.permissions.contains`.
-4. Per-site disable is a user setting checked by the observer; it does not revoke the Chrome permission.
-5. Without the grant, the context-menu item and toolbar-icon click use the `activeTab` grant to `chrome.scripting.executeScript` the observer + UI into that tab once, then open the card for the current selection.
+4. Per-site disable is a user setting (`preferences.disabledSites`). The background rewrites the registration's `excludeMatches` (`*://<host>/*` per disabled host, plus the Web Store) with `scripting.updateContentScripts`, because the observer cannot read locked-down storage. It does not revoke the Chrome permission. `tooltipBehavior: 'on-demand'` keeps the observer unregistered; the activeTab paths still work.
+5. After a grant (or when the observer becomes registered again), the background injects the observer into already-open eligible http(s) tabs, so users don't have to reload; restricted, discarded and disabled-site tabs are skipped. The user's choice is persisted as `onboarding.siteAccessChoice`.
+6. Without the grant, the context-menu item and the popup's **Explain on this page** button use the `activeTab` grant to `chrome.scripting.executeScript` the observer + UI into that tab once, then open the card for the current selection.
 
 Do **not** request `<all_urls>` solely for Groq, and never re-prompt for site access without a user gesture.
 
@@ -447,12 +448,13 @@ These rules are the single source of truth for key handling; other documents lin
 
 1. At startup in the background, call `chrome.storage.local.setAccessLevel({ accessLevel: 'TRUSTED_CONTEXTS' })` **before** registering any message route that reads storage. Explicitly verify in tests that `chrome.storage.session` is also unreadable from content scripts.
 2. Persistent keys live in `chrome.storage.local`; session-only keys live in `chrome.storage.session`. Never use `chrome.storage.sync` for secrets. Neither area is an encrypted vault or OS keychain; the settings UI must say so and must not claim encryption.
-3. Only the background reads the key. Content scripts send `AI_EXPLAIN`; there is no message that returns the key, and `GET_PUBLIC_SETTINGS` returns `hasKey: boolean`, model ID, language and rate only.
-4. `SET_API_KEY`, `TEST_API_KEY` and `REMOVE_API_KEY` are accepted only from extension pages (onboarding/options): check `sender.id === chrome.runtime.id`, that `sender.url` starts with the extension origin, and that there is no `sender.tab` pointing at a website.
+3. Only the background reads the key. Content scripts send `AI_EXPLAIN`; there is no message that returns the key, and `GET_PUBLIC_SETTINGS` returns `hasKey: boolean` and non-secret preferences only (`publicSettingsSchema`).
+4. One background router (`lib/router`) owns the single `runtime.onMessage` listener and checks every route's sender: `sender.id === chrome.runtime.id`, extension pages matched by **exact path**, no website `sender.tab`. Key routes (`SET_API_KEY`, `TEST_API_KEY`, `REMOVE_API_KEY`, `GET_KEY_STATUS`, `CLEAR_ALL_DATA`) only from `/options.html` and `/onboarding.html`; settings and status routes also from `/popup.html`; never from the reader, the practice page or the offscreen document. Unknown types get no reply; a known type from a disallowed sender or with a bad shape gets `INVALID_REQUEST`.
 5. Key inputs are masked by default; the UI may show the last 4 characters only.
-6. Removing the key clears the chosen storage area, in-memory references, connection status and any cache tied to it.
+6. Removing the key clears the chosen storage area, in-memory references, connection status and any cache tied to it, and aborts in-flight requests. Key metadata (storage area, last4, verification, models) lives in the **same area as the key**, so a session-only key leaves nothing in `chrome.storage.local`. Key reads and writes `await whenStorageLockedDown()` and fail with `STORAGE_UNAVAILABLE` if it resolved `false`; deletion is allowed regardless.
 7. One user-supplied key per provider; no developer key is ever shipped. Groq is reached only over `https:` within the narrow host permission.
 8. Extension pages have privileged access, so they must avoid DOM-based XSS (no `innerHTML` with untrusted data).
+9. AI requests are limited per tab (or per extension page): one in flight — a new `AI_EXPLAIN` aborts the previous one — and a token bucket of 10 per minute (`RATE_LIMITED` with `retryAfterMs`). `AI_EXPLAIN` requires a key and the acknowledged disclosure.
 
 ### Data flow declaration for privacy policy
 

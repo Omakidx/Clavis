@@ -14,8 +14,8 @@
 | UI | **React** | Onboarding, settings, reader, side panel, explanation card | Reusable compositional UI |
 | On-page toolbar | **Preact**, bundled in the observer (D-08, decided by Spike B) | Selection toolbar on websites | Measured 60 ms first-toolbar p95 vs ~230 ms for lazily loaded React |
 | Selection observer | **Plain TypeScript** + the Preact toolbar | Always-loaded content script on granted sites | 11.8 KB gzip total |
-| CSS | **Tailwind CSS** + CSS variables | Styling and responsive design | Efficient and themeable; scope on-page styles via Shadow DOM |
-| UI primitives | **Radix UI or shadcn/ui (selectively)** | Dialogs, tabs, popovers and a11y patterns | Avoid custom keyboard/focus logic for every control |
+| CSS | **Plain CSS with design tokens** (CSS custom properties), classes namespaced `clavis-*` (D-19) | Styling and responsive design | No global resets that would shift the PDF.js text layer; on-page styles stay inside the toolbar's Shadow DOM |
+| UI primitives | Semantic HTML first; individual **Radix UI** primitives only where a pattern needs them (e.g. tabs in the Phase 5 card) | Dialogs, tabs, popovers and a11y patterns | Avoid custom keyboard/focus logic; no shadcn/Tailwind dependency (D-19) |
 | Icons | **Lucide React** | Lightweight consistent iconography | Tree-shakeable components |
 | Validation | **Zod** | Runtime schemas for messages and AI output | Defensive extension boundaries |
 | PDF parser/renderer | **Mozilla PDF.js (`pdfjs-dist`)** core + **viewer components** (`pdfjs-dist/web/pdf_viewer`) | Rendering, virtualization, text layer, zoom, find (D-06) | Mature standard; do not build parser or page lifecycle from scratch |

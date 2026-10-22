@@ -1,28 +1,37 @@
 import { describe, expect, it, vi } from 'vitest';
 import { CONTENT_SCRIPT_ID, OPTIONAL_SITE_ORIGINS } from '../../../lib/config/constants';
 import {
+  EXCLUDED_MATCHES,
   buildRegisteredScript,
+  excludeMatchesFor,
   hasSiteAccess,
+  isObserverRegistered,
   reconcileRegistration,
   reconcileSerialized,
   type RegistrationDeps,
 } from '../../../lib/site-access/registration';
 
-function deps(options: { granted: boolean; registered: boolean }) {
+function deps(options: { granted: boolean; registered: boolean; excludeMatches?: string[] }) {
   let registered = options.registered;
+  let excludeMatches = options.excludeMatches ?? buildRegisteredScript().excludeMatches ?? [];
+  const store = (scripts: unknown): void => {
+    excludeMatches = (scripts as { excludeMatches?: string[] }[])[0]?.excludeMatches ?? [];
+  };
   const scripting = {
     getRegisteredContentScripts: vi.fn(() =>
-      Promise.resolve(registered ? [{ id: CONTENT_SCRIPT_ID }] : []),
+      Promise.resolve(registered ? [{ id: CONTENT_SCRIPT_ID, excludeMatches }] : []),
     ),
-    registerContentScripts: vi.fn(() => {
+    registerContentScripts: vi.fn((scripts: unknown) => {
       if (registered)
         return Promise.reject(new Error(`Duplicate script ID '${CONTENT_SCRIPT_ID}'`));
       registered = true;
+      store(scripts);
       return Promise.resolve();
     }),
-    updateContentScripts: vi.fn(() => {
+    updateContentScripts: vi.fn((scripts: unknown) => {
       if (!registered)
         return Promise.reject(new Error(`Script with ID '${CONTENT_SCRIPT_ID}' does not exist`));
+      store(scripts);
       return Promise.resolve();
     }),
     unregisterContentScripts: vi.fn(() => {
@@ -119,7 +128,7 @@ describe('reconcileRegistration', () => {
 
   it('rewrites the registration in place on demand (extension update), never leaving a gap', async () => {
     const { scripting, value } = deps({ granted: true, registered: true });
-    expect(await reconcileRegistration(value, { force: true })).toBe('registered');
+    expect(await reconcileRegistration(value, { force: true })).toBe('refreshed');
     expect(scripting.updateContentScripts).toHaveBeenCalledWith([buildRegisteredScript()]);
     expect(scripting.unregisterContentScripts).not.toHaveBeenCalled();
     expect(scripting.registerContentScripts).not.toHaveBeenCalled();
@@ -149,5 +158,67 @@ describe('reconcileSerialized', () => {
     failing.scripting.registerContentScripts.mockRejectedValueOnce(new Error('boom'));
     await expect(reconcileSerialized(failing.value)).rejects.toThrow('boom');
     expect(await reconcileSerialized(failing.value)).toBe('registered');
+  });
+});
+
+describe('per-site disable (FR-009) and on-demand mode (FR-006)', () => {
+  const policy = { automatic: true, disabledSites: ['news.example', 'blog.test'] };
+
+  it('excludes each disabled host with a *://host/* pattern, after the Web Store hosts', () => {
+    expect(excludeMatchesFor(policy.disabledSites)).toEqual([
+      'https://chromewebstore.google.com/*',
+      'https://chrome.google.com/webstore/*',
+      '*://news.example/*',
+      '*://blog.test/*',
+    ]);
+    expect(buildRegisteredScript(policy).excludeMatches).toEqual(
+      excludeMatchesFor(policy.disabledSites),
+    );
+  });
+
+  it('drops anything that is not a plain hostname, so Chrome never rejects the registration', () => {
+    expect(
+      excludeMatchesFor(['ok.test', 'EVIL.test', 'a b', 'x/*', '', 'host:8080', 'ok.test']),
+    ).toEqual([...EXCLUDED_MATCHES, '*://ok.test/*']);
+  });
+
+  it('registers with the exclusions when first granted', async () => {
+    const { scripting, value } = deps({ granted: true, registered: false });
+    expect(await reconcileRegistration(value, { policy })).toBe('registered');
+    expect(scripting.registerContentScripts).toHaveBeenCalledWith([buildRegisteredScript(policy)]);
+  });
+
+  it('updates the registration in place when the disabled list changes, and only then', async () => {
+    const { scripting, value } = deps({ granted: true, registered: true });
+    expect(await reconcileRegistration(value, { policy })).toBe('refreshed');
+    expect(scripting.updateContentScripts).toHaveBeenCalledWith([buildRegisteredScript(policy)]);
+    expect(await reconcileRegistration(value, { policy })).toBe('unchanged');
+    expect(scripting.updateContentScripts).toHaveBeenCalledTimes(1);
+    expect(await reconcileRegistration(value)).toBe('refreshed');
+    expect(scripting.unregisterContentScripts).not.toHaveBeenCalled();
+  });
+
+  it('keeps the observer unregistered in on-demand mode, even with access granted', async () => {
+    const onDemand = { automatic: false, disabledSites: [] };
+    const fresh = deps({ granted: true, registered: false });
+    expect(await reconcileRegistration(fresh.value, { policy: onDemand })).toBe('unchanged');
+    expect(fresh.scripting.registerContentScripts).not.toHaveBeenCalled();
+
+    const registered = deps({ granted: true, registered: true });
+    expect(await reconcileRegistration(registered.value, { policy: onDemand })).toBe(
+      'unregistered',
+    );
+    expect(registered.scripting.unregisterContentScripts).toHaveBeenCalledTimes(1);
+  });
+
+  it('reports whether the observer is registered, and false if the API fails', async () => {
+    expect(await isObserverRegistered(deps({ granted: true, registered: true }).scripting)).toBe(
+      true,
+    );
+    expect(await isObserverRegistered(deps({ granted: true, registered: false }).scripting)).toBe(
+      false,
+    );
+    const broken = { getRegisteredContentScripts: vi.fn(() => Promise.reject(new Error('x'))) };
+    expect(await isObserverRegistered(broken as never)).toBe(false);
   });
 });

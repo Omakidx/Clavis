@@ -1,12 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fakeBrowser } from 'wxt/testing/fake-browser';
-import { createSpeechRouter, registerSpeech } from '../../../lib/speech/background';
+import {
+  createSpeechHandlers,
+  rejectedSpeakReply,
+  type SpeechSender,
+} from '../../../lib/speech/background';
 import { SpeechService } from '../../../lib/speech/service';
 import type { TtsEventMessage } from '../../../lib/speech/messages';
 import { FakeEngine, ID_A, ID_B, voice } from './helpers';
-
-const EXT = 'chrome-extension://abc/';
-const OFFSCREEN = `${EXT}offscreen.html`;
 
 function setup(chromeVoices = [voice('chrome-tts', 'en-US')]) {
   const chrome = new FakeEngine('chrome-tts', chromeVoices);
@@ -15,12 +16,9 @@ function setup(chromeVoices = [voice('chrome-tts', 'en-US')]) {
   const handlePageEvent = vi.fn();
   const handlePageIdle = vi.fn();
   const pushed: { target: object; message: TtsEventMessage }[] = [];
-  const route = createSpeechRouter({
+  const handlers = createSpeechHandlers({
     service,
     offscreenEngine: { handlePageEvent, handlePageIdle },
-    runtimeId: 'abc',
-    extensionUrlPrefix: EXT,
-    offscreenPageUrl: OFFSCREEN,
     push: (target, message) => {
       pushed.push({ target, message });
       return Promise.resolve();
@@ -28,18 +26,14 @@ function setup(chromeVoices = [voice('chrome-tts', 'en-US')]) {
     offscreenApi: { getContexts: true, hasDocument: true, matchClients: true },
     userAgent: 'test',
   });
-  return { chrome, service, route, handlePageEvent, handlePageIdle, pushed };
+  return { chrome, service, handlers, handlePageEvent, handlePageIdle, pushed };
 }
 
-const SELF = { id: 'abc', url: 'https://example.com/page', tab: { id: 7 }, frameId: 2 };
-const speakMsg = (over: object = {}) => ({
-  v: 1,
-  type: 'TTS_SPEAK',
-  requestId: ID_A,
-  text: 'bank',
-  rate: 1,
-  ...over,
-});
+const SELF: SpeechSender = { tabId: 7, frameId: 2 };
+const speakMsg = (over: object = {}) =>
+  ({ v: 1, type: 'TTS_SPEAK', requestId: ID_A, text: 'bank', rate: 1, ...over }) as never;
+const stopMsg = (requestId?: string) =>
+  ({ v: 1, type: 'TTS_STOP', ...(requestId === undefined ? {} : { requestId }) }) as never;
 
 beforeEach(() => {
   vi.useFakeTimers();
@@ -50,10 +44,10 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-describe('speech router', () => {
+describe('speech handlers', () => {
   it('replies to TTS_SPEAK with an ok envelope only once audio has started', async () => {
-    const { route } = setup();
-    const reply = await route(speakMsg({ lang: 'en-US' }), SELF);
+    const { handlers } = setup();
+    const reply = await handlers.speak(speakMsg({ lang: 'en-US' }), SELF);
     expect(reply).toEqual({
       ok: true,
       requestId: ID_A,
@@ -68,8 +62,8 @@ describe('speech router', () => {
   });
 
   it('replies NO_VOICE (never ok) when no engine has a voice', async () => {
-    const { route } = setup([]);
-    const reply = (await route(speakMsg(), SELF)) as {
+    const { handlers } = setup([]);
+    const reply = (await handlers.speak(speakMsg(), SELF)) as {
       ok: boolean;
       requestId: string;
       error: { code: string; message: string };
@@ -81,64 +75,94 @@ describe('speech router', () => {
     expect(reply).not.toHaveProperty('data');
   });
 
-  it('replies with an error envelope for invalid speak requests', async () => {
-    const { route, chrome } = setup();
-    const badRate = (await route(speakMsg({ rate: 9 }), SELF)) as {
+  it('replies with an error envelope when the service rejects the request', async () => {
+    const { handlers, chrome } = setup();
+    const badRate = (await handlers.speak(speakMsg({ rate: Number.NaN }), SELF)) as {
       ok: boolean;
       error: { code: string };
     };
     expect(badRate.ok).toBe(false);
     expect(badRate.error.code).not.toBe('NO_VOICE');
-    const tooLong = await route(speakMsg({ text: 'x'.repeat(2001) }), SELF);
-    expect(tooLong).toMatchObject({ ok: false, error: { code: 'SELECTION_TOO_LONG' } });
     expect(chrome.speakCalls).toHaveLength(0);
   });
 
-  it('rejects senders that are not this extension', async () => {
-    const { route, chrome } = setup();
-    const reply = await route(speakMsg(), { id: 'someone-else', tab: { id: 1 } });
-    expect(reply).toMatchObject({ ok: false, error: { code: 'PERMISSION_DENIED' } });
-    expect(chrome.speakCalls).toHaveLength(0);
-  });
-
-  it('claims only TTS_SPEAK/TTS_STOP (and its own internal types); everything else returns undefined', () => {
-    const { route } = setup();
-    for (const message of [
-      { v: 1, type: 'AI_EXPLAIN' },
-      { v: 1, type: 'GET_PUBLIC_SETTINGS' },
-      { v: 1, type: 'GET_AI_STATUS' },
-      { v: 1, type: 'SET_API_KEY' },
-      { v: 1, target: 'offscreen', type: 'SPEECH_OFFSCREEN_GET_VOICES' },
-      { type: 'TTS_EVENT' },
-      'hello',
-      null,
-      42,
-      {},
-    ]) {
-      expect(route(message, SELF), JSON.stringify(message)).toBeUndefined();
-    }
+  it('builds the schema-rejection reply: SELECTION_TOO_LONG for long text, else INVALID_REQUEST', () => {
+    expect(rejectedSpeakReply(speakMsg({ text: 'x'.repeat(2001) }))).toMatchObject({
+      ok: false,
+      requestId: ID_A,
+      error: { code: 'SELECTION_TOO_LONG' },
+    });
+    expect(rejectedSpeakReply(speakMsg({ rate: 9 }))).toMatchObject({
+      ok: false,
+      error: { code: 'INVALID_REQUEST' },
+    });
+    // Only a well-formed UUID is echoed back.
+    expect(rejectedSpeakReply(speakMsg({ rate: 9, requestId: 'secret-text' }))).not.toHaveProperty(
+      'requestId',
+    );
   });
 
   it('handles TTS_STOP with and without a requestId', async () => {
-    const { route } = setup();
-    await route(speakMsg(), SELF);
-    expect(await route({ v: 1, type: 'TTS_STOP', requestId: ID_B }, SELF)).toEqual({
+    const { handlers } = setup();
+    await handlers.speak(speakMsg(), SELF);
+    expect(await handlers.stop(stopMsg(ID_B), SELF)).toEqual({
       ok: true,
       requestId: ID_B,
       data: { stopped: false },
     });
-    expect(await route({ v: 1, type: 'TTS_STOP' }, SELF)).toEqual({
-      ok: true,
-      data: { stopped: true },
+    expect(await handlers.stop(stopMsg(), SELF)).toEqual({ ok: true, data: { stopped: true } });
+  });
+
+  describe('TTS_STOP is scoped to the sender (Phase 2 review, INFO)', () => {
+    it('lets a tab stop only its own utterance, with or without an id', async () => {
+      const { handlers, chrome } = setup();
+      await handlers.speak(speakMsg({ requestId: ID_A }), { tabId: 1, frameId: 0 });
+
+      expect(await handlers.stop(stopMsg(), { tabId: 2 })).toMatchObject({
+        data: { stopped: false },
+      });
+      expect(await handlers.stop(stopMsg(ID_A), { tabId: 2 })).toMatchObject({
+        data: { stopped: false },
+      });
+      expect(chrome.stopCalls).toBe(0);
+
+      expect(await handlers.stop(stopMsg(), { tabId: 1 })).toMatchObject({
+        data: { stopped: true },
+      });
     });
-    expect(await route({ v: 1, type: 'TTS_STOP', requestId: 'not-a-uuid' }, SELF)).toMatchObject({
-      ok: false,
+
+    it('lets a tab stop its own utterance by id', async () => {
+      const { handlers } = setup();
+      await handlers.speak(speakMsg({ requestId: ID_A }), { tabId: 1, frameId: 0 });
+      expect(await handlers.stop(stopMsg(ID_A), { tabId: 1 })).toMatchObject({
+        data: { stopped: true },
+      });
+    });
+
+    it('lets a tab-less extension page (the popup) stop anything', async () => {
+      const { handlers } = setup();
+      await handlers.speak(speakMsg(), { tabId: 1, frameId: 0 });
+      expect(await handlers.stop(stopMsg(), {})).toMatchObject({ data: { stopped: true } });
+    });
+
+    it('does not let a tab stop speech started by the popup', async () => {
+      const { handlers } = setup();
+      await handlers.speak(speakMsg(), {});
+      expect(await handlers.stop(stopMsg(), { tabId: 3 })).toMatchObject({
+        data: { stopped: false },
+      });
+    });
+
+    it('still reaches the engines for an id-less stop when nothing is tracked (worker restarted)', async () => {
+      const { handlers, chrome } = setup();
+      await handlers.stop(stopMsg(), { tabId: 3 });
+      expect(chrome.stopCalls).toBe(1);
     });
   });
 
   it('pushes terminal states (not started) to the tab and frame that asked', async () => {
-    const { route, chrome, pushed } = setup();
-    await route(speakMsg(), SELF);
+    const { handlers, chrome, pushed } = setup();
+    await handlers.speak(speakMsg(), SELF);
     expect(pushed).toHaveLength(0);
     chrome.emit({ state: 'ended' });
     expect(pushed).toEqual([
@@ -150,9 +174,9 @@ describe('speech router', () => {
   });
 
   it('pushes cancelled to the first page when a second request replaces it', async () => {
-    const { route, pushed } = setup();
-    await route(speakMsg({ requestId: ID_A }), { ...SELF, tab: { id: 1 } });
-    await route(speakMsg({ requestId: ID_B }), { ...SELF, tab: { id: 2 } });
+    const { handlers, pushed } = setup();
+    await handlers.speak(speakMsg({ requestId: ID_A }), { tabId: 1, frameId: 2 });
+    await handlers.speak(speakMsg({ requestId: ID_B }), { tabId: 2, frameId: 2 });
     expect(pushed).toEqual([
       expect.objectContaining({
         target: { tabId: 1, frameId: 2 },
@@ -161,81 +185,27 @@ describe('speech router', () => {
     ]);
   });
 
-  it('only accepts offscreen events and idle notices from the offscreen page itself', () => {
-    const { route, handlePageEvent, handlePageIdle } = setup();
-    const event = { v: 1, type: 'SPEECH_OFFSCREEN_EVENT', requestId: ID_A, state: 'ended' };
-    route(event, SELF); // content script on a web page
-    route(event, { id: 'abc', url: `${EXT}popup.html` }); // another extension page
-    route(event, { id: 'other', url: OFFSCREEN });
-    expect(handlePageEvent).not.toHaveBeenCalled();
-    route(event, { id: 'abc', url: OFFSCREEN });
+  it('forwards offscreen events and idle notices to the offscreen engine', () => {
+    const { handlers, handlePageEvent, handlePageIdle } = setup();
+    const event = {
+      v: 1,
+      type: 'SPEECH_OFFSCREEN_EVENT',
+      requestId: ID_A,
+      state: 'ended',
+    } as const;
+    handlers.offscreenEvent(event);
     expect(handlePageEvent).toHaveBeenCalledWith(event);
-
-    route({ v: 1, type: 'SPEECH_OFFSCREEN_IDLE' }, SELF);
-    expect(handlePageIdle).not.toHaveBeenCalled();
-    route({ v: 1, type: 'SPEECH_OFFSCREEN_IDLE' }, { id: 'abc', url: OFFSCREEN });
+    handlers.offscreenIdle();
     expect(handlePageIdle).toHaveBeenCalledTimes(1);
   });
 
-  it('ignores malformed offscreen events', () => {
-    const { route, handlePageEvent } = setup();
-    route(
-      { v: 1, type: 'SPEECH_OFFSCREEN_EVENT', requestId: 'x', state: 'weird' },
-      {
-        id: 'abc',
-        url: OFFSCREEN,
-      },
-    );
-    expect(handlePageEvent).not.toHaveBeenCalled();
-  });
-
-  it('serves diagnostics to extension pages only', async () => {
-    const { route } = setup();
-    const message = { v: 1, type: 'SPEECH_DIAGNOSE' };
-    expect(await route(message, SELF)).toMatchObject({
-      ok: false,
-      error: { code: 'PERMISSION_DENIED' },
-    });
-    const reply = (await route(message, {
-      id: 'abc',
-      url: `${EXT}popup.html`,
-      tab: { id: 1 },
-    })) as {
-      ok: boolean;
-      data: { capability: { engine: string }; userAgent: string };
-    };
+  it('serves diagnostics', async () => {
+    const { handlers } = setup();
+    const reply = await handlers.diagnose();
     expect(reply.ok).toBe(true);
-    expect(reply.data.capability.engine).toBe('chrome-tts');
-    expect(reply.data.userAgent).toBe('test');
-  });
-});
-
-describe('registerSpeech', () => {
-  it('registers a runtime.onMessage listener synchronously', () => {
-    registerSpeech();
-    expect(fakeBrowser.runtime.onMessage.hasListeners()).toBe(true);
-  });
-
-  it('answers speech messages through the real listener and ignores everything else', async () => {
-    // The fake browser has no tts implementation: an engine that throws must not break Stop.
-    registerSpeech();
-    const sender = { id: fakeBrowser.runtime.id };
-
-    const ignored = await fakeBrowser.runtime.onMessage.trigger(
-      { v: 1, type: 'AI_EXPLAIN' },
-      sender,
-      vi.fn(),
-    );
-    expect(ignored).toEqual([undefined]);
-
-    const sendResponse = vi.fn();
-    const results = await fakeBrowser.runtime.onMessage.trigger(
-      { v: 1, type: 'TTS_STOP' },
-      sender,
-      sendResponse,
-    );
-    expect(results).toEqual([true]);
-    await vi.advanceTimersByTimeAsync(0);
-    expect(sendResponse).toHaveBeenCalledWith({ ok: true, data: { stopped: false } });
+    if (reply.ok) {
+      expect(reply.data.capability.engine).toBe('chrome-tts');
+      expect(reply.data.userAgent).toBe('test');
+    }
   });
 });

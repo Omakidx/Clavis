@@ -372,5 +372,959 @@
     "message": "Cut to the first $MAX$ characters.",
     "description": "Developer panel note when a selection was longer than the limit. $MAX$ is the character limit.",
     "placeholders": { "MAX": { "content": "$1" } }
+  },
+  "uiBack": {
+    "message": "Back",
+    "description": "Button that goes to the previous step of the setup wizard."
+  },
+  "uiNext": {
+    "message": "Next",
+    "description": "Button that goes to the next step of the setup wizard."
+  },
+  "uiCancel": {
+    "message": "Cancel",
+    "description": "Button that dismisses a confirmation without doing anything."
+  },
+  "uiRetry": {
+    "message": "Try again",
+    "description": "Button that repeats the action that just failed."
+  },
+  "uiLoading": {
+    "message": "Loading…",
+    "description": "Shown while a settings page section is loading its data."
+  },
+  "uiSaving": {
+    "message": "Saving…",
+    "description": "Status shown while a change is being saved."
+  },
+  "uiSaved": {
+    "message": "Saved.",
+    "description": "Confirmation announced after a setting was saved."
+  },
+  "uiOpenSettings": {
+    "message": "Open settings",
+    "description": "Button that opens the Clavis settings page."
+  },
+  "uiUpdateKey": {
+    "message": "Update key",
+    "description": "Button that opens the settings page so the user can replace a Groq key that does not work."
+  },
+  "uiConnectGroq": {
+    "message": "Connect Groq",
+    "description": "Button that opens the settings page so the user can paste a Groq key. Groq is the AI provider name."
+  },
+  "uiOpensInNewTab": {
+    "message": "(opens in a new tab)",
+    "description": "Visually hidden suffix added to the accessible name of a link that opens a new browser tab."
+  },
+  "errInvalidApiKey": {
+    "message": "Groq didn't accept your key. Check that you copied the whole key, or create a new one on the Groq keys page.",
+    "description": "Error shown when Groq rejects the API key (HTTP 401 or 403). Groq is the AI provider name."
+  },
+  "errNetwork": {
+    "message": "Clavis can't reach Groq. Check your internet connection and try again.",
+    "description": "Error shown when the network request to Groq failed."
+  },
+  "errTimeout": {
+    "message": "Groq took too long to answer. Try again in a moment.",
+    "description": "Error shown when a request to Groq timed out."
+  },
+  "errRateLimited": {
+    "message": "Groq's rate limit was reached. Wait a moment, then try again.",
+    "description": "Error shown when Groq answers that too many requests were made (HTTP 429)."
+  },
+  "errRateLimitedSeconds": {
+    "message": "Groq's rate limit was reached. Try again in about $SECONDS$ seconds.",
+    "description": "Error shown for a Groq rate limit when Groq says how long to wait. $SECONDS$ is a whole number of seconds.",
+    "placeholders": { "SECONDS": { "content": "$1" } }
+  },
+  "errStorage": {
+    "message": "Chrome's protected extension storage isn't available, so Clavis can't save or use your key. Restart Chrome and try again.",
+    "description": "Error shown when the browser could not restrict extension storage to trusted pages, so key actions are refused."
+  },
+  "errInvalidRequest": {
+    "message": "Clavis couldn't process that request. Reload this page and try again.",
+    "description": "Error shown when the background part of the extension rejected a request as malformed or from an unexpected page."
+  },
+  "errSetupRequired": {
+    "message": "Connect your Groq key to use Explain.",
+    "description": "Error shown when Explain is used before a Groq key is connected."
+  },
+  "errModelUnavailable": {
+    "message": "The chosen model isn't available. Open settings and choose another model.",
+    "description": "Error shown when the selected Groq model cannot be used with the key."
+  },
+  "errPermission": {
+    "message": "Chrome didn't allow that. Open settings to check Clavis's permissions.",
+    "description": "Error shown when the browser refused a permission-gated action."
+  },
+  "errNoResponse": {
+    "message": "Clavis isn't responding. Wait a few seconds and try again. If it keeps happening, reload the extension on the chrome://extensions page.",
+    "description": "Error shown when the extension background did not answer, for example while it restarts."
+  },
+  "errInvalidResponse": {
+    "message": "Clavis couldn't read the answer. Try again.",
+    "description": "Error shown when the answer from the provider or the extension background had an unexpected shape."
+  },
+  "errSelectionTooLong": {
+    "message": "That selection is too long. Select a shorter piece of text.",
+    "description": "Error shown when the selected text is over the allowed length."
+  },
+  "errUnsupportedSite": {
+    "message": "Clavis can't work on this kind of page.",
+    "description": "Error shown when the current page does not allow the extension."
+  },
+  "errCancelled": {
+    "message": "The request was cancelled.",
+    "description": "Status shown when a request was cancelled before it finished."
+  },
+  "errGeneric": {
+    "message": "Something went wrong. Try again.",
+    "description": "Fallback error shown when no more specific message applies."
+  },
+  "onbProgressLabel": {
+    "message": "Setup progress",
+    "description": "Accessible name of the list that shows the steps of the setup wizard."
+  },
+  "onbStepOf": {
+    "message": "Step $CURRENT$ of $TOTAL$",
+    "description": "Position in the setup wizard, for example Step 2 of 8.",
+    "placeholders": { "CURRENT": { "content": "$1" }, "TOTAL": { "content": "$2" } }
+  },
+  "onbStepPurpose": {
+    "message": "Welcome",
+    "description": "Short name of setup step 1, shown in the progress list."
+  },
+  "onbStepDisclosure": {
+    "message": "Your data",
+    "description": "Short name of the setup step that explains what data is sent, shown in the progress list."
+  },
+  "onbStepAccess": {
+    "message": "Website access",
+    "description": "Short name of the setup step about website access, shown in the progress list."
+  },
+  "onbStepGetKey": {
+    "message": "Get a key",
+    "description": "Short name of the setup step that explains how to get a Groq key, shown in the progress list."
+  },
+  "onbStepConnect": {
+    "message": "Connect",
+    "description": "Short name of the setup step where the user pastes the Groq key, shown in the progress list."
+  },
+  "onbStepPrefs": {
+    "message": "Preferences",
+    "description": "Short name of the setup step for language and reading preferences, shown in the progress list."
+  },
+  "onbStepPractice": {
+    "message": "Practice",
+    "description": "Short name of the setup step that opens the practice page, shown in the progress list."
+  },
+  "onbStepDone": {
+    "message": "Done",
+    "description": "Short name of the last setup step, shown in the progress list."
+  },
+  "onbStepCurrent": {
+    "message": "(current step)",
+    "description": "Visually hidden text that marks the current step in the setup progress list."
+  },
+  "onbStepComplete": {
+    "message": "(completed)",
+    "description": "Visually hidden text that marks a finished step in the setup progress list."
+  },
+  "onbPurposeTitle": {
+    "message": "Understand and pronounce what you read",
+    "description": "Heading of the first setup step, which explains what Clavis does."
+  },
+  "onbPurposeIntro": {
+    "message": "Clavis helps you with words and sentences you select on webpages and in PDF files you open on this computer.",
+    "description": "Intro paragraph of the first setup step."
+  },
+  "onbPurposeListen": {
+    "message": "Listen reads your selection aloud using the voices on your computer.",
+    "description": "Bullet in the first setup step. Listen is the name of a toolbar button."
+  },
+  "onbPurposeExplain": {
+    "message": "Explain tells you what it means in context, using Groq's AI with your own Groq key.",
+    "description": "Bullet in the first setup step. Explain is the name of a toolbar button. Groq is the AI provider name."
+  },
+  "onbPurposeTime": {
+    "message": "Setup takes a few minutes. You can skip the Groq key for now and still use Listen and the PDF reader.",
+    "description": "Closing paragraph of the first setup step."
+  },
+  "onbDisclosureAccepted": {
+    "message": "You've already confirmed this. You can continue.",
+    "description": "Shown on the data disclosure step when the user already clicked I understand earlier, for example when running the tutorial again."
+  },
+  "onbDisclosureSaved": {
+    "message": "Thanks. Your confirmation was saved.",
+    "description": "Status announced after the user clicked I understand."
+  },
+  "onbDisclosureNeeded": {
+    "message": "Please read this and choose I understand to continue.",
+    "description": "Hint shown on the data disclosure step before the user confirmed it."
+  },
+  "onbAccessAlternative": {
+    "message": "Without website access you can still use Clavis: select text, right-click it and choose Explain with Clavis. You can also press Alt+Shift+E after selecting text, or click the Clavis icon in Chrome and choose Explain on this page.",
+    "description": "Explains the right-click, keyboard shortcut and toolbar icon alternatives to website access. Alt+Shift+E is the default shortcut."
+  },
+  "onbAccessLater": {
+    "message": "You can change this at any time in Settings.",
+    "description": "Reminder under the website access choice."
+  },
+  "onbAccessSaveFailed": {
+    "message": "Clavis couldn't save your choice. Try again.",
+    "description": "Error shown when saving the website access choice failed."
+  },
+  "onbAccessChoose": {
+    "message": "Choose one of the two options to continue.",
+    "description": "Hint shown on the website access step before the user chose."
+  },
+  "onbGetKeyTitle": {
+    "message": "Get your Groq key",
+    "description": "Heading of the setup step that explains how to get a Groq key."
+  },
+  "onbGetKeyIntro": {
+    "message": "Explain needs an API key from your own Groq account. Clavis has no key of its own and no server.",
+    "description": "Intro paragraph of the Groq key step."
+  },
+  "onbGetKeyStep1": {
+    "message": "Open the Groq keys page and sign in or create an account.",
+    "description": "First instruction in the Groq key step."
+  },
+  "onbGetKeyStep2": {
+    "message": "Choose Create API Key, give it any name, and copy the key Groq shows you.",
+    "description": "Second instruction in the Groq key step. Create API Key is the name of a button on the Groq website."
+  },
+  "onbGetKeyStep3": {
+    "message": "Come back to this tab and paste the key in the next step.",
+    "description": "Third instruction in the Groq key step."
+  },
+  "onbGetKeyLink": {
+    "message": "Open the Groq keys page",
+    "description": "Link text that opens https://console.groq.com/keys in a new tab."
+  },
+  "onbHaveKey": {
+    "message": "I have my key",
+    "description": "Button that moves from the Groq key instructions to the step where the key is pasted."
+  },
+  "onbSkipKey": {
+    "message": "Set up later",
+    "description": "Button that skips connecting Groq during setup."
+  },
+  "onbSkipKeyHint": {
+    "message": "You can skip this. Listen and the PDF reader work without a key, and Explain will ask you to connect Groq when you first use it.",
+    "description": "Explains what happens when the user skips connecting Groq."
+  },
+  "onbConnectTitle": {
+    "message": "Connect your Groq key",
+    "description": "Heading of the setup step where the user pastes the Groq key."
+  },
+  "onbConnectContinue": {
+    "message": "Continue",
+    "description": "Button that continues after a key was connected."
+  },
+  "onbConnectContinueAnyway": {
+    "message": "Continue anyway",
+    "description": "Button that continues even though the key was not verified or not accepted."
+  },
+  "onbConnectNeeded": {
+    "message": "Connect your key, or choose Set up later.",
+    "description": "Hint shown on the connect step before a key was saved."
+  },
+  "onbPrefsTitle": {
+    "message": "Choose your preferences",
+    "description": "Heading of the setup step for language, reading level, speed and toolbar behavior."
+  },
+  "onbPrefsIntro": {
+    "message": "These save as you change them. You can change them later in Settings.",
+    "description": "Intro paragraph of the preferences step."
+  },
+  "onbPracticeTitle": {
+    "message": "Try it on a practice page",
+    "description": "Heading of the setup step that opens the practice page."
+  },
+  "onbPracticeBody": {
+    "message": "Open a short article made for practice. Select a word or a sentence, then choose Listen or Explain in the toolbar. It works on your computer without visiting any website.",
+    "description": "Body of the practice step. Listen and Explain are names of toolbar buttons."
+  },
+  "onbPracticeNoKey": {
+    "message": "You haven't connected Groq, so Explain will show you how to connect it. Listen works now.",
+    "description": "Note on the practice step when no Groq key is connected."
+  },
+  "onbPracticeOpen": {
+    "message": "Open the practice page",
+    "description": "Link text that opens the practice page in a new tab."
+  },
+  "onbDoneTitle": {
+    "message": "You're ready",
+    "description": "Heading of the last setup step."
+  },
+  "onbDoneBody": {
+    "message": "Select text on any page and use the Clavis toolbar. Settings and the PDF reader are always one click away from the Clavis icon.",
+    "description": "Body of the last setup step."
+  },
+  "onbDoneNoKey": {
+    "message": "You haven't connected Groq yet, so Explain won't work until you do. Listen and the PDF reader work now.",
+    "description": "Warning on the last setup step when no Groq key is connected."
+  },
+  "onbDoneFinish": {
+    "message": "Finish setup",
+    "description": "Button that completes setup."
+  },
+  "onbDoneSaved": {
+    "message": "Setup is complete. You can close this tab.",
+    "description": "Status shown after setup was completed."
+  },
+  "onbDoneSaveFailed": {
+    "message": "Clavis couldn't save that setup is complete. Try again.",
+    "description": "Error shown when marking setup as completed failed."
+  },
+  "onbSummaryHeading": {
+    "message": "Your setup",
+    "description": "Heading of the setup summary on the last step."
+  },
+  "onbSummaryGroq": {
+    "message": "Groq",
+    "description": "Label in the setup summary for the Groq connection. Groq is the AI provider name."
+  },
+  "onbSummaryAccess": {
+    "message": "Website access",
+    "description": "Label in the setup summary for website access."
+  },
+  "onbSummaryConnected": {
+    "message": "Connected",
+    "description": "Value in the setup summary when a Groq key is connected."
+  },
+  "onbSummaryNotConnected": {
+    "message": "Not connected",
+    "description": "Value in the setup summary when no Groq key is connected."
+  },
+  "onbSummaryOn": {
+    "message": "On",
+    "description": "Value in the setup summary when website access is on."
+  },
+  "onbSummaryOff": {
+    "message": "Off (use right-click)",
+    "description": "Value in the setup summary when website access is off; the user can use the right-click menu instead."
+  },
+  "keyTitle": {
+    "message": "Groq API key",
+    "description": "Heading of the API key section in Settings. Groq is the AI provider name."
+  },
+  "keyInputLabel": {
+    "message": "Your Groq key",
+    "description": "Label of the masked text box where the user pastes the Groq key."
+  },
+  "keyInputHint": {
+    "message": "Paste the key here. Groq keys usually start with gsk_.",
+    "description": "Hint under the Groq key text box."
+  },
+  "keyPrefixHint": {
+    "message": "This doesn't start with gsk_, which Groq keys usually do. Check that you copied the whole key.",
+    "description": "Soft warning when the pasted key does not look like a Groq key. It does not block connecting."
+  },
+  "keyShow": {
+    "message": "Show key",
+    "description": "Button that reveals the key in its text box."
+  },
+  "keyHide": {
+    "message": "Hide key",
+    "description": "Button that masks the key in its text box."
+  },
+  "keyStorageLegend": {
+    "message": "Where should Clavis keep your key?",
+    "description": "Legend of the radio group that chooses between keeping the key on this device or only for this session."
+  },
+  "keyConnect": {
+    "message": "Connect",
+    "description": "Button that saves the pasted key and checks it with Groq."
+  },
+  "keyConnecting": {
+    "message": "Connecting…",
+    "description": "Status while the key is being saved and checked."
+  },
+  "keyEmptyError": {
+    "message": "Paste your Groq key first.",
+    "description": "Error shown when Connect is pressed with an empty key box."
+  },
+  "keyFormatError": {
+    "message": "That doesn't look like a key. A key has no spaces or line breaks and is under 512 characters.",
+    "description": "Error shown when the pasted text cannot be a key."
+  },
+  "keyResultValid": {
+    "message": "Connected. Groq accepted your key ending in $LAST4$.",
+    "description": "Success message after the key was verified. $LAST4$ is the last four characters of the key.",
+    "placeholders": { "LAST4": { "content": "$1" } }
+  },
+  "keyResultInvalid": {
+    "message": "Groq didn't accept this key. Check that you copied the whole key, or create a new one on the Groq keys page.",
+    "description": "Message after Groq rejected the key."
+  },
+  "keyResultUnverified": {
+    "message": "Your key is saved, but Clavis couldn't reach Groq to check it. Check your internet connection, then choose Test connection. Explain will try the key when you use it.",
+    "description": "Message when the key was saved but the connection check failed because of a network problem."
+  },
+  "keyResultChecking": {
+    "message": "Checking your key with Groq…",
+    "description": "Status while Clavis verifies the key with Groq."
+  },
+  "keyModelsCount": {
+    "message": "Models your key can use: $COUNT$.",
+    "description": "Shown after a key check. $COUNT$ is the number of models.",
+    "placeholders": { "COUNT": { "content": "$1" } }
+  },
+  "keyTest": {
+    "message": "Test connection",
+    "description": "Button that asks Groq whether the saved key works."
+  },
+  "keyChange": {
+    "message": "Change key",
+    "description": "Button that shows the form for replacing the saved key."
+  },
+  "keyRemove": {
+    "message": "Remove key",
+    "description": "Button that deletes the saved key."
+  },
+  "keyRemoveTitle": {
+    "message": "Remove your Groq key?",
+    "description": "Heading of the confirmation shown before the key is deleted."
+  },
+  "keyRemoveBody": {
+    "message": "Clavis will delete the key from this browser and stop using Groq until you connect a new key. Your preferences stay.",
+    "description": "Body of the confirmation shown before the key is deleted."
+  },
+  "keyRemoved": {
+    "message": "Your key was removed.",
+    "description": "Status after the key was deleted."
+  },
+  "keyNone": {
+    "message": "No Groq key is connected.",
+    "description": "Status in Settings when there is no saved key."
+  },
+  "keyNoneHint": {
+    "message": "Explain needs a key. Listen and the PDF reader work without one.",
+    "description": "Hint when there is no saved key."
+  },
+  "keyFactStatus": {
+    "message": "Status",
+    "description": "Label of the key status row in Settings."
+  },
+  "keyFactKey": {
+    "message": "Key",
+    "description": "Label of the row that shows the last four characters of the saved key."
+  },
+  "keyFactStorage": {
+    "message": "Kept",
+    "description": "Label of the row that shows where the key is kept."
+  },
+  "keyFactChecked": {
+    "message": "Last checked",
+    "description": "Label of the row that shows when the key was last verified."
+  },
+  "keyEnding": {
+    "message": "Ending in $LAST4$",
+    "description": "Shows only the last four characters of the saved key. $LAST4$ is four characters.",
+    "placeholders": { "LAST4": { "content": "$1" } }
+  },
+  "keyStatusValid": {
+    "message": "Working",
+    "description": "Key status: Groq accepted the key."
+  },
+  "keyStatusInvalid": {
+    "message": "Not accepted by Groq",
+    "description": "Key status: Groq rejected the key."
+  },
+  "keyStatusUnverified": {
+    "message": "Saved, but not verified (no connection)",
+    "description": "Key status: the key is saved but could not be checked because of a network problem."
+  },
+  "keyStatusNever": {
+    "message": "Saved, not checked yet",
+    "description": "Key status: the key is saved and has never been checked."
+  },
+  "keyStorageLocalShort": {
+    "message": "On this device until you remove it",
+    "description": "Shows that the key is kept in persistent extension storage."
+  },
+  "keyStorageSessionShort": {
+    "message": "Only for this session (cleared when Chrome closes)",
+    "description": "Shows that the key is kept only in memory for this browser session."
+  },
+  "keyNeverChecked": {
+    "message": "Never",
+    "description": "Shown as the last-checked time when the key was never verified."
+  },
+  "keyNotEncrypted": {
+    "message": "Clavis does not encrypt your key. A key kept on this device sits in Chrome's extension storage, where anyone with access to your Chrome profile could find it. Clavis does not use your operating system's password vault.",
+    "description": "Statement that key storage is not encrypted and is not an operating system secret vault (FR-071). Must not claim encryption."
+  },
+  "keyConnectedLive": {
+    "message": "Connected to Groq.",
+    "description": "Short status announced after a key check succeeded."
+  },
+  "prefsTitle": {
+    "message": "Preferences",
+    "description": "Heading of the preferences section in Settings."
+  },
+  "prefLanguage": {
+    "message": "Explanation language",
+    "description": "Label of the drop-down that chooses the language explanations are written in."
+  },
+  "prefLanguageHint": {
+    "message": "Explanations are written in this language.",
+    "description": "Hint under the explanation language drop-down."
+  },
+  "prefVoiceLanguage": {
+    "message": "Voice language",
+    "description": "Label of the drop-down that chooses the language used to pick a voice for Listen."
+  },
+  "prefVoiceLanguageAuto": {
+    "message": "Same as the text",
+    "description": "Option that lets Clavis pick the voice language from the selected text."
+  },
+  "prefVoiceLanguageHint": {
+    "message": "Used to choose a voice for Listen.",
+    "description": "Hint under the voice language drop-down. Listen is the name of a toolbar button."
+  },
+  "prefLevel": {
+    "message": "Reading level",
+    "description": "Legend of the radio group that chooses how simple explanations are."
+  },
+  "prefLevelSimple": {
+    "message": "Simple: short words and plain sentences",
+    "description": "Reading level option."
+  },
+  "prefLevelStandard": {
+    "message": "Standard: everyday language",
+    "description": "Reading level option."
+  },
+  "prefLevelAdvanced": {
+    "message": "Advanced: precise, with specialist terms",
+    "description": "Reading level option."
+  },
+  "prefSpeed": {
+    "message": "Playback speed",
+    "description": "Legend of the radio group that chooses how fast Listen reads."
+  },
+  "prefSpeedNormal": {
+    "message": "Normal",
+    "description": "Playback speed option."
+  },
+  "prefSpeedSlow": {
+    "message": "Slow",
+    "description": "Playback speed option."
+  },
+  "prefSpeedCustom": {
+    "message": "Custom speed ($RATE$×)",
+    "description": "Shown when the saved playback speed is neither Normal nor Slow. $RATE$ is a number such as 1.5.",
+    "placeholders": { "RATE": { "content": "$1" } }
+  },
+  "prefTooltip": {
+    "message": "When to show the toolbar",
+    "description": "Legend of the radio group that chooses automatic or on-demand toolbar."
+  },
+  "prefTooltipAutomatic": {
+    "message": "Automatically when I select text (needs website access)",
+    "description": "Toolbar behavior option."
+  },
+  "prefTooltipOnDemand": {
+    "message": "Only when I ask: right-click, the keyboard shortcut or the Clavis icon",
+    "description": "Toolbar behavior option."
+  },
+  "prefReset": {
+    "message": "Reset to defaults",
+    "description": "Button that restores all preferences to their default values."
+  },
+  "prefResetDone": {
+    "message": "Preferences were reset to their defaults.",
+    "description": "Status after preferences were reset."
+  },
+  "prefResetHint": {
+    "message": "Resets language, reading level, speed, toolbar behavior and model choice.",
+    "description": "Hint next to the reset button."
+  },
+  "prefLoadFailed": {
+    "message": "Clavis couldn't load your settings.",
+    "description": "Error shown when loading settings failed."
+  },
+  "modelTitle": {
+    "message": "Model",
+    "description": "Heading of the model section in Settings."
+  },
+  "modelLabel": {
+    "message": "Model used for Explain",
+    "description": "Label of the model drop-down."
+  },
+  "modelAuto": {
+    "message": "Recommended by Clavis (default)",
+    "description": "Model option that lets Clavis use its default model."
+  },
+  "modelChoose": {
+    "message": "Choose a model",
+    "description": "Placeholder option when the saved model is not available and the user must pick another."
+  },
+  "modelMissing": {
+    "message": "The model you chose, $MODEL$, isn't available to your key right now. Choose another model below. Clavis won't switch models for you.",
+    "description": "Warning when the saved model is missing from the list Groq returned. $MODEL$ is a model id.",
+    "placeholders": { "MODEL": { "content": "$1" } }
+  },
+  "modelUnavailableOption": {
+    "message": "$MODEL$ (not available now)",
+    "description": "Drop-down option for a saved model that is no longer in the list. $MODEL$ is a model id.",
+    "placeholders": { "MODEL": { "content": "$1" } }
+  },
+  "modelListNoKey": {
+    "message": "Connect a Groq key to see the models you can use. Until then Clavis uses its recommended model.",
+    "description": "Note under the model drop-down when no key is saved."
+  },
+  "modelListEmpty": {
+    "message": "The list of models appears after Clavis checks your key with Groq. Until then Clavis uses its recommended model.",
+    "description": "Note under the model drop-down when the key was never verified."
+  },
+  "modelListUnverified": {
+    "message": "Clavis couldn't check your key with Groq, so this list may be out of date.",
+    "description": "Note under the model drop-down when the last key check failed because of the network."
+  },
+  "modelPlanNote": {
+    "message": "Which models you can use and their limits depend on your Groq plan. Clavis never switches models on its own.",
+    "description": "Note under the model drop-down."
+  },
+  "siteTitle": {
+    "message": "Website access",
+    "description": "Heading of the website access section in Settings."
+  },
+  "siteStatusLabel": {
+    "message": "Website access status",
+    "description": "Accessible label of the website access status line."
+  },
+  "siteStatusOn": {
+    "message": "Website access is on. Clavis shows its toolbar when you select text on websites.",
+    "description": "Settings status when site access is granted and active."
+  },
+  "siteStatusNotStarted": {
+    "message": "Website access is on, but Clavis hasn't started on your open pages yet. Reload a page to use the toolbar there.",
+    "description": "Settings status when site access is granted but the page script is not registered yet."
+  },
+  "siteStatusOff": {
+    "message": "Website access is off. Select text, right-click and choose Explain with Clavis, or click the Clavis icon and choose Explain on this page.",
+    "description": "Settings status when site access is not granted."
+  },
+  "siteStatusLoading": {
+    "message": "Checking website access…",
+    "description": "Settings status while the website access state is loading."
+  },
+  "siteRevokeHelp": {
+    "message": "To turn it off in Chrome, open Clavis on the chrome://extensions page, choose Details, and change Site access. You can also use the button below.",
+    "description": "Explains how to revoke website access in Chrome."
+  },
+  "siteRevoke": {
+    "message": "Remove website access",
+    "description": "Button that removes the optional website access."
+  },
+  "siteRevoked": {
+    "message": "Website access was removed.",
+    "description": "Status after website access was removed."
+  },
+  "siteOpenExtensions": {
+    "message": "Open Clavis in Chrome's extensions page",
+    "description": "Button that opens Clavis's details on the chrome://extensions page."
+  },
+  "siteDisabledTitle": {
+    "message": "Websites where Clavis stays off",
+    "description": "Heading of the per-site disable list in Settings."
+  },
+  "siteDisabledIntro": {
+    "message": "Clavis won't show its toolbar automatically on these websites.",
+    "description": "Explains the per-site disable list."
+  },
+  "siteDisabledLabel": {
+    "message": "Website address",
+    "description": "Label of the text box for adding a website to the disable list."
+  },
+  "siteDisabledHint": {
+    "message": "For example: example.com. Only that exact address is matched: example.com does not cover www.example.com, so add each address you need.",
+    "description": "Hint under the website address text box."
+  },
+  "siteDisabledAdd": {
+    "message": "Add website",
+    "description": "Button that adds a website to the disable list."
+  },
+  "siteDisabledListLabel": {
+    "message": "Websites where Clavis is off",
+    "description": "Accessible name of the list of disabled websites."
+  },
+  "siteDisabledRemove": {
+    "message": "Remove $SITE$",
+    "description": "Accessible name of the button that removes one website from the list. $SITE$ is a host name.",
+    "placeholders": { "SITE": { "content": "$1" } }
+  },
+  "siteDisabledRemoveShort": {
+    "message": "Remove",
+    "description": "Visible text of the button that removes one website from the list."
+  },
+  "siteDisabledEmpty": {
+    "message": "No websites are listed.",
+    "description": "Shown when the disable list is empty."
+  },
+  "siteDisabledErrEmpty": {
+    "message": "Enter a website address.",
+    "description": "Error shown when adding an empty website address."
+  },
+  "siteDisabledErrInvalid": {
+    "message": "That doesn't look like a website address. Use a name such as example.com.",
+    "description": "Error shown when the website address is not valid."
+  },
+  "siteDisabledErrDuplicate": {
+    "message": "$SITE$ is already on the list.",
+    "description": "Error shown when the website is already listed. $SITE$ is a host name.",
+    "placeholders": { "SITE": { "content": "$1" } }
+  },
+  "siteDisabledErrLimit": {
+    "message": "The list is full. Remove a website before adding another.",
+    "description": "Error shown when the disable list reached its maximum size."
+  },
+  "siteDisabledAdded": {
+    "message": "Added $SITE$.",
+    "description": "Status after adding a website to the list. $SITE$ is a host name.",
+    "placeholders": { "SITE": { "content": "$1" } }
+  },
+  "siteDisabledRemoved": {
+    "message": "Removed $SITE$.",
+    "description": "Status after removing a website from the list. $SITE$ is a host name.",
+    "placeholders": { "SITE": { "content": "$1" } }
+  },
+  "privacyTitle": {
+    "message": "Privacy and data",
+    "description": "Heading of the privacy section in Settings."
+  },
+  "privacyIntro": {
+    "message": "This is what Clavis does with your reading, and when.",
+    "description": "Intro line of the privacy section in Settings."
+  },
+  "privacyPolicyLink": {
+    "message": "Clavis privacy policy",
+    "description": "Link text to the Clavis privacy policy."
+  },
+  "clearTitle": {
+    "message": "Clear all Clavis data",
+    "description": "Heading of the clear-all-data block in Settings."
+  },
+  "clearBody": {
+    "message": "Removes your Groq key, preferences, setup progress and website list from this browser. It does not remove website access that Chrome granted; use Remove website access for that.",
+    "description": "Explains what Clear all data removes."
+  },
+  "clearButton": {
+    "message": "Clear all data",
+    "description": "Button that starts clearing all Clavis data."
+  },
+  "clearConfirmTitle": {
+    "message": "Clear all Clavis data?",
+    "description": "Heading of the confirmation shown before clearing all data."
+  },
+  "clearConfirmBody": {
+    "message": "This removes your key, preferences and setup progress from this browser. It can't be undone.",
+    "description": "Body of the confirmation shown before clearing all data."
+  },
+  "clearConfirm": {
+    "message": "Clear all data",
+    "description": "Button that confirms clearing all data."
+  },
+  "clearDone": {
+    "message": "All Clavis data was removed from this browser.",
+    "description": "Status after all data was cleared."
+  },
+  "helpTitle": {
+    "message": "Help and practice",
+    "description": "Heading of the help section in Settings."
+  },
+  "helpTutorial": {
+    "message": "Run the welcome tutorial again",
+    "description": "Link that opens the first-run setup wizard again."
+  },
+  "helpPractice": {
+    "message": "Open the practice page",
+    "description": "Link that opens the practice page in a new tab."
+  },
+  "helpPdf": {
+    "message": "Open the PDF reader",
+    "description": "Link that opens the PDF reader in a new tab."
+  },
+  "helpShortcut": {
+    "message": "Keyboard: select text, then press Alt+Shift+E to open the Clavis toolbar. You can change the shortcut on the chrome://extensions/shortcuts page.",
+    "description": "Explains the keyboard shortcut. Alt+Shift+E is the default."
+  },
+  "optionsNavLabel": {
+    "message": "Settings sections",
+    "description": "Accessible name of the navigation list that jumps between settings sections."
+  },
+  "popupGroqLabel": {
+    "message": "Groq",
+    "description": "Label in the popup status for the Groq connection. Groq is the AI provider name."
+  },
+  "popupGroqReady": {
+    "message": "Connected",
+    "description": "Popup status: a Groq key is saved and usable."
+  },
+  "popupGroqSetup": {
+    "message": "Setup needed",
+    "description": "Popup status: no Groq key is saved."
+  },
+  "popupGroqInvalid": {
+    "message": "Key not working",
+    "description": "Popup status: the saved key was rejected by Groq."
+  },
+  "popupGroqDisclosure": {
+    "message": "Review the data notice",
+    "description": "Popup status: a key is saved but the data disclosure was not confirmed yet."
+  },
+  "popupGroqStorage": {
+    "message": "Key storage isn't available",
+    "description": "Popup status: Chrome could not restrict extension storage, so key actions are refused."
+  },
+  "popupGroqChecking": {
+    "message": "Checking…",
+    "description": "Popup status while the Groq state is loading."
+  },
+  "popupGroqUnknown": {
+    "message": "Status unavailable",
+    "description": "Popup status when the Groq state could not be read."
+  },
+  "popupSiteLabel": {
+    "message": "Website access",
+    "description": "Label in the popup status for website access."
+  },
+  "popupSiteOn": {
+    "message": "On",
+    "description": "Popup status: website access is granted."
+  },
+  "popupSiteOff": {
+    "message": "Off",
+    "description": "Popup status: website access is not granted."
+  },
+  "popupSiteChecking": {
+    "message": "Checking…",
+    "description": "Popup status while website access is being read."
+  },
+  "popupReviewSetup": {
+    "message": "Review setup",
+    "description": "Popup button that opens the setup wizard to confirm the data notice."
+  },
+  "popupStatusLabel": {
+    "message": "Clavis status",
+    "description": "Accessible name of the popup status list."
+  },
+  "practiceTitle": {
+    "message": "Clavis practice page",
+    "description": "Heading and tab title of the practice page."
+  },
+  "practiceIntro": {
+    "message": "Try Clavis here. Select a word or a sentence in the article with your mouse, then choose Listen or Explain in the toolbar that appears.",
+    "description": "Intro on the practice page. Listen and Explain are names of toolbar buttons."
+  },
+  "practiceNoKey": {
+    "message": "No Groq key yet? Listen works without one. Explain will show you how to connect Groq.",
+    "description": "Note on the practice page."
+  },
+  "practiceTryTitle": {
+    "message": "Things to try",
+    "description": "Heading of the list of practice suggestions."
+  },
+  "practiceTry1": {
+    "message": "Select the word bank in the first paragraph and choose Explain. Then select bank in the last paragraph and compare the two answers.",
+    "description": "Practice suggestion. bank is a word to select in the article."
+  },
+  "practiceTry2": {
+    "message": "Select the whole sentence She finally broke the ice. and choose Explain. Is it about ice, or about something else?",
+    "description": "Practice suggestion. The quoted sentence appears in the article."
+  },
+  "practiceTry3": {
+    "message": "Press Escape to close the toolbar.",
+    "description": "Practice suggestion."
+  },
+  "practiceArticleLabel": {
+    "message": "Practice article",
+    "description": "Accessible name of the frame that contains the practice article."
+  },
+  "practiceArticleTitle": {
+    "message": "A morning by the river",
+    "description": "Title of the practice article."
+  },
+  "practiceArticleP1": {
+    "message": "They sat on the bank of the river and watched the water slide by. A heron stood very still among the reeds.",
+    "description": "First paragraph of the practice article. Contains the word bank in its river meaning."
+  },
+  "practiceArticleP2": {
+    "message": "Everyone was quiet at first. She finally broke the ice. Soon they were all laughing about the ducks.",
+    "description": "Second paragraph of the practice article. Contains the sentence She finally broke the ice. which must stay a separate sentence."
+  },
+  "practiceArticleP3": {
+    "message": "Later they walked into town, where Sam stopped at the bank to pay a bill. The two words look the same, but a river bank and a money bank are different things.",
+    "description": "Third paragraph of the practice article. Contains the word bank in its money meaning."
+  },
+  "practiceShowToolbar": {
+    "message": "Show the toolbar for my selection",
+    "description": "Button that opens the toolbar for the text currently selected in the practice article, as a keyboard alternative."
+  },
+  "practiceShowToolbarHint": {
+    "message": "Prefer the keyboard? Select text first, then use this button.",
+    "description": "Hint next to the show toolbar button."
+  },
+  "practiceNoSelection": {
+    "message": "Select some text in the article first.",
+    "description": "Shown when the show toolbar button was used without a selection."
+  },
+  "practiceResultTitle": {
+    "message": "Result",
+    "description": "Heading of the panel that shows what Listen or Explain did."
+  },
+  "practiceResultEmpty": {
+    "message": "Choose Listen or Explain in the toolbar to see the result here.",
+    "description": "Placeholder in the result panel before anything was chosen."
+  },
+  "practiceListening": {
+    "message": "Reading aloud…",
+    "description": "Status while Listen is speaking."
+  },
+  "practiceExplaining": {
+    "message": "Asking Groq…",
+    "description": "Status while Explain waits for Groq."
+  },
+  "practiceMeaning": {
+    "message": "Meaning here",
+    "description": "Label of the in-context meaning in the Explain result."
+  },
+  "practiceDefinition": {
+    "message": "Definition",
+    "description": "Label of the definition in the Explain result."
+  },
+  "practiceExamples": {
+    "message": "Examples",
+    "description": "Label of the examples in the Explain result."
+  },
+  "practiceCaveat": {
+    "message": "Note",
+    "description": "Label of the caveat in the Explain result."
+  },
+  "practiceModel": {
+    "message": "Model: $MODEL$",
+    "description": "Shows which model produced the Explain result. $MODEL$ is a model id.",
+    "placeholders": { "MODEL": { "content": "$1" } }
+  },
+  "practiceSelected": {
+    "message": "Selected: $TEXT$",
+    "description": "Shows the text that was selected for Listen or Explain. $TEXT$ is the selection.",
+    "placeholders": { "TEXT": { "content": "$1" } }
+  },
+  "settingsReloadNote": {
+    "message": "Changes to when the toolbar appears and to this list apply to pages you load afterwards. Reload pages that are already open.",
+    "description": "Note in Settings: toolbar behavior and per-site disable changes only affect pages loaded after the change."
+  },
+  "keyRemoveGroqNote": {
+    "message": "Removing the key from Clavis does not cancel it at Groq. To delete it there too, open the Groq keys page.",
+    "description": "Part of the confirmation before removing the key: the key stays valid at Groq until deleted there. Followed by a link."
+  },
+  "keyRemoveGroqLink": {
+    "message": "Groq keys page",
+    "description": "Link text to https://console.groq.com/keys in the remove-key confirmation."
   }
 }

@@ -22,14 +22,31 @@ export async function requestSiteAccess(
   }
 }
 
+/** Remove the optional website access again (Settings). Resolves to whether Chrome removed it. */
+export async function removeSiteAccess(
+  permissions: Pick<typeof browser.permissions, 'remove'>,
+): Promise<boolean> {
+  try {
+    return await permissions.remove({ origins: [...OPTIONAL_SITE_ORIGINS] });
+  } catch {
+    return false;
+  }
+}
+
 export type SiteAccessStatus = 'unknown' | 'granted' | 'not-granted';
 export type SiteAccessRequestState = 'idle' | 'pending' | 'skipped' | RequestOutcome;
 
 export interface SiteAccess {
   status: SiteAccessStatus;
   requestState: SiteAccessRequestState;
-  /** Click handler for the "Enable on websites" button. */
-  grant(): void;
+  /**
+   * Click handler for the "Enable on websites" button. The Chrome prompt is requested
+   * synchronously; `onOutcome` (optional) receives the user's answer so callers can persist it.
+   * Returns nothing so it can be used directly as a click handler.
+   */
+  grant(onOutcome?: (outcome: RequestOutcome) => void): void;
+  /** Click handler for "Remove website access" (Settings). Resolves to whether it was removed. */
+  revoke(): Promise<boolean>;
   /** Click handler for "Not now". */
   skip(): void;
 }
@@ -56,15 +73,25 @@ export function useSiteAccess(): SiteAccess {
     };
   }, []);
 
-  const grant = useCallback(() => {
+  const grant = useCallback((onOutcome?: (outcome: RequestOutcome) => void): void => {
     setRequestState('pending');
+    // `requestSiteAccess` calls permissions.request before its first await, i.e. still inside
+    // the click handler's user gesture. Nothing may be awaited above this line.
     void requestSiteAccess(browser.permissions).then((outcome) => {
       setRequestState(outcome);
-      setStatus(outcome === 'granted' ? 'granted' : 'not-granted');
+      // A refusal must not downgrade an access that was already granted.
+      if (outcome === 'granted') setStatus('granted');
+      onOutcome?.(outcome);
     });
+  }, []);
+
+  const revoke = useCallback(async (): Promise<boolean> => {
+    const removed = await removeSiteAccess(browser.permissions);
+    if (removed) setStatus('not-granted');
+    return removed;
   }, []);
 
   const skip = useCallback(() => setRequestState('skipped'), []);
 
-  return { status, requestState, grant, skip };
+  return { status, requestState, grant, revoke, skip };
 }

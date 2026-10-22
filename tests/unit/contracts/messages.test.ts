@@ -158,7 +158,14 @@ describe('privilegedMessageSchema / parsePrivilegedMessage', () => {
 
 describe('messageReplySchema', () => {
   const schema = messageReplySchema(publicSettingsSchema);
-  const settings = { hasKey: false, model: 'm', explanationLanguage: 'en', ttsRate: 1 };
+  const settings = {
+    hasKey: false,
+    disclosureAccepted: false,
+    explanationLanguage: 'en',
+    readingLevel: 'standard',
+    tooltipBehavior: 'automatic',
+    ttsRate: 1,
+  };
 
   it('accepts ok and error replies', () => {
     expect(schema.safeParse({ ok: true, data: settings }).success).toBe(true);

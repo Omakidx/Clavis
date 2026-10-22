@@ -1,22 +1,18 @@
 import { browser } from 'wxt/browser';
 import { MESSAGE_VERSION } from '../config/constants';
 import {
+  idSchema,
   parsePublicMessage,
   type ErrorCode,
   type MessageIssue,
   type MessageReply,
+  type PublicMessage,
 } from '../contracts';
 import { t } from '../i18n';
 import { logger } from '../security/logger';
-import { OFFSCREEN_PAGE_PATH } from './constants';
 import { ChromeTtsEngine } from './engines/chrome-tts';
 import { OffscreenSpeechEngine } from './engines/offscreen';
-import {
-  offscreenEventSchema,
-  offscreenIdleSchema,
-  speechDiagnoseSchema,
-  type TtsEventMessage,
-} from './messages';
+import { type OffscreenEventMessage, type TtsEventMessage } from './messages';
 import { createOffscreenHost } from './offscreen-host';
 import { SpeechService } from './service';
 import {
@@ -48,34 +44,31 @@ interface PushTarget {
   frameId?: number | undefined;
 }
 
-export interface SpeechRouterDeps {
+export interface SpeechHandlerDeps {
   service: SpeechService;
   offscreenEngine: Pick<OffscreenSpeechEngine, 'handlePageEvent' | 'handlePageIdle'>;
-  runtimeId: string;
-  /** `chrome-extension://<id>/` */
-  extensionUrlPrefix: string;
-  /** Absolute URL of the offscreen page, to authenticate relayed events. */
-  offscreenPageUrl: string;
   push(target: PushTarget, message: TtsEventMessage): Promise<unknown>;
   offscreenApi?: SpeechDiagnoseReplyData['offscreenApi'];
   userAgent?: string;
 }
 
-type SenderLike = {
-  id?: string | undefined;
-  url?: string | undefined;
-  tab?: { id?: number | undefined } | undefined;
+/** Where a speech request came from. Supplied by the router from the classified sender. */
+export interface SpeechSender {
+  /** Absent for tab-less extension pages (the popup). */
+  tabId?: number | undefined;
   frameId?: number | undefined;
-};
+}
 
-const IGNORED = undefined;
+type TtsSpeakMessage = Extract<PublicMessage, { type: 'TTS_SPEAK' }>;
+type TtsStopMessage = Extract<PublicMessage, { type: 'TTS_STOP' }>;
 
-// There is no INVALID_REQUEST code in lib/contracts/errors.ts yet (proposed in
-// the Spike D report). Until then validation failures use INVALID_RESPONSE.
-const INVALID_REQUEST_CODE: ErrorCode = 'INVALID_RESPONSE';
-
-function messageType(raw: unknown): unknown {
-  return typeof raw === 'object' && raw !== null ? (raw as { type?: unknown }).type : undefined;
+/** Echo a correlation id only if it is a well-formed UUID; never any other caller-supplied value. */
+function requestIdOf(raw: unknown): string | undefined {
+  const id =
+    typeof raw === 'object' && raw !== null
+      ? (raw as { requestId?: unknown }).requestId
+      : undefined;
+  return typeof id === 'string' && idSchema.safeParse(id).success ? id : undefined;
 }
 
 function failure(
@@ -94,29 +87,32 @@ function failure(
   return { ok: false, ...(requestId === undefined ? {} : { requestId }), error: { code, message } };
 }
 
-function requestIdOf(raw: unknown): string | undefined {
-  const id =
-    typeof raw === 'object' && raw !== null
-      ? (raw as { requestId?: unknown }).requestId
-      : undefined;
-  return typeof id === 'string' && id.length <= 64 ? id : undefined;
-}
-
 function invalidReply(raw: unknown, issues: MessageIssue[], reason: string): MessageReply<never> {
   const tooLong =
     reason === 'too_large' || issues.some((i) => i.path === 'text' && i.code === 'too_big');
   return tooLong
     ? failure('SELECTION_TOO_LONG', 'speechInvalidRequest', 'Text is too long.', requestIdOf(raw))
-    : failure(INVALID_REQUEST_CODE, 'speechInvalidRequest', 'Invalid request.', requestIdOf(raw));
+    : failure('INVALID_REQUEST', 'speechInvalidRequest', 'Invalid request.', requestIdOf(raw));
 }
 
 /**
- * Message router for the speech module. Returns a pending reply for the speech
- * messages it owns and `undefined` for everything else, so other modules'
- * `runtime.onMessage` listeners keep working (only the first listener that
- * replies wins, so this must never claim a message that is not its own).
+ * Reply for a TTS_SPEAK that failed schema validation: SELECTION_TOO_LONG when the text
+ * was the problem (the UI offers "Use the first 2,000 characters"), else INVALID_REQUEST.
  */
-export function createSpeechRouter(deps: SpeechRouterDeps) {
+export function rejectedSpeakReply(raw: unknown): MessageReply<never> {
+  const parsed = parsePublicMessage(raw);
+  return parsed.ok
+    ? failure('INVALID_REQUEST', 'speechInvalidRequest', 'Invalid request.', requestIdOf(raw))
+    : invalidReply(raw, parsed.issues, parsed.reason);
+}
+
+/**
+ * Speech handlers for the message router (Phase 3). The router owns sender checks and
+ * schema validation; these receive validated messages and the sender's tab.
+ *
+ * Replies are always envelopes: `started` only once audio has actually started.
+ */
+export function createSpeechHandlers(deps: SpeechHandlerDeps) {
   const { service } = deps;
   const targets = new Map<string, PushTarget>();
 
@@ -138,125 +134,100 @@ export function createSpeechRouter(deps: SpeechRouterDeps) {
       });
   });
 
-  const fromThisExtension = (sender: SenderLike): boolean => sender.id === deps.runtimeId;
-  const fromExtensionPage = (sender: SenderLike): boolean =>
-    fromThisExtension(sender) && sender.url?.startsWith(deps.extensionUrlPrefix) === true;
-  const fromOffscreenPage = (sender: SenderLike): boolean =>
-    fromThisExtension(sender) && sender.url?.startsWith(deps.offscreenPageUrl) === true;
-
-  async function speak(raw: unknown, sender: SenderLike): Promise<MessageReply<TtsSpeakReplyData>> {
-    if (!fromThisExtension(sender)) {
-      return failure('PERMISSION_DENIED', undefined, 'Not allowed.', requestIdOf(raw));
-    }
-    const parsed = parsePublicMessage(raw);
-    if (!parsed.ok) return invalidReply(raw, parsed.issues, parsed.reason);
-    if (parsed.message.type !== 'TTS_SPEAK') {
-      return failure(INVALID_REQUEST_CODE, 'speechInvalidRequest', 'Invalid request.');
-    }
-    const { requestId, text, lang, rate } = parsed.message;
-
-    targets.set(requestId, { tabId: sender.tab?.id, frameId: sender.frameId });
-    try {
-      const result = await service.speak({ requestId, text, lang, rate });
-      const { requestId: _omit, ...rest } = result;
-      return { ok: true, requestId, data: { ...rest, state: 'started' } };
-    } catch (error) {
-      targets.delete(requestId);
-      if (error instanceof SpeechError) {
-        return failure(error.code, error.messageKey, error.message, requestId);
+  return {
+    async speak(
+      message: TtsSpeakMessage,
+      sender: SpeechSender,
+    ): Promise<MessageReply<TtsSpeakReplyData>> {
+      const { requestId, text, lang, rate } = message;
+      targets.set(requestId, { tabId: sender.tabId, frameId: sender.frameId });
+      try {
+        const result = await service.speak({ requestId, text, lang, rate });
+        const { requestId: _omit, ...rest } = result;
+        return { ok: true, requestId, data: { ...rest, state: 'started' } };
+      } catch (error) {
+        targets.delete(requestId);
+        if (error instanceof SpeechError) {
+          return failure(error.code, error.messageKey, error.message, requestId);
+        }
+        logger.error('speech_unexpected_failure', { requestId });
+        return failure('NO_VOICE', 'speechStartFailed', 'Speech failed.', requestId);
       }
-      logger.error('speech_unexpected_failure', { requestId });
-      return failure('NO_VOICE', 'speechStartFailed', 'Speech failed.', requestId);
-    }
-  }
+    },
 
-  async function stop(raw: unknown, sender: SenderLike): Promise<MessageReply<TtsStopReplyData>> {
-    if (!fromThisExtension(sender)) {
-      return failure('PERMISSION_DENIED', undefined, 'Not allowed.', requestIdOf(raw));
-    }
-    const parsed = parsePublicMessage(raw);
-    if (!parsed.ok || parsed.message.type !== 'TTS_STOP') {
-      return failure(
-        INVALID_REQUEST_CODE,
-        'speechInvalidRequest',
-        'Invalid request.',
-        requestIdOf(raw),
-      );
-    }
-    const requestId = parsed.message.requestId;
-    const stopped = await service.stop(requestId);
-    return { ok: true, ...(requestId === undefined ? {} : { requestId }), data: { stopped } };
-  }
+    /**
+     * Stop speech. A tab (content script or reader) may only stop ITS OWN utterance, with or
+     * without a requestId (Phase 2 review: an id-less stop from any tab used to stop all
+     * speech). Tab-less extension pages (the popup) are global controls and stop anything.
+     * With nothing tracked at all (the worker restarted mid-utterance) an id-less stop still
+     * reaches the engines, because chrome.tts keeps speaking untracked.
+     */
+    async stop(
+      message: TtsStopMessage,
+      sender: SpeechSender,
+    ): Promise<MessageReply<TtsStopReplyData>> {
+      const { requestId } = message;
+      const reply = (stopped: boolean): MessageReply<TtsStopReplyData> => ({
+        ok: true,
+        ...(requestId === undefined ? {} : { requestId }),
+        data: { stopped },
+      });
+      if (sender.tabId !== undefined) {
+        const owns = (target: PushTarget | undefined): boolean => target?.tabId === sender.tabId;
+        if (requestId !== undefined) {
+          if (!owns(targets.get(requestId))) return reply(false);
+        } else if (targets.size > 0 && ![...targets.values()].some(owns)) {
+          return reply(false);
+        }
+      }
+      return reply(await service.stop(requestId));
+    },
 
-  async function diagnose(sender: SenderLike): Promise<MessageReply<SpeechDiagnoseReplyData>> {
-    if (!fromExtensionPage(sender)) {
-      return failure('PERMISSION_DENIED', undefined, 'Extension pages only.');
-    }
-    return {
-      ok: true,
-      data: {
-        capability: await service.getCapability({ probeAll: true }),
-        offscreenApi: deps.offscreenApi ?? {
-          getContexts: false,
-          hasDocument: false,
-          matchClients: false,
+    async diagnose(): Promise<MessageReply<SpeechDiagnoseReplyData>> {
+      return {
+        ok: true,
+        data: {
+          capability: await service.getCapability({ probeAll: true }),
+          offscreenApi: deps.offscreenApi ?? {
+            getContexts: false,
+            hasDocument: false,
+            matchClients: false,
+          },
+          userAgent: deps.userAgent ?? '',
         },
-        userAgent: deps.userAgent ?? '',
-      },
-    };
-  }
+      };
+    },
 
-  return function route(raw: unknown, sender: SenderLike): Promise<unknown> | undefined {
-    switch (messageType(raw)) {
-      case 'TTS_SPEAK':
-        return speak(raw, sender);
-      case 'TTS_STOP':
-        return stop(raw, sender);
-      case 'SPEECH_DIAGNOSE':
-        return speechDiagnoseSchema.safeParse(raw).success ? diagnose(sender) : IGNORED;
-      case 'SPEECH_OFFSCREEN_EVENT': {
-        const event = offscreenEventSchema.safeParse(raw);
-        if (event.success && fromOffscreenPage(sender)) {
-          deps.offscreenEngine.handlePageEvent(event.data);
-        }
-        return IGNORED;
-      }
-      case 'SPEECH_OFFSCREEN_IDLE':
-        if (offscreenIdleSchema.safeParse(raw).success && fromOffscreenPage(sender)) {
-          deps.offscreenEngine.handlePageIdle();
-        }
-        return IGNORED;
-      default:
-        return IGNORED;
-    }
+    offscreenEvent(event: OffscreenEventMessage): void {
+      deps.offscreenEngine.handlePageEvent(event);
+    },
+
+    offscreenIdle(): void {
+      deps.offscreenEngine.handlePageIdle();
+    },
   };
 }
 
+export type SpeechHandlers = ReturnType<typeof createSpeechHandlers>;
+
 /**
- * Called once, synchronously, from the service worker at startup (MV3 requires
- * listeners to be registered in the first turn). Nothing here awaits.
+ * Build the speech stack for the service worker. Registers NO listener: its messages
+ * (TTS_SPEAK, TTS_STOP, SPEECH_DIAGNOSE, the offscreen events) are routes in the single
+ * message router (lib/router), which checks senders and validates shapes.
  *
  * Phase 6 design notes (Spike D):
  * - The service lives in the worker's memory. If the worker is torn down mid
- *   utterance, chrome.tts keeps speaking but tracking is lost; a Stop without a
- *   requestId therefore stops every engine, tracked or not.
+ *   utterance, chrome.tts keeps speaking but tracking is lost.
  * - State events are pushed with tabs.sendMessage (frame-targeted) to the tab
  *   that asked, or runtime.sendMessage for tab-less extension pages (popup).
- * - Phase 3's central router should call `createSpeechRouter(...)` instead of
- *   adding a second listener, and TTS_EVENT / the offscreen messages should be
- *   promoted into lib/contracts.
  */
-export function registerSpeech(): void {
-  const offscreenPageUrl = browser.runtime.getURL(OFFSCREEN_PAGE_PATH);
+export function createSpeech(): SpeechHandlers {
   const offscreenEngine = new OffscreenSpeechEngine({ host: createOffscreenHost() });
   const service = new SpeechService({ engines: [new ChromeTtsEngine(), offscreenEngine] });
 
-  const route = createSpeechRouter({
+  return createSpeechHandlers({
     service,
     offscreenEngine,
-    runtimeId: browser.runtime.id,
-    extensionUrlPrefix: new URL('/', offscreenPageUrl).href,
-    offscreenPageUrl,
     offscreenApi: {
       getContexts: typeof browser.runtime.getContexts === 'function',
       hasDocument: typeof browser.offscreen?.hasDocument === 'function',
@@ -271,12 +242,5 @@ export function registerSpeech(): void {
             message,
             target.frameId === undefined ? {} : { frameId: target.frameId },
           ) as Promise<unknown>),
-  });
-
-  browser.runtime.onMessage.addListener((raw: unknown, sender, sendResponse) => {
-    const pending = route(raw, sender);
-    if (pending === undefined) return undefined;
-    void pending.then(sendResponse);
-    return true;
   });
 }

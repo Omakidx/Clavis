@@ -3,7 +3,8 @@ import { LIMITS, MESSAGE_VERSION } from '../config/constants';
 import { errorEnvelopeSchema } from './errors';
 import { explainRequestSchema } from './explain';
 import { idSchema, languageTagSchema } from './primitives';
-import { ttsRateSchema } from './settings';
+import { keyStorageSchema } from './key-storage';
+import { preferencesPatchSchema, siteAccessChoiceSchema, ttsRateSchema } from './setup';
 
 const v = z.literal(MESSAGE_VERSION);
 
@@ -61,11 +62,13 @@ export type PublicMessage = z.infer<typeof publicMessageSchema>;
 // ---------------------------------------------------------------------------
 // Privileged routes: extension pages only (secret boundary rule 4). Kept in a
 // SEPARATE union so a public parser can never accept them. Sender checks are
-// the router's job; these schemas only validate shape.
+// the router's job; these schemas only validate shape. Allowed senders
+// (Phase 2 security review, LOW-5):
+//   - key routes (SET/TEST/REMOVE_API_KEY, GET_KEY_STATUS, CLEAR_ALL_DATA):
+//     exactly /options.html and /onboarding.html
+//   - settings and status routes: /options.html, /onboarding.html, /popup.html
+//   Never the reader (untrusted PDFs) or the offscreen document.
 // ---------------------------------------------------------------------------
-
-export const keyStorageSchema = z.enum(['local', 'session']);
-export type KeyStorage = z.infer<typeof keyStorageSchema>;
 
 /** Secret-bearing string: no whitespace or control characters, bounded length. */
 const apiKeySchema = z
@@ -93,11 +96,80 @@ export const removeApiKeyMessageSchema = z.strictObject({
   type: z.literal('REMOVE_API_KEY'),
 });
 
+export const getKeyStatusMessageSchema = z.strictObject({
+  v,
+  type: z.literal('GET_KEY_STATUS'),
+});
+
+/** Full preferences + onboarding state for extension pages. */
+export const getSettingsMessageSchema = z.strictObject({
+  v,
+  type: z.literal('GET_SETTINGS'),
+});
+
+export const updatePreferencesMessageSchema = z.strictObject({
+  v,
+  type: z.literal('UPDATE_PREFERENCES'),
+  patch: preferencesPatchSchema,
+});
+
+export const resetPreferencesMessageSchema = z.strictObject({
+  v,
+  type: z.literal('RESET_PREFERENCES'),
+});
+
+/** FR-002: the user acknowledged the data disclosure (D-16 copy). */
+export const acceptDisclosureMessageSchema = z.strictObject({
+  v,
+  type: z.literal('ACCEPT_DISCLOSURE'),
+});
+
+/** Records onboarding progress; the site-access choice is persisted so we never re-prompt. */
+export const updateOnboardingMessageSchema = z
+  .strictObject({
+    v,
+    type: z.literal('UPDATE_ONBOARDING'),
+    completed: z.boolean().optional(),
+    siteAccessChoice: siteAccessChoiceSchema.optional(),
+  })
+  .refine(
+    (m) => m.completed !== undefined || m.siteAccessChoice !== undefined,
+    'Nothing to update',
+  );
+
+export const getSiteAccessStatusMessageSchema = z.strictObject({
+  v,
+  type: z.literal('GET_SITE_ACCESS_STATUS'),
+});
+
+/** FR-078: remove the key, preferences, onboarding state and caches. */
+export const clearAllDataMessageSchema = z.strictObject({
+  v,
+  type: z.literal('CLEAR_ALL_DATA'),
+});
+
 export const privilegedMessageSchema = z.discriminatedUnion('type', [
   setApiKeyMessageSchema,
   testApiKeyMessageSchema,
   removeApiKeyMessageSchema,
+  getKeyStatusMessageSchema,
+  getSettingsMessageSchema,
+  updatePreferencesMessageSchema,
+  resetPreferencesMessageSchema,
+  acceptDisclosureMessageSchema,
+  updateOnboardingMessageSchema,
+  getSiteAccessStatusMessageSchema,
+  clearAllDataMessageSchema,
 ]);
+
+/** Privileged routes that touch the key; only /options.html and /onboarding.html may send them. */
+export const KEY_ROUTES = [
+  'SET_API_KEY',
+  'TEST_API_KEY',
+  'REMOVE_API_KEY',
+  'GET_KEY_STATUS',
+  'CLEAR_ALL_DATA',
+] as const satisfies readonly PrivilegedMessage['type'][];
 export type PrivilegedMessage = z.infer<typeof privilegedMessageSchema>;
 
 /** Every message the background may receive. */

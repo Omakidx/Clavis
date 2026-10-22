@@ -19,6 +19,9 @@ const MESSAGES: Record<ErrorCode, string> = {
   PDF_LOAD_ERROR: 'The PDF could not be loaded.',
   REQUEST_CANCELLED: 'The request was cancelled.',
   SELECTION_TOO_LONG: 'The selection is too long.',
+  INVALID_REQUEST: 'The request was not valid.',
+  STORAGE_UNAVAILABLE: 'Secure storage is unavailable; the API key cannot be used.',
+  INTERNAL_ERROR: 'Something went wrong inside Clavis.',
 };
 
 /** Why an `INVALID_RESPONSE` happened. Diagnostic only; carries no model output. */

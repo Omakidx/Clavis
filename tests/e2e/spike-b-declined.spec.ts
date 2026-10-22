@@ -3,6 +3,7 @@ import { launchExtension, type LaunchedExtension } from './spike-b-support/exten
 import { dblclickText } from './spike-b-support/page';
 import { startFixtureServer, type FixtureServer } from './spike-b-support/server';
 import { tb } from './spike-b-support/toolbar';
+import { gotoSiteAccessStep } from './p3-ui-support/pages';
 
 // Spike B, site access DECLINED path (D-02, FR-018): nothing is registered or injected
 // automatically, the popup offers the on-demand fallback, and every refusal is graceful.
@@ -180,6 +181,7 @@ test.describe('popup fallback (toolbar-icon path)', () => {
 test.describe('onboarding site-access step', () => {
   test('the grant button asks Chrome and shows a pending state while the prompt is open', async () => {
     const onboarding = await openExtensionPage('onboarding');
+    await gotoSiteAccessStep(onboarding);
     const grant = onboarding.getByRole('button', { name: 'Enable on websites' });
     await grant.click();
     // Chrome's native prompt cannot be answered from Playwright; the request stays pending.
@@ -190,6 +192,7 @@ test.describe('onboarding site-access step', () => {
 
   test('"Not now" explains the right-click alternative and requests nothing', async () => {
     const onboarding = await openExtensionPage('onboarding');
+    await gotoSiteAccessStep(onboarding);
     await onboarding.getByRole('button', { name: /Not now/ }).click();
     await expect(onboarding.getByRole('status')).toHaveText(/Explain with Clavis/);
     expect(

@@ -7,13 +7,11 @@ import {
   handleCommand,
   handleContextMenuClick,
   isInjectableUrl,
-  routeInjectionMessage,
+  injectTabForPopup,
+  injectUiForSender,
   type InjectionDeps,
 } from '../../../lib/site-access/injection';
-import { injectTabMessage, injectUiMessage } from '../../../lib/site-access/messages';
-
-const RUNTIME_ID = 'abcdefghijklmnopabcdefghijklmnop';
-const PREFIX = `chrome-extension://${RUNTIME_ID}/`;
+import { injectTabMessage } from '../../../lib/site-access/messages';
 
 function deps(
   overrides: {
@@ -27,8 +25,6 @@ function deps(
   const value: InjectionDeps = {
     scripting: { executeScript } as never,
     tabs: { sendMessage } as never,
-    runtimeId: RUNTIME_ID,
-    extensionUrlPrefix: PREFIX,
     files: filesForVariant('a'),
   };
   return { executeScript, sendMessage, value };
@@ -199,20 +195,13 @@ describe('handleCommand (keyboard shortcut)', () => {
   });
 });
 
-describe('routeInjectionMessage', () => {
-  it('returns undefined for messages it does not own so other listeners can answer', () => {
-    const { value } = deps();
-    expect(routeInjectionMessage(value, { type: 'TTS_SPEAK' }, { id: RUNTIME_ID })).toBeUndefined();
-    expect(routeInjectionMessage(value, 'hello', {})).toBeUndefined();
-  });
-
-  it('option (a): injects only the UI file into the sender frame', async () => {
+describe('injectUiForSender (option a)', () => {
+  it('injects only the UI file into the sender frame', async () => {
     const { executeScript, value } = deps();
-    const result = await routeInjectionMessage(value, injectUiMessage(), {
-      id: RUNTIME_ID,
-      url: 'https://example.com/page',
+    const result = await injectUiForSender(value, {
+      tabId: 12,
       frameId: 5,
-      tab: { id: 12 },
+      url: 'https://example.com/page',
     });
     expect(result).toEqual({ ok: true, shown: false });
     expect(executeScript).toHaveBeenCalledWith({
@@ -221,79 +210,66 @@ describe('routeInjectionMessage', () => {
     });
   });
 
-  it('option (a): serves about:blank and about:srcdoc frames, which inherit their parent origin', async () => {
+  it('defaults the frame to the top frame', async () => {
+    const { executeScript, value } = deps();
+    await injectUiForSender(value, { tabId: 1, frameId: undefined, url: 'https://a.test/' });
+    expect(executeScript).toHaveBeenCalledWith(
+      expect.objectContaining({ target: { tabId: 1, frameIds: [0] } }),
+    );
+  });
+
+  it('serves about:blank and about:srcdoc frames, which inherit their parent origin', async () => {
     const { executeScript, value } = deps();
     for (const url of ['about:srcdoc', 'about:blank']) {
-      const result = await routeInjectionMessage(value, injectUiMessage(), {
-        id: RUNTIME_ID,
-        url,
-        frameId: 4,
-        tab: { id: 1 },
-      });
+      const result = await injectUiForSender(value, { tabId: 1, frameId: 4, url });
       expect(result).toEqual({ ok: true, shown: false });
     }
     expect(executeScript).toHaveBeenCalledTimes(2);
   });
 
-  it('option (a): refuses browser-internal frames', async () => {
+  it('refuses browser-internal frames', async () => {
     const { executeScript, value } = deps();
-    const result = await routeInjectionMessage(value, injectUiMessage(), {
-      id: RUNTIME_ID,
+    const result = await injectUiForSender(value, {
+      tabId: 1,
+      frameId: 0,
       url: 'chrome://extensions/',
-      tab: { id: 1 },
     });
     expect(result).toEqual({ ok: false, reason: 'restricted' });
     expect(executeScript).not.toHaveBeenCalled();
   });
 
-  it('option (a): rejects senders that are not this extension or have no tab', async () => {
-    const { executeScript, value } = deps();
-    expect(
-      await routeInjectionMessage(value, injectUiMessage(), { id: 'other', tab: { id: 1 } }),
-    ).toEqual({ ok: false, reason: 'failed' });
-    expect(await routeInjectionMessage(value, injectUiMessage(), { id: RUNTIME_ID })).toEqual({
-      ok: false,
-      reason: 'failed',
+  it('maps an injection failure to a reason', async () => {
+    const { value } = deps({
+      executeScript: vi.fn(() => Promise.reject(new Error('Cannot access contents of the page'))),
     });
-    expect(executeScript).not.toHaveBeenCalled();
+    expect(
+      await injectUiForSender(value, { tabId: 1, frameId: 0, url: 'https://a.test/' }),
+    ).toEqual({ ok: false, reason: 'no-access' });
   });
+});
 
-  it('popup fallback: accepts extension pages only, and covers every reachable frame', async () => {
+describe('injectTabForPopup (activeTab fallback)', () => {
+  it('covers every reachable frame and answers "any frame shown"', async () => {
     const { executeScript, sendMessage, value } = deps({
       executeScript: vi.fn(() => Promise.resolve([{ frameId: 0 }, { frameId: 6 }])),
       sendMessage: vi.fn((_tab: number, _msg: unknown, options: { frameId: number }) =>
         Promise.resolve({ ok: true, shown: options.frameId === 6 }),
       ),
     });
-    const fromPopup = await routeInjectionMessage(value, injectTabMessage(3, 'https://a.test/'), {
-      id: RUNTIME_ID,
-      url: `${PREFIX}popup.html`,
-    });
-    // Only the frame holding the selection reports `shown`; the answer is "any frame".
-    expect(fromPopup).toEqual({ ok: true, shown: true });
-    expect(executeScript).toHaveBeenCalledTimes(1);
+    const result = await injectTabForPopup(value, injectTabMessage(3, 'https://a.test/'));
+    expect(result).toEqual({ ok: true, shown: true });
     expect(executeScript).toHaveBeenCalledWith(
       expect.objectContaining({ target: { tabId: 3, allFrames: true } }),
     );
     expect(sendMessage).toHaveBeenCalledTimes(2);
-
-    const fromWebPage = await routeInjectionMessage(value, injectTabMessage(3), {
-      id: RUNTIME_ID,
-      url: 'https://evil.test/',
-      tab: { id: 8 },
-    });
-    expect(fromWebPage).toEqual({ ok: false, reason: 'failed' });
-    expect(executeScript).toHaveBeenCalledTimes(1);
   });
 
-  it('popup fallback: ignores malformed tab ids', () => {
-    const { value } = deps();
-    const sender = { id: RUNTIME_ID, url: `${PREFIX}popup.html` };
-    expect(
-      routeInjectionMessage(value, { v: 1, type: 'CLAVIS_INJECT_TAB', tabId: '3' }, sender),
-    ).toBeUndefined();
-    expect(
-      routeInjectionMessage(value, { v: 1, type: 'CLAVIS_INJECT_TAB', tabId: 1.5 }, sender),
-    ).toBeUndefined();
+  it('skips restricted pages without touching the tab', async () => {
+    const { executeScript, value } = deps();
+    expect(await injectTabForPopup(value, injectTabMessage(3, 'chrome://settings'))).toEqual({
+      ok: false,
+      reason: 'restricted',
+    });
+    expect(executeScript).not.toHaveBeenCalled();
   });
 });

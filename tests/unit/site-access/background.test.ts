@@ -1,9 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { browser } from 'wxt/browser';
 import { CONTENT_SCRIPT_ID } from '../../../lib/config/constants';
-import { registerSiteAccess, setupContextMenu } from '../../../lib/site-access/background';
+import {
+  registerSiteAccess,
+  setupContextMenu,
+  type SiteAccessOptions,
+} from '../../../lib/site-access/background';
+import type { SitePolicy } from '../../../lib/site-access/registration';
 import { CONTEXT_MENU_ID } from '../../../lib/site-access/injection';
-import { injectUiMessage } from '../../../lib/site-access/messages';
 import { buildRegisteredScript } from '../../../lib/site-access/registration';
 
 type Listener = (...args: unknown[]) => unknown;
@@ -27,7 +31,6 @@ function install() {
     onRemoved: fakeEvent(),
     onStartup: fakeEvent(),
     onInstalled: fakeEvent(),
-    onMessage: fakeEvent(),
     onClicked: fakeEvent(),
     onCommand: fakeEvent(),
   };
@@ -45,6 +48,7 @@ function install() {
     }),
     executeScript: vi.fn((_injection: unknown) => Promise.resolve([])),
     sendMessage: vi.fn(() => Promise.resolve({ ok: true, shown: true })),
+    query: vi.fn((_query: unknown) => Promise.resolve([] as unknown[])),
     removeAll: vi.fn(() => Promise.resolve()),
     create: vi.fn((_props: unknown, callback?: () => void) => callback?.()),
   };
@@ -57,7 +61,7 @@ function install() {
       updateContentScripts: api.update,
       executeScript: api.executeScript,
     },
-    tabs: { sendMessage: api.sendMessage },
+    tabs: { sendMessage: api.sendMessage, query: api.query },
     contextMenus: { create: api.create, removeAll: api.removeAll, onClicked: events.onClicked },
     commands: { onCommand: events.onCommand },
   });
@@ -66,13 +70,28 @@ function install() {
     getURL: (path: string) => `chrome-extension://${RUNTIME_ID}${path}`,
     onStartup: events.onStartup,
     onInstalled: events.onInstalled,
-    onMessage: events.onMessage,
   });
   return {
     api,
     events,
     grant: (value: boolean) => void (granted = value),
   };
+}
+
+/** Let queued promise work finish (for assertions that something did NOT happen). */
+const settle = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 25));
+
+/** Mutable policy + recorded choices, standing in for the settings store. */
+function options(initial: SitePolicy = { automatic: true, disabledSites: [] }) {
+  const state = { policy: initial, choices: [] as string[] };
+  const value: SiteAccessOptions = {
+    readPolicy: () => Promise.resolve(state.policy),
+    recordChoice: (choice) => {
+      state.choices.push(choice);
+      return Promise.resolve();
+    },
+  };
+  return { state, value };
 }
 
 beforeEach(() => {
@@ -83,7 +102,7 @@ beforeEach(() => {
 describe('registerSiteAccess', () => {
   it('registers every listener synchronously, before any await (MV3 requirement)', () => {
     const { events } = install();
-    registerSiteAccess();
+    registerSiteAccess(options().value);
     for (const event of Object.values(events)) {
       expect(event.addListener).toHaveBeenCalledTimes(1);
     }
@@ -91,7 +110,7 @@ describe('registerSiteAccess', () => {
 
   it('does not register the content script while access is not granted', async () => {
     const { api } = install();
-    registerSiteAccess();
+    registerSiteAccess(options().value);
     await vi.waitFor(() => expect(api.contains).toHaveBeenCalled());
     await Promise.resolve();
     expect(api.register).not.toHaveBeenCalled();
@@ -99,7 +118,7 @@ describe('registerSiteAccess', () => {
 
   it('registers the observer when permissions.onAdded fires after a grant', async () => {
     const { api, events, grant } = install();
-    registerSiteAccess();
+    registerSiteAccess(options().value);
     await vi.waitFor(() => expect(api.contains).toHaveBeenCalledTimes(1));
     grant(true);
     events.onAdded.emit({ origins: ['http://*/*', 'https://*/*'] });
@@ -108,7 +127,7 @@ describe('registerSiteAccess', () => {
 
   it('unregisters when permissions.onRemoved fires after a revoke', async () => {
     const { api, events, grant } = install();
-    registerSiteAccess();
+    registerSiteAccess(options().value);
     grant(true);
     events.onAdded.emit({});
     await vi.waitFor(() => expect(api.register).toHaveBeenCalledTimes(1));
@@ -121,7 +140,7 @@ describe('registerSiteAccess', () => {
 
   it('reconciles on startup, so a grant made while the worker was stopped is picked up', async () => {
     const { api, events, grant } = install();
-    registerSiteAccess();
+    registerSiteAccess(options().value);
     grant(true);
     events.onStartup.emit();
     await vi.waitFor(() => expect(api.register).toHaveBeenCalledTimes(1));
@@ -129,7 +148,7 @@ describe('registerSiteAccess', () => {
 
   it('rebuilds the context menu and force-registers on install/update', async () => {
     const { api, events, grant } = install();
-    registerSiteAccess();
+    registerSiteAccess(options().value);
     grant(true);
     events.onInstalled.emit({ reason: 'update' });
     await vi.waitFor(() => expect(api.create).toHaveBeenCalledTimes(1));
@@ -143,7 +162,7 @@ describe('registerSiteAccess', () => {
 
   it('injects into the current tab when the context menu item is clicked', async () => {
     const { api, events } = install();
-    registerSiteAccess();
+    registerSiteAccess(options().value);
     events.onClicked.emit(
       { menuItemId: CONTEXT_MENU_ID, frameId: 0, pageUrl: 'https://example.com/' },
       { id: 5, url: 'https://example.com/' },
@@ -154,7 +173,7 @@ describe('registerSiteAccess', () => {
 
   it('injects and focuses the toolbar when the keyboard command fires', async () => {
     const { api, events } = install();
-    registerSiteAccess();
+    registerSiteAccess(options().value);
     events.onCommand.emit('explain-selection', { id: 6, url: 'https://example.com/' });
     await vi.waitFor(() => expect(api.executeScript).toHaveBeenCalledTimes(1));
     expect(api.executeScript.mock.calls[0]?.[0]).toMatchObject({
@@ -168,25 +187,68 @@ describe('registerSiteAccess', () => {
   it('does not crash the worker when the manifest declares no commands (browser.commands is undefined)', () => {
     install();
     Object.assign(browser, { commands: undefined });
-    expect(() => registerSiteAccess()).not.toThrow();
+    expect(() => registerSiteAccess(options().value)).not.toThrow();
   });
 
-  it('answers option (a) UI-injection requests and leaves other messages alone', async () => {
-    const { api, events } = install();
-    registerSiteAccess();
-    const sendResponse = vi.fn();
-    const handled = events.onMessage.emit(
-      injectUiMessage(),
-      { id: RUNTIME_ID, url: 'https://example.com/', frameId: 0, tab: { id: 2 } },
-      sendResponse,
-    );
-    expect(handled).toEqual([true]);
-    await vi.waitFor(() => expect(sendResponse).toHaveBeenCalledWith({ ok: true, shown: false }));
-    expect(api.executeScript).toHaveBeenCalledTimes(1);
+  it('no longer listens for runtime messages: the single router owns them (Phase 3)', () => {
+    install();
+    registerSiteAccess(options().value);
+    expect(browser.runtime.onMessage.hasListeners()).toBe(false);
+  });
 
-    expect(events.onMessage.emit({ type: 'SOMETHING_ELSE' }, { id: RUNTIME_ID }, vi.fn())).toEqual([
-      undefined,
+  it('excludes disabled sites and injects the observer into open tabs after a grant', async () => {
+    const { api, events, grant } = install();
+    const { value } = options({ automatic: true, disabledSites: ['news.example'] });
+    api.query.mockResolvedValue([
+      { id: 1, url: 'https://a.test/page' },
+      { id: 2, url: 'https://news.example/story' },
     ]);
+    registerSiteAccess(value);
+    await vi.waitFor(() => expect(api.contains).toHaveBeenCalledTimes(1));
+    grant(true);
+    events.onAdded.emit({ origins: ['http://*/*', 'https://*/*'] });
+    await vi.waitFor(() =>
+      expect(api.register).toHaveBeenCalledWith([
+        buildRegisteredScript({ automatic: true, disabledSites: ['news.example'] }),
+      ]),
+    );
+    await vi.waitFor(() => expect(api.executeScript).toHaveBeenCalledTimes(1));
+    expect(api.executeScript).toHaveBeenCalledWith({
+      target: { tabId: 1, frameIds: [0] },
+      files: ['/content-scripts/content.js'],
+    });
+  });
+
+  it('records the granted and declined choices when the permission changes', async () => {
+    const { events, grant } = install();
+    const { state, value } = options();
+    registerSiteAccess(value);
+    grant(true);
+    events.onAdded.emit({ origins: ['http://*/*', 'https://*/*'] });
+    await vi.waitFor(() => expect(state.choices).toEqual(['granted']));
+    grant(false);
+    events.onRemoved.emit({ origins: ['http://*/*', 'https://*/*'] });
+    await vi.waitFor(() => expect(state.choices).toEqual(['granted', 'declined']));
+  });
+
+  it('does not touch the choice for permission events about other origins', async () => {
+    const { api, events } = install();
+    const { state, value } = options();
+    registerSiteAccess(value);
+    await vi.waitFor(() => expect(api.contains).toHaveBeenCalled());
+    events.onAdded.emit({ origins: ['https://api.groq.com/*'] });
+    await settle();
+    expect(state.choices).toEqual([]);
+  });
+
+  it('keeps the observer unregistered in on-demand mode even with access granted', async () => {
+    const { api, events, grant } = install();
+    registerSiteAccess(options({ automatic: false, disabledSites: [] }).value);
+    grant(true);
+    events.onAdded.emit({ origins: ['http://*/*', 'https://*/*'] });
+    await settle();
+    expect(api.register).not.toHaveBeenCalled();
+    expect(api.executeScript).not.toHaveBeenCalled();
   });
 });
 

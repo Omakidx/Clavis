@@ -1,0 +1,66 @@
+/*
+ * Shared design tokens for every Clavis extension page (D-19: plain CSS, no Tailwind).
+ * Token names `--bg`, `--fg`, `--muted`, `--border`, `--accent`, `--accent-fg`, `--surface`
+ * and `--focus` are also read by components/reader/reader.css, so they keep their names.
+ * Only custom properties live here: no element, universal or generic class selectors, so
+ * importing this file can never change the layout of a page that merely wants the tokens
+ * (the PDF.js text layer is sensitive to that, see docs/decisions/spike-c-pdf.md finding 3).
+ */
+:root {
+  color-scheme: light dark;
+
+  /* Colour */
+  --bg: #ffffff;
+  --fg: #1b1f24;
+  --muted: #4a5360;
+  --border: #c3cbd4;
+  --accent: #1a56db;
+  --accent-fg: #ffffff;
+  --surface: #f6f8fa;
+  --focus: #1a56db;
+  --success: #116329;
+  --success-bg: #e6f4ea;
+  --warning: #7a4b00;
+  --warning-bg: #fff4d6;
+  --danger: #b42318;
+  --danger-bg: #fdecea;
+  --danger-fg: #ffffff;
+  --info-bg: #e8f0fe;
+
+  /* Spacing, radius, type, focus ring */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --radius: 6px;
+  --radius-lg: 10px;
+  --target: 2.5rem; /* minimum interactive height: 40px, above the 24px WCAG 2.2 floor */
+  --ring-width: 3px;
+  --ring-offset: 2px;
+  --font:
+    system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans', sans-serif;
+  --font-mono: ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #14181d;
+    --fg: #e8ecf1;
+    --muted: #a8b3c0;
+    --border: #4a5563;
+    --accent: #6ea0ff;
+    --accent-fg: #0b1220;
+    --surface: #1d232b;
+    --focus: #8db3ff;
+    --success: #7ee2a0;
+    --success-bg: #12301d;
+    --warning: #f5c76b;
+    --warning-bg: #3a2c0b;
+    --danger: #ff9b92;
+    --danger-bg: #3d1713;
+    --danger-fg: #1b0a08;
+    --info-bg: #17284a;
+  }
+}

@@ -1,0 +1,13 @@
+.clavis-practice__frame {
+  display: block;
+  width: 100%;
+  min-height: 18rem;
+  margin: 0 0 var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--bg);
+}
+
+.clavis-practice__tools {
+  margin: 0 0 var(--space-4);
+}

@@ -1,17 +1,27 @@
 import { useState } from 'react';
 import { browser } from 'wxt/browser';
+import { Button, ErrorNotice } from '../../components/common/ui';
 import { Page } from '../../components/common/Page';
 import { t } from '../../lib/i18n';
 import { injectTabMessage, type InjectResult } from '../../lib/site-access/messages';
 import { useSiteAccess } from '../../lib/site-access/use-site-access';
+import { api } from '../../lib/ui-client/api';
+import { openExtensionPage, openSettingsPage } from '../../lib/ui-client/navigation';
+import { useResource } from '../../lib/ui-client/use-resource';
+import { GROQ_STATUS } from './status';
 
 function openReader() {
-  void browser.tabs.create({ url: browser.runtime.getURL('/reader.html') });
+  openExtensionPage('/reader.html');
   window.close();
 }
 
 function openSettings() {
-  void browser.runtime.openOptionsPage();
+  openSettingsPage();
+  window.close();
+}
+
+function openSetup() {
+  openExtensionPage('/onboarding.html');
   window.close();
 }
 
@@ -39,8 +49,10 @@ const INJECT_MESSAGE = {
   failed: 'popupInjectFailed',
 } as const;
 
+/** Compact status: is Groq ready, is website access on, and the buttons people need most. */
 export function App() {
   const { status } = useSiteAccess();
+  const ai = useResource(api.getAiStatus);
   const [inject, setInject] = useState<InjectState>('idle');
 
   function onExplainHere() {
@@ -54,31 +66,74 @@ export function App() {
     );
   }
 
+  const aiState = ai.state;
+  const groq = aiState.status === 'ready' ? GROQ_STATUS[aiState.data.state] : null;
+
   return (
     <Page title={t('extName')} size="narrow">
-      <div className="page__actions">
+      <dl className="clavis-facts" aria-label={t('popupStatusLabel')} data-testid="popup-status">
+        <dt>{t('popupGroqLabel')}</dt>
+        <dd data-testid="popup-groq">
+          {aiState.status === 'loading' ? (
+            t('popupGroqChecking')
+          ) : groq === null ? (
+            t('popupGroqUnknown')
+          ) : (
+            <span className={`clavis-badge clavis-badge--${groq.tone}`}>{t(groq.text)}</span>
+          )}
+        </dd>
+        <dt>{t('popupSiteLabel')}</dt>
+        <dd data-testid="popup-site">
+          {status === 'unknown'
+            ? t('popupSiteChecking')
+            : status === 'granted'
+              ? t('popupSiteOn')
+              : t('popupSiteOff')}
+        </dd>
+      </dl>
+
+      {aiState.status === 'error' ? (
+        <ErrorNotice error={aiState.error} onRetry={ai.reload} onOpenSettings={openSettings} />
+      ) : null}
+
+      <div className="clavis-actions">
+        {groq?.action === 'connect' ? (
+          <Button variant="primary" onClick={openSettings}>
+            {t('uiConnectGroq')}
+          </Button>
+        ) : null}
+        {groq?.action === 'update-key' ? (
+          <Button variant="primary" onClick={openSettings}>
+            {t('uiUpdateKey')}
+          </Button>
+        ) : null}
+        {groq?.action === 'review' ? (
+          <Button variant="primary" onClick={openSetup}>
+            {t('popupReviewSetup')}
+          </Button>
+        ) : null}
         {status === 'not-granted' ? (
           <>
-            <button
-              type="button"
-              className="button button--primary"
+            <Button
+              variant={groq === null || groq.action === 'none' ? 'primary' : 'default'}
               disabled={inject === 'busy'}
               onClick={onExplainHere}
             >
               {t('popupInjectButton')}
-            </button>
-            <p>{t('popupInjectHint')}</p>
-            {inject === 'idle' || inject === 'busy' ? null : (
-              <p role="status">{t(INJECT_MESSAGE[inject])}</p>
-            )}
+            </Button>
+            <p className="clavis-muted">{t('popupInjectHint')}</p>
+            <div className="clavis-live" role="status">
+              {inject === 'idle' || inject === 'busy' ? null : <p>{t(INJECT_MESSAGE[inject])}</p>}
+            </div>
           </>
         ) : null}
-        <button type="button" className="button button--primary" onClick={openReader}>
+        <Button
+          variant={groq?.action === 'none' || groq === null ? 'primary' : 'default'}
+          onClick={openReader}
+        >
           {t('popupOpenReader')}
-        </button>
-        <button type="button" className="button" onClick={openSettings}>
-          {t('popupSettings')}
-        </button>
+        </Button>
+        <Button onClick={openSettings}>{t('popupSettings')}</Button>
       </div>
     </Page>
   );

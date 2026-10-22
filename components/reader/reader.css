@@ -181,13 +181,13 @@
 }
 
 /*
- * Class-name collisions with the shared components/common/page.css, which this page imports for
- * design tokens and `.button`: PDF.js also names every page div `.page`, and sizes it assuming
- * `box-sizing: content-box` and no padding (its 9px border sits outside the scaled width). The
- * shared `.page { padding: 24px 16px }` and `* { box-sizing: border-box }` rules would otherwise
- * shrink the canvas and shift the text layer. Scoped reset for viewer pages only.
+ * components/common/page.css is namespaced (`clavis-` classes, no universal rule), so it no
+ * longer collides with PDF.js, which names every page div `.page` and sizes it assuming
+ * `box-sizing: content-box` and no padding. The reader components still use the legacy
+ * `.button`, `.button--primary` and `.page__actions` aliases defined there. Only the reader's
+ * own fixed-width inputs need border-box so their size includes padding.
  */
-.reader .pdfViewer .page {
-  box-sizing: content-box;
-  padding: 0;
+.reader .reader-input,
+.reader .button {
+  box-sizing: border-box;
 }

@@ -87,3 +87,16 @@ export const REQUEST_TIMEOUT_MS = {
   /** Key verification via the models endpoint. */
   keyValidation: 10_000,
 } as const;
+
+/**
+ * Per-sender limits on AI requests (Phase 2 security review, HIGH-1 follow-up).
+ * A "sender" is one tab, or one tab-less extension page. The token bucket holds at most
+ * `capacity` requests and refills evenly over `windowMs`, so the sustained rate is
+ * capacity / windowMs (10 per minute). At most one AI_EXPLAIN is in flight per sender.
+ */
+export const AI_RATE_LIMIT = {
+  capacity: 10,
+  windowMs: 60_000,
+  /** Upper bound on tracked senders, so a flood of tab ids cannot grow memory without bound. */
+  maxTrackedSenders: 256,
+} as const;

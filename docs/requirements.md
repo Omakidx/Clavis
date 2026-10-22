@@ -3,7 +3,7 @@
 **Status:** Implementation-ready specification (v1 baseline)  
 **Version:** 1.1-draft · **Last reviewed:** 2026-10-22  
 **Platform:** Google Chrome, Manifest V3, desktop first  
-**Product owner decisions:** Groq only for v1; user provides key; no mandatory accounts or first-party backend; custom PDF.js reader; native pronunciation for words **and** sentences. Further resolved decisions D-01 … D-18 are in [§11](#11-product-decisions).
+**Product owner decisions:** Groq only for v1; user provides key; no mandatory accounts or first-party backend; custom PDF.js reader; native pronunciation for words **and** sentences. Further resolved decisions D-01 … D-19 are in [§11](#11-product-decisions).
 
 ## 1. Problem, audience and success criteria
 
@@ -366,6 +366,7 @@ The team can test **Linux only** by hand. Other platforms get automated coverage
 | D-15 | **Privacy policy hosted on GitHub Pages**; text drafted in `docs/privacy-policy.md` | Free, versioned with the repo | Needs a GitHub repo with Pages enabled (public repo, or a plan that allows Pages on private repos) before Phase 10 |
 | D-17 | **CSP allows WebAssembly on extension pages:** `script-src 'self' 'wasm-unsafe-eval'; object-src 'self'` | PDF.js needs wasm for ICC/CMYK colour, JPEG 2000 and JBIG2; the default MV3 CSP blocks it ([spike-c-pdf.md](decisions/spike-c-pdf.md)). `eval` stays blocked; no remote code | Manifest; ZIP audit requires this exact CSP |
 | D-18 | **Minimum Chrome version 147** | pdfjs-dist 6 uses `Math.sumPrecise` (Chrome 147) without a fallback; other floors: `Uint8Array` base64 140, `Promise.try` 128, `URL.parse` 126, `matchOriginAsFallback` 119 (MDN browser-compat-data 8.1.7). The alternative, PDF.js's polyfilled legacy build, is larger | Manifest; platform matrix; ZIP audit |
+| D-19 | **No Tailwind for v1; plain CSS with shared design tokens** | Global resets (as in Tailwind's preflight) shift the PDF.js text layer (Spike C finding 3); extension pages are simple forms that don't need a utility framework | Tech stack §1, §6; shared classes are namespaced `clavis-*` |
 | D-16 | **Disclosure copy approved** as written in [§4.1](#approved-disclosure-copy-fr-002-fr-009-fr-071) | Defines exactly what users see before anything is sent to Groq | Onboarding, first Explain, settings |
 
 ### Still open

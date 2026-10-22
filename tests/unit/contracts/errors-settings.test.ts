@@ -6,10 +6,13 @@ import {
 } from '../../../lib/contracts';
 
 describe('errorCodeSchema / errorEnvelopeSchema', () => {
-  it('contains the architecture §4 codes including SELECTION_TOO_LONG', () => {
-    expect(ERROR_CODES).toHaveLength(13);
+  it('contains the architecture §4 codes plus the Phase 3 INVALID_REQUEST, STORAGE_UNAVAILABLE and INTERNAL_ERROR', () => {
+    expect(ERROR_CODES).toHaveLength(16);
     for (const code of ERROR_CODES) expect(errorCodeSchema.safeParse(code).success).toBe(true);
     expect(errorCodeSchema.safeParse('SELECTION_TOO_LONG').success).toBe(true);
+    expect(errorCodeSchema.safeParse('INVALID_REQUEST').success).toBe(true);
+    expect(errorCodeSchema.safeParse('STORAGE_UNAVAILABLE').success).toBe(true);
+    expect(errorCodeSchema.safeParse('INTERNAL_ERROR').success).toBe(true);
     expect(errorCodeSchema.safeParse('UNKNOWN').success).toBe(false);
   });
 
@@ -45,13 +48,18 @@ describe('errorCodeSchema / errorEnvelopeSchema', () => {
 describe('publicSettingsSchema', () => {
   const settings = {
     hasKey: true,
+    disclosureAccepted: true,
     model: 'openai/gpt-oss-20b',
     explanationLanguage: 'en',
+    readingLevel: 'standard',
+    tooltipBehavior: 'automatic',
     ttsRate: 0.75,
   };
 
-  it('accepts valid settings with and without ttsLang', () => {
+  it('accepts valid settings with and without ttsLang and model', () => {
     expect(publicSettingsSchema.safeParse(settings).success).toBe(true);
+    const { model: _model, ...withoutModel } = settings;
+    expect(publicSettingsSchema.safeParse(withoutModel).success).toBe(true);
     expect(publicSettingsSchema.safeParse({ ...settings, ttsLang: 'en-GB' }).success).toBe(true);
   });
 
@@ -65,9 +73,12 @@ describe('publicSettingsSchema', () => {
 
   it('declares no key-carrying field in its shape', () => {
     expect(Object.keys(publicSettingsSchema.shape).sort()).toEqual([
+      'disclosureAccepted',
       'explanationLanguage',
       'hasKey',
       'model',
+      'readingLevel',
+      'tooltipBehavior',
       'ttsLang',
       'ttsRate',
     ]);

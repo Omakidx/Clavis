@@ -16,7 +16,7 @@ Work in this order. Phases 3, 4 and 7 can overlap once Phase 2 closes; see the d
 | 4 | Spike B — optional permission flow, runtime registration, toolbar loading measurement (D-02, D-08) | 2 | 6, 7 | Done (option c chosen) |
 | 5 | Spike C — PDF.js viewer components (D-06) | 2 | 10 | Done |
 | 6 | Spike D — `chrome.tts` on Linux + offscreen fallback (D-07) | 2 | 9 | Done; voice check awaits the user |
-| 7 | Onboarding, disclosure, site access, key lifecycle, settings | 3 | 8 | Not started |
+| 7 | Onboarding, disclosure, site access, key lifecycle, settings | 3 | 8 | Done |
 | 8 | Selection observer + toolbar on both injection paths | 4 | 8, 9 | Not started |
 | 9 | Core Explain + Must tabs (roots, related words, simplify) | 5 | 11 | Not started |
 | 10 | Listen / `SpeechService` | 6 | 11 | Not started |
@@ -31,14 +31,14 @@ Work in this order. Phases 3, 4 and 7 can overlap once Phase 2 closes; see the d
 
 | ID | Short name | Phase | Status |
 | --- | --- | --- | --- |
-| FR-001 | Welcome page once per install | 3 | Not started |
-| FR-002 | Data disclosure before first AI use | 3 | Not started |
-| FR-003 | Link to Groq key creation | 3 | Not started |
-| FR-004 | Test key from privileged context | 3 | Not started |
-| FR-005 | Model choice from available models | 3 | Not started |
-| FR-006 | Language, reading level, tooltip, TTS preferences | 3 | Not started |
-| FR-007 | Change/revoke key; persistent vs session | 3 | Not started |
-| FR-009 | Optional all-sites access, grant/revoke | 3 | Not started |
+| FR-001 | Welcome page once per install | 3 | Done |
+| FR-002 | Data disclosure before first AI use | 3 | Done |
+| FR-003 | Link to Groq key creation | 3 | Done |
+| FR-004 | Test key from privileged context | 3 | Done |
+| FR-005 | Model choice from available models | 3 | Done |
+| FR-006 | Language, reading level, tooltip, TTS preferences | 3 | Done |
+| FR-007 | Change/revoke key; persistent vs session | 3 | Done |
+| FR-009 | Optional all-sites access, grant/revoke | 3 | Done |
 | FR-010 | Detect selections on granted sites | 4 | Not started |
 | FR-011 | Word/phrase/sentence/passage classification | 4 | Not started |
 | FR-012 | Toolbar placement | 4 | Not started |
@@ -71,9 +71,9 @@ Work in this order. Phases 3, 4 and 7 can overlap once Phase 2 closes; see the d
 | FR-055 | PDF error states | 7 | Not started |
 | FR-056 | No interception of Chrome's PDF viewer | 7 | Not started |
 | FR-059 | Virtualized pages | 7 | Not started |
-| FR-070 | Key only in trusted contexts | 3 | Not started |
-| FR-071 | Key storage caveats; session mode | 3 | Not started |
-| FR-072 | Revoked key / transient errors | 5 | Not started |
+| FR-070 | Key only in trusted contexts | 3 | Done |
+| FR-071 | Key storage caveats; session mode | 3 | Done |
+| FR-072 | Revoked key / transient errors | 5 | Done (key routes and AI_EXPLAIN) |
 | FR-073 | No content/key in logs | 1–9 | In progress (metadata-only logger; lint bans console.log) |
 | FR-074 | Public privacy policy + store disclosures | 10 | Draft written ([privacy-policy.md](privacy-policy.md)) |
 | FR-075 | All executable code packaged locally | 1–10 | In progress (ZIP audit enforces it) |
@@ -84,7 +84,7 @@ Work in this order. Phases 3, 4 and 7 can overlap once Phase 2 closes; see the d
 
 | ID | Short name | Phase | Status |
 | --- | --- | --- | --- |
-| FR-008 | Rerun tutorial from Settings | 8 | Not started |
+| FR-008 | Rerun tutorial from Settings | 8 | Done (rerun tutorial in Settings) |
 | FR-019 | Copy answer | 8 | Not started |
 | FR-025 | Voice chooser | 6 | Not started |
 | FR-036 | Grammar tab | 8 | Not started |
@@ -92,7 +92,7 @@ Work in this order. Phases 3, 4 and 7 can overlap once Phase 2 closes; see the d
 | FR-042 | Side panel for long answers | 8 | Not started |
 | FR-043 | Opt-in cross-selection cache | 8 | Not started |
 | FR-057 | PDF find-in-document | 7 | Not started |
-| FR-078 | Reset / clear all data | 8 | Not started |
+| FR-078 | Reset / clear all data | 8 | Done |
 
 ### Could / Later / Won't
 

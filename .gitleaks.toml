@@ -18,7 +18,7 @@ tags = ["key", "groq"]
 # "gsk_TESTxxxxxxxxxxxxxxxxxxxxxxxx" or "gsk_FAKE...". A real key never starts with these words.
 [[allowlists]]
 description = "Clearly fake Groq keys used in tests and docs"
-targetRules = ["groq-api-key"]
+targetRules = ["groq-api-key", "generic-api-key"]
 regexes = ['''gsk_(?:TEST|FAKE|EXAMPLE|DUMMY|MOCK|REDACTED)[A-Za-z0-9_]*''']
 
 # Only matters for `gitleaks dir` (working-tree scans): these directories are generated or

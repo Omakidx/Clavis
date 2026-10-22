@@ -304,8 +304,8 @@ test.describe('spike D: speech in the built extension', () => {
     const tooLong = await speak(page, 'x'.repeat(2001));
     expect(tooLong).toMatchObject({ ok: false, error: { code: 'SELECTION_TOO_LONG' } });
 
-    // Not a speech message: this module must not claim or answer it.
-    const other = await send(page, { v: 1, type: 'GET_AI_STATUS' });
+    // A type no route owns is left unanswered (GET_AI_STATUS is a routed public message since Phase 3).
+    const other = await send(page, { v: 1, type: 'GET_API_KEY' });
     expect(other ?? null).toBeNull();
   });
 

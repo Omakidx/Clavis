@@ -1,7 +1,6 @@
 import { expect, test, type Frame, type Page } from '@playwright/test';
 import { launchExtension, type LaunchedExtension } from './spike-b-support/extension';
 import {
-  clickPopupPrimaryButton,
   openClavisPopup,
   realUiEnabled,
   rightClickBox,
@@ -10,6 +9,7 @@ import {
 import { dblclickText, frameOffset, textBox } from './spike-b-support/page';
 import { SEL, tb } from './spike-b-support/toolbar';
 import { startFixtureServer, type FixtureServer } from './spike-b-support/server';
+import { gotoSiteAccessStep } from './p3-ui-support/pages';
 
 // Spike B with Chrome's REAL native UI, no manifest patching and no stand-ins:
 // the permission prompt (D-02), the context menu and the toolbar icon (FR-018, activeTab).
@@ -50,7 +50,21 @@ async function launch(
   if (onboarding === undefined) throw new Error('onboarding tab never opened');
   for (const page of ext.context.pages()) if (page !== onboarding) await page.close();
   await onboarding.bringToFront();
+  // The wizard: accept the data disclosure and go to the website-access step.
+  await gotoSiteAccessStep(onboarding);
   return { ext, onboarding };
+}
+
+/**
+ * Press "Explain on this page" in the open Clavis popup, by keyboard. The popup now starts with a
+ * status block and, while Groq is not connected, a "Connect Groq" button, so the fixed-coordinate
+ * click on its "first button" no longer lands here. On a fresh profile the tab order is
+ * Connect Groq, then Explain on this page.
+ */
+function pressPopupExplainHere(): void {
+  xdotool('key', 'Tab');
+  xdotool('key', 'Tab');
+  xdotool('key', 'Return');
 }
 
 async function registeredCount(extension: LaunchedExtension): Promise<number> {
@@ -98,11 +112,12 @@ test('Allow in the real permission prompt registers the observer; revoking unreg
   await dblclickText(fresh, fresh, 'cartographer');
   await tb(fresh).waitShown();
 
-  // Finding: Chrome does not inject registered scripts into tabs that were already open.
+  // Chrome itself does not inject registered scripts into tabs that were already open; since
+  // Phase 3 the background injects the observer into them after a grant, so no reload is needed.
   await early.bringToFront();
   await dblclickText(early, early, 'cartographer');
-  await early.waitForTimeout(600);
-  await tb(early).expectNoHost();
+  await tb(early).waitShown();
+  // A reload still works (the registered script takes over; only one observer runs per frame).
   await early.reload();
   await early.waitForTimeout(500);
   await dblclickText(early, early, 'cartographer');
@@ -181,7 +196,7 @@ test('declined access: the toolbar icon (popup button) injects into the current 
   await tb(page).expectNoHost();
 
   await openClavisPopup(page);
-  clickPopupPrimaryButton();
+  pressPopupExplainHere();
   await tb(page).waitShown();
   expect(await registeredCount(extension)).toBe(0);
 });
@@ -278,7 +293,7 @@ test('declined access: the popup button and the shortcut still work on a page th
   // Then the toolbar icon + popup button (same all-frames call).
   await dblclickText(page, page, 'frames');
   await openClavisPopup(page);
-  clickPopupPrimaryButton();
+  pressPopupExplainHere();
   await tb(page).waitShown();
 });
 

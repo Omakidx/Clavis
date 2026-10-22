@@ -3,11 +3,10 @@ import type { ScriptPublicPath } from 'wxt/utils/inject-script';
 import {
   OBSERVER_SCRIPT_PATH,
   UI_SCRIPT_PATH,
-  isInjectTabMessage,
-  isInjectUiMessage,
   openSelectionMessage,
   type InjectReason,
   type InjectResult,
+  type InjectTabMessage,
 } from './messages';
 
 type Scripting = Pick<typeof browser.scripting, 'executeScript'>;
@@ -16,10 +15,6 @@ type Tabs = Pick<typeof browser.tabs, 'sendMessage'>;
 export interface InjectionDeps {
   scripting: Scripting;
   tabs: Tabs;
-  /** `runtime.id`, to reject messages from other extensions. */
-  runtimeId: string;
-  /** `runtime.getURL('/')`, to tell extension pages from content scripts. */
-  extensionUrlPrefix: string;
   /** Files the declined-access path injects: observer + UI, or observer only when the UI is bundled. */
   files: ScriptPublicPath[];
 }
@@ -153,44 +148,35 @@ export function handleContextMenuClick(
   });
 }
 
-interface SenderLike {
-  id?: string | undefined;
-  url?: string | undefined;
-  frameId?: number | undefined;
-  tab?: { id?: number | undefined } | undefined;
+/** The content-script sender of a CLAVIS_INJECT_UI request, as classified by the router. */
+export interface InjectUiSender {
+  tabId: number;
+  frameId: number | undefined;
+  url: string | undefined;
 }
 
 /**
- * Route the Spike B messages. Returns a pending reply for messages it owns and
- * `undefined` for everything else, so other modules' listeners keep working.
+ * Option (a): a content script asks for the UI to be injected into its own frame. The
+ * router has already established that the sender is a content script of this extension.
  */
-export function routeInjectionMessage(
+export async function injectUiForSender(
   deps: InjectionDeps,
-  raw: unknown,
-  sender: SenderLike,
-): Promise<InjectResult> | undefined {
-  if (isInjectUiMessage(raw)) {
-    // Option (a): a content script asks for the UI to be injected into its own frame.
-    const tabId = sender.tab?.id;
-    if (sender.id !== deps.runtimeId || tabId === undefined) {
-      return Promise.resolve({ ok: false, reason: 'failed' });
-    }
-    // about:blank and about:srcdoc frames run the observer through matchOriginAsFallback
-    // and are fine; anything else non-http(s) is restricted.
-    const inheritsOrigin = sender.url === 'about:blank' || sender.url === 'about:srcdoc';
-    if (!inheritsOrigin && !isInjectableUrl(sender.url)) {
-      return Promise.resolve({ ok: false, reason: 'restricted' });
-    }
-    return injectFiles(deps.scripting, tabId, sender.frameId ?? 0, [UI_SCRIPT_PATH]).then(
-      (injected) => (injected.ok ? { ok: true, shown: false } : injected),
-    );
-  }
-  if (isInjectTabMessage(raw)) {
-    // Popup fallback: only extension pages may inject into an arbitrary tab.
-    const fromExtensionPage =
-      sender.id === deps.runtimeId && sender.url?.startsWith(deps.extensionUrlPrefix) === true;
-    if (!fromExtensionPage) return Promise.resolve({ ok: false, reason: 'failed' });
-    return explainInTab(deps, { tabId: raw.tabId, frameId: undefined, url: raw.url });
-  }
-  return undefined;
+  sender: InjectUiSender,
+): Promise<InjectResult> {
+  // about:blank and about:srcdoc frames run the observer through matchOriginAsFallback
+  // and are fine; anything else non-http(s) is restricted.
+  const inheritsOrigin = sender.url === 'about:blank' || sender.url === 'about:srcdoc';
+  if (!inheritsOrigin && !isInjectableUrl(sender.url)) return { ok: false, reason: 'restricted' };
+  const injected = await injectFiles(deps.scripting, sender.tabId, sender.frameId ?? 0, [
+    UI_SCRIPT_PATH,
+  ]);
+  return injected.ok ? { ok: true, shown: false } : injected;
+}
+
+/** Popup fallback: inject observer + UI into a tab via `activeTab`. The router checked the sender. */
+export function injectTabForPopup(
+  deps: InjectionDeps,
+  message: InjectTabMessage,
+): Promise<InjectResult> {
+  return explainInTab(deps, { tabId: message.tabId, frameId: undefined, url: message.url });
 }

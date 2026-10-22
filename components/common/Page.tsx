@@ -16,8 +16,8 @@ export function Page({ title, size = 'wide', children }: PageProps) {
   }, [title]);
 
   return (
-    <main className={`page page--${size}`}>
-      <h1 className="page__title">{title}</h1>
+    <main className={`clavis-page clavis-page--${size}`}>
+      <h1 className="clavis-page__title">{title}</h1>
       {children}
     </main>
   );

@@ -1,78 +1,12 @@
-import { useId } from 'react';
 import { Page } from '../../components/common/Page';
+import { Wizard } from '../../components/onboarding/Wizard';
 import { t } from '../../lib/i18n';
-import { useSiteAccess, type SiteAccessRequestState } from '../../lib/site-access/use-site-access';
 
-// TODO(Phase 3): move to lib/config once it exposes provider constants.
-const GROQ_PRIVACY_URL = 'https://groq.com/privacy-policy/';
-
-const SITE_ACCESS_STATUS = {
-  pending: 'toolbarSiteAccessPending',
-  granted: 'toolbarSiteAccessGranted',
-  denied: 'toolbarSiteAccessDenied',
-  skipped: 'toolbarSiteAccessSkipped',
-  error: 'toolbarSiteAccessError',
-} as const satisfies Record<Exclude<SiteAccessRequestState, 'idle'>, string>;
-
+/** First-run setup (FR-001). Also reachable later from Settings > Help. */
 export function App() {
-  const disclosureId = useId();
-  const siteAccessId = useId();
-  const siteAccess = useSiteAccess();
-
   return (
     <Page title={t('onboardingTitle')}>
-      <section aria-labelledby={disclosureId}>
-        <h2 id={disclosureId}>{t('disclosureTitle')}</h2>
-        <ul>
-          <li>{t('disclosureSelect')}</li>
-          <li>{t('disclosureListen')}</li>
-          <li>
-            {t('disclosureExplain')}{' '}
-            <a href={GROQ_PRIVACY_URL} target="_blank" rel="noopener noreferrer">
-              {t('disclosurePrivacyLink')}
-            </a>
-          </li>
-          <li>{t('disclosurePdf')}</li>
-          <li>{t('disclosureNoServer')}</li>
-        </ul>
-        <div className="page__actions">
-          <button
-            type="button"
-            className="button button--primary"
-            onClick={() => {
-              // TODO(Phase 3): persist the disclosure acknowledgement (FR-002).
-            }}
-          >
-            {t('disclosureAccept')}
-          </button>
-        </div>
-      </section>
-
-      <section aria-labelledby={siteAccessId}>
-        <h2 id={siteAccessId}>{t('siteAccessTitle')}</h2>
-        <p>{t('siteAccessBody')}</p>
-        <div className="page__actions">
-          <button
-            type="button"
-            className="button button--primary"
-            disabled={siteAccess.requestState === 'pending'}
-            onClick={siteAccess.grant}
-          >
-            {t('siteAccessGrant')}
-          </button>
-          <button
-            type="button"
-            className="button"
-            // TODO(Phase 3): persist that site access was declined (the choice is not stored yet).
-            onClick={siteAccess.skip}
-          >
-            {t('siteAccessSkip')}
-          </button>
-        </div>
-        {siteAccess.requestState === 'idle' ? null : (
-          <p role="status">{t(SITE_ACCESS_STATUS[siteAccess.requestState])}</p>
-        )}
-      </section>
+      <Wizard />
     </Page>
   );
 }

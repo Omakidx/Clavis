@@ -49,6 +49,50 @@ describe('messages.json catalog', () => {
     }
   });
 
+  it('keeps the approved disclosure copy verbatim (D-16)', () => {
+    // requirements.md section 4.1 "Approved disclosure copy". Do not weaken these.
+    const approved: Record<string, string> = {
+      disclosureTitle: 'Your reading stays on your device until you ask',
+      disclosureSelect:
+        'Selecting text does nothing by itself. Clavis notices the selection on your device and shows its toolbar.',
+      disclosureListen: 'Listen uses the voices on your computer. Nothing is sent to Groq.',
+      disclosureExplain:
+        'Explain sends the text you selected, up to 1,000 characters of the text around it, and your chosen language to Groq, using your own API key. Groq handles it under its own terms and privacy policy.',
+      disclosurePdf:
+        'PDFs you open are read inside your browser and never uploaded. Only text you select and explain is sent.',
+      disclosureNoServer: 'Clavis has no server of its own and collects no data about you.',
+      disclosureAccept: 'I understand',
+      firstSendBody:
+        "Send this to Groq? Clavis will send the selected text and a little of the text around it to Groq to explain it. You'll only be asked once.",
+      firstSendConfirm: 'Explain',
+      firstSendCancel: 'Cancel',
+      siteAccessTitle: 'Show Clavis when you select text',
+      siteAccessBody:
+        'To show the toolbar automatically, Chrome will ask you to let Clavis read and change data on websites. Clavis uses this only to notice when you select text and to show its toolbar. It does not read pages in the background, and nothing leaves your device until you click Explain.',
+      siteAccessGrant: 'Enable on websites',
+      siteAccessSkip: "Not now — I'll use right-click instead",
+      keyStoreLocal:
+        "Remember on this device — Saved in Chrome's extension storage on this computer until you remove it. It is not encrypted: anyone with access to your Chrome profile could find it.",
+      keyStoreSession:
+        "Only for this session — Kept in memory and cleared when you close Chrome. You'll paste it again next time.",
+      keyWarning: 'Never paste your key into a website or share it in a chat.',
+    };
+    expect(Object.keys(approved).sort()).toEqual([...DISCLOSURE_KEYS].sort());
+    for (const [key, message] of Object.entries(approved)) {
+      expect(catalog[key]?.message, key).toBe(message);
+    }
+  });
+
+  it('never claims the key is encrypted or in a vault (FR-071)', () => {
+    const storageCopy = [catalog['keyStoreLocal'], catalog['keyNotEncrypted']]
+      .map((entry) => String(entry?.message))
+      .join(' ');
+    expect(storageCopy).toMatch(/not encrypted|does not encrypt/);
+    for (const entry of Object.values(catalog)) {
+      expect(String(entry.message)).not.toMatch(/\b(is|are|stays?) encrypted\b|\bsecure vault\b/i);
+    }
+  });
+
   it('keeps extName and extDescription for the manifest', () => {
     expect(catalog).toHaveProperty('extName');
     expect(catalog).toHaveProperty('extDescription');
