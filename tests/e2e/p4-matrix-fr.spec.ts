@@ -867,6 +867,34 @@ async function waitForFrame(page: Page, origin: string): Promise<Surface> {
   }
 }
 
+/** Whether keyboard focus is inside the explanation card (the card slot of the closed root). */
+async function focusIsInCard(page: Page): Promise<boolean> {
+  return (
+    (await toolbar(page).evalIn<boolean>(
+      null,
+      `function () {
+        let el = this.activeElement;
+        while (el && el.shadowRoot && el.shadowRoot.activeElement) el = el.shadowRoot.activeElement;
+        return !!el && !!el.closest('[data-clavis="card-slot"], [data-clavis="card"]');
+      }`,
+    )) === true
+  );
+}
+
+/** Whether the focused element is the card control with this data-clavis name. */
+async function focusedCardControl(page: Page, name: string): Promise<boolean> {
+  return (
+    (await toolbar(page).evalIn<boolean>(
+      null,
+      `function () {
+        let el = this.activeElement;
+        while (el && el.shadowRoot && el.shadowRoot.activeElement) el = el.shadowRoot.activeElement;
+        return !!el && el.getAttribute('data-clavis') === ${JSON.stringify(name)};
+      }`,
+    )) === true
+  );
+}
+
 // --------------------------------------------------------------------------------------------
 test.describe('FR-013 Listen and Explain, by mouse and by keyboard', () => {
   test('both actions are visible together and named Listen and Explain', async () => {
@@ -923,12 +951,34 @@ test.describe('FR-013 Listen and Explain, by mouse and by keyboard', () => {
       await page.keyboard.press('ArrowRight');
       expect(await toolbar(page).focusedAction()).toBe('explain');
       await page.keyboard.press('Enter');
+      // Phase 5: a keyboard-started Explain moves focus INTO the card.
+      await waitFor(
+        async () => (await toolbar(page).attr(SEL.card, 'data-action')) === 'explain',
+        3000,
+        40,
+      );
       expect(await toolbar(page).attr(SEL.card, 'data-action')).toBe('explain');
+      expect(await focusIsInCard(page), 'focus moved into the explanation card').toBe(true);
+      // Tab to the card's Close button and press it: focus returns to the Explain button.
+      for (let i = 0; i < 10 && !(await focusedCardControl(page, 'card-close')); i++) {
+        await page.keyboard.press('Tab');
+      }
+      expect(await focusedCardControl(page, 'card-close'), 'Close is reachable with Tab').toBe(
+        true,
+      );
+      await page.keyboard.press('Enter');
+      await waitFor(async () => (await toolbar(page).focusedAction()) === 'explain', 2000, 40);
+      expect(await toolbar(page).focusedAction(), 'Close returns focus to Explain').toBe('explain');
+      expect(await toolbar(page).isShown(SEL.card), 'the card is gone').toBe(false);
+      // The toolbar keyboard model still works: ArrowLeft to Listen, Space activates it.
       await page.keyboard.press('ArrowLeft');
       expect(await toolbar(page).focusedAction()).toBe('listen');
       await page.keyboard.press('Space');
       expect(await toolbar(page).attr(SEL.card, 'data-action')).toBe('listen');
       expect(await readCardText(page)).toBe('bank');
+      // Escape dismisses everything.
+      await page.keyboard.press('Escape');
+      expect(await expectHidden(page), 'Escape closes the toolbar and the card').toBe(true);
     });
   });
 });

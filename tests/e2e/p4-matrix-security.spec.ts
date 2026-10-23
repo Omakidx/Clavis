@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { expectShown, logWorkerMessages, selectText } from './p4-matrix-support/actions';
+import { expectShown, logWorkerMessages, resetPage, selectText } from './p4-matrix-support/actions';
 import { openPath, startHarness, type Harness } from './p4-matrix-support/harness';
 import { frameOffset, hostShown } from './p4-matrix-support/page';
 import { clickAction, readCardText, SEL, toolbar } from './p4-matrix-support/toolbar';
@@ -208,13 +208,16 @@ test('a hostile page cannot start AI or speech traffic: no message from the page
       (window as unknown as { attackProgrammatically(): void }).attackProgrammatically(),
     );
     await page.waitForTimeout(500);
+    // A real user clicks away from whatever the page selected before selecting a word; start from
+    // a clean state so a slow machine cannot turn this into a timing race.
+    await resetPage(page);
     await selectText(
       page,
       page,
       { context: 'selects another word here', text: 'another' },
       'dblclick',
     );
-    expect(await expectShown(page)).toBe(true);
+    expect(await expectShown(page, 8000)).toBe(true);
     await page.evaluate(() => (window as unknown as { attackToolbar(): unknown }).attackToolbar());
     await page.waitForTimeout(500);
     expect(harness.groqRequests.slice(before)).toEqual([]);

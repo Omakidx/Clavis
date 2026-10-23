@@ -13,8 +13,11 @@ export interface ModelCapabilities {
   reasoningEffort: 'low' | null;
   /** Documented `response_format: json_schema` support level. */
   jsonSchema: JsonSchemaSupport;
-  /** Completion budget when the caller gives none. Reasoning tokens count against it. */
-  defaultMaxCompletionTokens: number;
+  /**
+   * The model produces reasoning tokens before its answer. They count against
+   * `max_completion_tokens`, so these models get the larger budget (lib/ai/budgets.ts).
+   */
+  reasoning: boolean;
 }
 
 interface CapabilityRule {
@@ -29,7 +32,7 @@ const RULES: readonly CapabilityRule[] = [
     capabilities: {
       reasoningEffort: 'low',
       jsonSchema: 'strict',
-      defaultMaxCompletionTokens: 2048,
+      reasoning: true,
     },
   },
   {
@@ -38,20 +41,20 @@ const RULES: readonly CapabilityRule[] = [
     capabilities: {
       reasoningEffort: 'low',
       jsonSchema: 'best_effort',
-      defaultMaxCompletionTokens: 2048,
+      reasoning: true,
     },
   },
   {
     // Documented strict-schema models that do NOT take gpt-oss style effort values.
     pattern: /^(?:qwen\/qwen3|meta-models\/muse-spark)/,
-    capabilities: { reasoningEffort: null, jsonSchema: 'strict', defaultMaxCompletionTokens: 2048 },
+    capabilities: { reasoningEffort: null, jsonSchema: 'strict', reasoning: true },
   },
 ];
 
 const DEFAULTS: ModelCapabilities = {
   reasoningEffort: null,
   jsonSchema: 'unknown',
-  defaultMaxCompletionTokens: 1024,
+  reasoning: false,
 };
 
 export function getModelCapabilities(modelId: string): ModelCapabilities {

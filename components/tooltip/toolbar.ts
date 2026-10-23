@@ -4,6 +4,7 @@ import { markOwnUi, isOwnUiNode } from '../../lib/selection/own-ui';
 import { isTrustedEvent } from '../../lib/selection/trust';
 import type {
   ActionContext,
+  CardSurface,
   DismissReason,
   ToolbarActionResult,
   ToolbarHandle,
@@ -171,6 +172,49 @@ export function createToolbar(
     actions.trim?.({ snapshot: next.snapshot, overLimit: false });
   }
 
+  /** The container the loaded explanation card draws in, while the toolbar shows one. */
+  function slotElement(): HTMLElement | null {
+    return panelParent?.querySelector<HTMLElement>('[data-clavis="card-slot"]') ?? null;
+  }
+
+  /** What an action may use to draw its own card (see `CardSurface`); valid for run `id` only. */
+  function createSurface(
+    name: 'listen' | 'explain',
+    id: number,
+    text: string,
+    keyboard: boolean,
+  ): CardSurface {
+    const current = (): boolean => id === run && visible;
+    return {
+      keyboard,
+      open() {
+        if (!current() || panelParent === null) return null;
+        if (card?.slot !== true) {
+          card = { action: name, text, note: '', slot: true };
+          render();
+        }
+        return slotElement();
+      },
+      reposition() {
+        if (current()) schedulePosition();
+      },
+      close() {
+        if (!current()) return;
+        const hadFocus = (shadow?.activeElement ?? null) !== null;
+        cancelRun();
+        busy = null;
+        card = null;
+        render();
+        // The focused control is about to disappear: keep keyboard users on the toolbar.
+        if (hadFocus) {
+          buttons()
+            .find((button) => button.getAttribute('data-action') === name)
+            ?.focus();
+        }
+      },
+    };
+  }
+
   function perform(name: 'listen' | 'explain', current: CapturedSelection): void {
     // Uses the snapshot captured at selection end, not the live (maybe collapsed) selection.
     const { snapshot, overLimit } = current;
@@ -180,26 +224,34 @@ export function createToolbar(
     const control = new AbortController();
     runAbort = control;
     const text = snapshot.text.slice(0, CARD_TEXT_MAX_CHARS);
+    const keyboard = (shadow?.activeElement ?? null) !== null;
+    // The state line stays until an action that draws its own card replaces it (`surface.open()`).
+    card = { action: name, text, note: t('toolbarWorking') };
     let result: ToolbarActionResult;
     try {
-      result = actions[name]?.({ snapshot, overLimit, signal: control.signal });
+      result = actions[name]?.({
+        snapshot,
+        overLimit,
+        signal: control.signal,
+        surface: createSurface(name, id, text, keyboard),
+      });
     } catch {
       result = Promise.reject(new Error('action failed'));
     }
     if (!isThenable(result)) {
       busy = null;
-      card = { action: name, text, note: t('toolbarCardPlaceholder') };
+      if (card?.slot !== true) card = { action: name, text, note: t('toolbarCardPlaceholder') };
       render();
       return;
     }
     busy = name;
-    card = { action: name, text, note: t('toolbarWorking') };
     render();
     announce(t('toolbarWorking'));
     const settle = (note: string, spoken: string): void => {
       if (id !== run || !visible) return;
       busy = null;
-      card = { action: name, text, note };
+      // A card the action drew itself keeps its own states; only the state line is replaced.
+      if (card?.slot !== true) card = { action: name, text, note };
       if (spoken !== '') announce(spoken);
       render();
     };
@@ -354,8 +406,11 @@ export function createToolbar(
     return el;
   }
 
+  /** The toolbar's own buttons (arrow-key group), not the controls of a card inside it. */
   function buttons(): HTMLButtonElement[] {
-    return Array.from(panelParent?.querySelectorAll('button') ?? []);
+    return Array.from(panelParent?.querySelectorAll('button') ?? []).filter(
+      (button) => button.closest('[data-clavis="card-slot"]') === null,
+    );
   }
 
   function focusButton(): void {
@@ -375,6 +430,8 @@ export function createToolbar(
 
   function onToolbarKeyDown(event: KeyboardEvent): void {
     if (!isTrustedEvent(event)) return;
+    // The loaded card handles its own Tab and arrow keys (a tab list, several controls).
+    if ((event.target as Element | null)?.closest?.('[data-clavis="card-slot"]')) return;
     // Tab leaves the toolbar from where the user was, not from the end of the document.
     if (event.key === 'Tab') {
       restoreFocus();

@@ -35,7 +35,58 @@ export interface ActionContext {
  */
 export interface RunContext extends ActionContext {
   signal: AbortSignal;
+  /**
+   * Lets the action draw its own card inside the toolbar (Phase 5 Explain card). Absent for
+   * hosts that only show the toolbar's state line.
+   */
+  surface?: CardSurface;
 }
+
+/**
+ * What the toolbar lends an action that draws its own card (the separately loaded explanation
+ * card, D-08). The toolbar owns the closed shadow root, placement, focus and dismissal; the card
+ * only draws inside `open()` and reports size changes. It never receives the root itself.
+ */
+export interface CardSurface {
+  /** The action was started from the keyboard (a toolbar button had focus), so focus may move. */
+  keyboard: boolean;
+  /**
+   * The empty element inside the toolbar's closed root the card renders into. The first call
+   * replaces the toolbar's own state line with it. Null once this run is no longer current.
+   */
+  open(): HTMLElement | null;
+  /** Re-run placement after the card changed size. */
+  reposition(): void;
+  /**
+   * Remove the card, abort the run (its `signal`) and put keyboard focus back on the button that
+   * opened it. The toolbar itself stays.
+   */
+  close(): void;
+}
+
+/**
+ * The separately loaded explanation card (components/explanation). `entrypoints/explain-card.content.ts`
+ * registers it on `EXPLAIN_CARD_GLOBAL` in the frame's isolated world; the page's main world has no
+ * access to that world, so a page can neither reach it nor replace it.
+ */
+export interface ExplainCardApi {
+  /**
+   * Show the card for `context` in its `surface` and start the core request (unless this
+   * selection already has one). Resolves once the card is on screen; request failures are shown
+   * IN the card, not thrown. Rejects only when there is no surface to draw on.
+   */
+  present(context: RunContext): Promise<void>;
+  /**
+   * The toolbar closed or the selection was replaced: cancel pending requests and drop the cache of
+   * `selectionId` (of everything when omitted, for example after a trim).
+   */
+  dismiss(selectionId?: string): void;
+  /** Remove everything (extension update, a newer injection, observer stop). */
+  destroy(): void;
+}
+
+/** Where the loaded card registers itself (isolated world only). */
+export const EXPLAIN_CARD_GLOBAL = Symbol.for('clavis.explain-card');
 
 /**
  * Reject with this to show a specific message in the toolbar instead of the generic "That didn't

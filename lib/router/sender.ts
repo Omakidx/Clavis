@@ -34,6 +34,8 @@ export interface ClassifiedSender {
   /** The sender's tab; absent for the popup and for the offscreen document. */
   tabId?: number;
   frameId?: number;
+  /** Chrome's id of the sender's document: new on every navigation, so it tells documents of one frame apart. */
+  documentId?: string;
   /** The sender's own url (a frame's url, not the tab's). Internal routes use it; never echoed. */
   url?: string;
 }
@@ -44,6 +46,7 @@ export interface SenderLike {
   url?: string | undefined;
   origin?: string | undefined;
   frameId?: number | undefined;
+  documentId?: string | undefined;
   tab?: { id?: number | undefined; url?: string | undefined } | undefined;
 }
 
@@ -95,6 +98,9 @@ export function classifySender(sender: SenderLike, identity: SenderIdentity): Cl
   const located = {
     ...(tabId === undefined ? {} : { tabId }),
     ...(sender.frameId === undefined ? {} : { frameId: sender.frameId }),
+    ...(typeof sender.documentId === 'string' && sender.documentId !== ''
+      ? { documentId: sender.documentId }
+      : {}),
     url: url.href,
   };
 

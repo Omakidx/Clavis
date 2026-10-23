@@ -1,15 +1,16 @@
 import { z } from 'zod';
 import { GROQ, LIMITS, REQUEST_TIMEOUT_MS } from '../config/constants';
 import {
-  coreOutputSchema,
   explainRequestSchema,
-  explainResultSchema,
   modelIdSchema,
   type ExplainRequest,
   type ExplainResult,
+  type ReadingLevel,
 } from '../contracts';
 import { logger as defaultLogger, type LogMetadata } from '../security/logger';
-import { getModelCapabilities } from './capabilities';
+import { maxCompletionTokensFor } from './budgets';
+import { getModelCapabilities, type ModelCapabilities } from './capabilities';
+import { createCapabilityCache, type CapabilityCache } from './capability-cache';
 import {
   GroqError,
   codeForStatus,
@@ -17,8 +18,8 @@ import {
   type GroqErrorInit,
   type GroqUsage,
 } from './errors';
-import { buildCorePrompt, type ResponseMode } from './prompts';
-import { dropNulls, toStrictJsonSchema } from './schema';
+import { buildResult, schemaNameFor, strictSchemaFor } from './modes';
+import { buildPrompt, type ResponseMode } from './prompts';
 
 export type { ResponseMode } from './prompts';
 
@@ -33,6 +34,15 @@ const TOKEN_PATTERN = /^[A-Za-z0-9_.-]{1,48}$/;
 /** A 400 mentioning these means the model/endpoint rejected `response_format` itself. */
 const UNSUPPORTED_FORMAT_PATTERN =
   /response_format|json_schema|json schema|structured output|json_object|json mode/i;
+/** A 400 naming the effort parameter means this model does not take `reasoning_effort`. */
+const UNSUPPORTED_EFFORT_PATTERN = /reasoning[_ -]?effort/i;
+/**
+ * At most this many HTTP exchanges per explain call: the first attempt, one fallback for an
+ * unsupported `response_format` and one for an unsupported `reasoning_effort`. Never a loop.
+ */
+const MAX_ATTEMPTS = 3;
+/** Thinking-model wrappers some models put in `content` before the JSON. */
+const THINK_BLOCK = /^\s*<think>[\s\S]*?<\/think>\s*/;
 
 export interface GroqModel {
   id: string;
@@ -49,17 +59,26 @@ export interface ExplainOptions {
   signal?: AbortSignal;
   /** Preferred response format. Defaults from the capability table. */
   responseMode?: ResponseMode;
-  /** Overall deadline for the call including the one json_object retry. */
+  /** Overall deadline for the call including its capability fallbacks. */
   timeoutMs?: number;
+  /** Override the per-mode budget table (lib/ai/budgets.ts). */
   maxCompletionTokens?: number;
+  /** The user's reading level (FR-006). Defaults to `standard`. */
+  readingLevel?: ReadingLevel;
 }
 
 export interface ExplainDetails {
   result: ExplainResult;
   /** Format that produced the result. */
   responseMode: ResponseMode;
+  /** Format of the first attempt (json_object when a cached verdict skipped json_schema). */
+  startedWith: ResponseMode;
   /** True when json_schema was rejected with a 400 and the call was retried as json_object. */
   fellBack: boolean;
+  /** `reasoning_effort` value of the successful request, null when none was sent. */
+  reasoningEffort: 'low' | null;
+  /** `max_completion_tokens` of the successful request. */
+  maxCompletionTokens: number;
   usage: GroqUsage;
   finishReason: string | undefined;
   requestCount: number;
@@ -77,6 +96,11 @@ export interface GroqDeps {
   now?: () => number;
   /** Wall clock in ms, used for HTTP-date Retry-After. Defaults to `Date.now()`. */
   wallNow?: () => number;
+  /**
+   * What this account's models were observed to accept. Defaults to a private in-memory cache;
+   * the background passes one backed by `chrome.storage.session`.
+   */
+  capabilityCache?: CapabilityCache;
 }
 
 // ---------------------------------------------------------------------------
@@ -192,9 +216,11 @@ function readProviderError(text: string): { type?: string; code?: string; messag
 export class GroqProvider {
   readonly id = 'groq' as const;
   private readonly deps: GroqDeps;
+  private readonly cache: CapabilityCache;
 
   constructor(deps: GroqDeps = {}) {
     this.deps = deps;
+    this.cache = deps.capabilityCache ?? createCapabilityCache();
   }
 
   private get log(): NonNullable<GroqDeps['logger']> {
@@ -220,6 +246,8 @@ export class GroqProvider {
     init: { method: 'GET' | 'POST'; apiKey: string; body?: string },
     signals: { caller: AbortSignal | undefined; deadline: AbortSignal },
   ): Promise<HttpOutcome> {
+    // Cancelled while waiting for the capability cache (or between fallback attempts): no request.
+    if (signals.caller?.aborted) throw new GroqError('REQUEST_CANCELLED');
     const signal = signals.caller
       ? AbortSignal.any([signals.caller, signals.deadline])
       : signals.deadline;
@@ -294,17 +322,16 @@ export class GroqProvider {
     }));
   }
 
-  /** Explain a selection (mode `core` only in this spike). Returns the unified result. */
+  /** Explain a selection in the requested mode. Returns the unified result. */
   async explain(request: ExplainRequest, opts: ExplainOptions): Promise<ExplainResult> {
     return (await this.explainDetailed(request, opts)).result;
   }
 
-  /** Like `explain`, plus response mode, fallback flag and token usage for measurement. */
+  /** Like `explain`, plus response mode, fallback flags and token usage for measurement. */
   async explainDetailed(request: ExplainRequest, opts: ExplainOptions): Promise<ExplainDetails> {
     const parsedRequest = explainRequestSchema.safeParse(request);
     if (!parsedRequest.success) throw new TypeError('Invalid explain request');
     const valid = parsedRequest.data;
-    if (valid.mode !== 'core') throw new TypeError('Only mode "core" is implemented in Spike A');
     if (!modelIdSchema.safeParse(opts.model).success) {
       throw new GroqError('MODEL_UNAVAILABLE');
     }
@@ -319,12 +346,19 @@ export class GroqProvider {
     });
 
     const capabilities = getModelCapabilities(opts.model);
-    const preferred: ResponseMode =
-      opts.responseMode ?? (capabilities.jsonSchema === 'unknown' ? 'json_object' : 'json_schema');
+    const observed = await this.cache.get(opts.model);
+    // What a past call learned beats the static table: a cached rejection is not re-tried.
+    const schemaExpected = observed.jsonSchema ?? capabilities.jsonSchema !== 'unknown';
+    const startedWith: ResponseMode =
+      opts.responseMode ?? (schemaExpected ? 'json_schema' : 'json_object');
+    let reasoningEffort: ModelCapabilities['reasoningEffort'] =
+      observed.reasoningEffort === false ? null : capabilities.reasoningEffort;
+    const maxCompletionTokens =
+      opts.maxCompletionTokens ?? maxCompletionTokensFor(valid.mode, capabilities);
     const deadline = AbortSignal.timeout(opts.timeoutMs ?? REQUEST_TIMEOUT_MS.default);
     const signals = { caller: opts.signal, deadline };
 
-    let responseMode = preferred;
+    let responseMode = startedWith;
     let fellBack = false;
     let fallbackFrom: ExplainDetails['fallbackFrom'];
     let requestCount = 0;
@@ -337,39 +371,70 @@ export class GroqProvider {
             method: 'POST',
             apiKey: opts.apiKey,
             body: JSON.stringify(
-              buildBody(valid, opts.model, responseMode, opts.maxCompletionTokens),
+              buildBody({
+                request: valid,
+                model: opts.model,
+                capabilities,
+                responseMode,
+                reasoningEffort,
+                maxCompletionTokens,
+                readingLevel: opts.readingLevel,
+              }),
             ),
           },
           signals,
         );
         if (outcome.ok) {
           const mapped = mapCompletion(outcome.text, valid, opts.model);
+          // A json_schema request that worked is a verdict worth keeping (an unknown model).
+          if (responseMode === 'json_schema' && observed.jsonSchema !== true && !fellBack) {
+            await this.cache.record(opts.model, { jsonSchema: true });
+          }
           this.log.debug('groq_explain_ok', meta({ status: outcome.status }));
           return {
             ...mapped,
             responseMode,
+            startedWith,
             fellBack,
+            reasoningEffort,
+            maxCompletionTokens,
             requestCount,
             ...(fallbackFrom ? { fallbackFrom } : {}),
           };
         }
+        const unsupported = outcome.status === 400 ? readProviderError(outcome.text) : undefined;
+        // `json_validate_failed` is the MODEL's output failing the schema, not an unsupported
+        // option: never a fallback, and never a cached verdict about the model.
         if (
-          outcome.status === 400 &&
-          responseMode === 'json_schema' &&
-          UNSUPPORTED_FORMAT_PATTERN.test(readProviderError(outcome.text).message)
+          unsupported !== undefined &&
+          unsupported.code !== 'json_validate_failed' &&
+          requestCount < MAX_ATTEMPTS
         ) {
-          const rejected = this.failure(outcome);
-          fallbackFrom = {
-            ...(rejected.providerErrorType
-              ? { providerErrorType: rejected.providerErrorType }
-              : {}),
-            ...(rejected.providerErrorCode
-              ? { providerErrorCode: rejected.providerErrorCode }
-              : {}),
-          };
-          responseMode = 'json_object';
-          fellBack = true;
-          continue;
+          if (
+            responseMode === 'json_schema' &&
+            UNSUPPORTED_FORMAT_PATTERN.test(unsupported.message)
+          ) {
+            const rejected = this.failure(outcome);
+            fallbackFrom = {
+              ...(rejected.providerErrorType
+                ? { providerErrorType: rejected.providerErrorType }
+                : {}),
+              ...(rejected.providerErrorCode
+                ? { providerErrorCode: rejected.providerErrorCode }
+                : {}),
+            };
+            responseMode = 'json_object';
+            fellBack = true;
+            await this.cache.record(opts.model, { jsonSchema: false });
+            this.log.debug('groq_format_fallback', meta({ status: outcome.status }));
+            continue;
+          }
+          if (reasoningEffort !== null && UNSUPPORTED_EFFORT_PATTERN.test(unsupported.message)) {
+            reasoningEffort = null;
+            await this.cache.record(opts.model, { reasoningEffort: false });
+            this.log.debug('groq_effort_fallback', meta({ status: outcome.status }));
+            continue;
+          }
         }
         throw this.failure(outcome);
       }
@@ -398,31 +463,39 @@ function assertApiKey(apiKey: string): void {
   }
 }
 
-function buildBody(
-  request: ExplainRequest,
-  model: string,
-  responseMode: ResponseMode,
-  maxCompletionTokens: number | undefined,
-): Record<string, unknown> {
-  const capabilities = getModelCapabilities(model);
+interface BodyInput {
+  request: ExplainRequest;
+  model: string;
+  capabilities: ModelCapabilities;
+  responseMode: ResponseMode;
+  reasoningEffort: ModelCapabilities['reasoningEffort'];
+  maxCompletionTokens: number;
+  readingLevel: ReadingLevel | undefined;
+}
+
+function buildBody(input: BodyInput): Record<string, unknown> {
+  const { request, model, capabilities, responseMode, reasoningEffort } = input;
   const responseFormat =
     responseMode === 'json_schema'
       ? {
           type: 'json_schema',
           json_schema: {
-            name: 'clavis_core',
+            name: schemaNameFor(request.mode),
             strict: capabilities.jsonSchema === 'strict',
-            schema: toStrictJsonSchema(coreOutputSchema),
+            schema: strictSchemaFor(request.mode),
           },
         }
       : { type: 'json_object' };
   return {
     model,
-    messages: buildCorePrompt(request, responseMode),
+    messages: buildPrompt(request, {
+      responseMode,
+      ...(input.readingLevel === undefined ? {} : { readingLevel: input.readingLevel }),
+    }),
     temperature: TEMPERATURE,
-    max_completion_tokens: maxCompletionTokens ?? capabilities.defaultMaxCompletionTokens,
+    max_completion_tokens: input.maxCompletionTokens,
     response_format: responseFormat,
-    ...(capabilities.reasoningEffort ? { reasoning_effort: capabilities.reasoningEffort } : {}),
+    ...(reasoningEffort ? { reasoning_effort: reasoningEffort } : {}),
   };
 }
 
@@ -449,28 +522,14 @@ function mapCompletion(
   if (finishReason === 'length') throw fail('truncated');
   let json: unknown;
   try {
-    json = JSON.parse(content);
+    json = JSON.parse(content.replace(THINK_BLOCK, ''));
   } catch {
     throw fail('json');
   }
-  const core = coreOutputSchema.safeParse(dropNulls(json));
-  if (!core.success) throw fail('schema');
-  const result = explainResultSchema.safeParse({
-    requestId: request.requestId,
-    selectedText: request.snapshot.text,
-    mode: 'core',
-    title: core.data.title,
-    summary: core.data.summary,
-    contextualMeaning: core.data.contextualMeaning,
-    definition: core.data.definition,
-    examples: core.data.examples,
-    ...(core.data.caveat !== undefined ? { caveat: core.data.caveat } : {}),
-    provider: 'groq',
-    model,
-  });
-  if (!result.success) throw fail('schema');
-  return { result: result.data, usage, finishReason };
+  const result = buildResult(request, model, json);
+  if (result === undefined) throw fail('schema');
+  return { result, usage, finishReason };
 }
 
-/** Shared default instance for the extension background. */
+/** Shared default instance for tests and tools; the background builds its own with a persistent cache. */
 export const groqProvider = new GroqProvider();

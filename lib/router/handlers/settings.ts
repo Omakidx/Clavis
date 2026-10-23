@@ -25,6 +25,11 @@ export interface SettingsHandlerDeps {
   siteAccess: Pick<SiteAccessController, 'reconcile' | 'getStatus'>;
   guard: AiGuard;
   areas: StorageAreaLike[];
+  /**
+   * The model preference changed or was reset, or all data was cleared: what was learned about
+   * the model's capabilities (lib/ai/capability-cache.ts) must be re-learned.
+   */
+  onModelContextChanged?: () => void;
 }
 
 /** Preference fields that change what the observer registration should look like. */
@@ -57,11 +62,13 @@ export function createSettingsHandlers(deps: SettingsHandlerDeps) {
         throw error;
       }
       if (SITE_POLICY_FIELDS.some((field) => field in patch)) await applySitePolicy();
+      if ('model' in patch) deps.onModelContextChanged?.();
       return snapshot();
     },
 
     async resetPreferences(): Promise<MessageReply<SettingsSnapshot>> {
       await settings.resetPreferences();
+      deps.onModelContextChanged?.();
       await applySitePolicy();
       return snapshot();
     },
@@ -100,6 +107,7 @@ export function createSettingsHandlers(deps: SettingsHandlerDeps) {
       await deps.keys.exclusive(() => settings.exclusive(() => clearClavisStorage(deps.areas)));
       deps.guard.inFlight.abortAll();
       deps.guard.buckets.clear();
+      deps.onModelContextChanged?.();
       await applySitePolicy();
       return success({ cleared: true });
     },

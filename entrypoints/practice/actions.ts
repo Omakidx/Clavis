@@ -1,19 +1,20 @@
 import { TTS_RATES } from '../../lib/config/constants';
-import type { ExplainResult } from '../../lib/contracts/explain';
 import type { SelectionSnapshot } from '../../lib/contracts/selection';
 import { DEFAULT_PREFERENCES, type PublicSettings } from '../../lib/contracts/setup';
 import { api, type Api } from '../../lib/ui-client/api';
 import type { ClientError } from '../../lib/ui-client/errors';
 
-/** What the result panel shows. Plain data only: it is rendered as text nodes. */
+/**
+ * What the result panel shows. Plain data only: it is rendered as text nodes. Only Listen reports
+ * here; Explain draws its answer in the same card the toolbar opens on web pages (Phase 5).
+ */
 export type PracticeState =
   | { kind: 'idle' }
-  | { kind: 'working'; action: 'listen' | 'explain'; text: string }
+  | { kind: 'working'; action: 'listen'; text: string }
   | { kind: 'speaking'; text: string }
-  | { kind: 'explained'; text: string; result: ExplainResult }
-  | { kind: 'error'; action: 'listen' | 'explain'; text: string; error: ClientError };
+  | { kind: 'error'; action: 'listen'; text: string; error: ClientError };
 
-type PracticeApi = Pick<Api, 'speak' | 'explain'>;
+type PracticeApi = Pick<Api, 'speak'>;
 
 /** The preferences the practice actions need; falls back to defaults without a backend. */
 export type PracticePrefs = Pick<PublicSettings, 'explanationLanguage' | 'ttsRate'> & {
@@ -41,25 +42,4 @@ export async function runListen(
   return result.ok
     ? { kind: 'speaking', text: snapshot.text }
     : { kind: 'error', action: 'listen', text: snapshot.text, error: result.error };
-}
-
-/**
- * Explain: AI_EXPLAIN in `core` mode. Phase 5 builds the real card; this panel only proves the
- * end-to-end path and shows the mapped error (SETUP_REQUIRED leads to "Connect Groq").
- */
-export async function runExplain(
-  snapshot: SelectionSnapshot,
-  prefs: PracticePrefs,
-  client: PracticeApi = api,
-): Promise<PracticeState> {
-  const result = await client.explain({
-    requestId: crypto.randomUUID(),
-    snapshot,
-    mode: 'core',
-    targetLanguage: prefs.explanationLanguage,
-    detailLevel: 'standard',
-  });
-  return result.ok
-    ? { kind: 'explained', text: snapshot.text, result: result.data }
-    : { kind: 'error', action: 'explain', text: snapshot.text, error: result.error };
 }

@@ -98,7 +98,7 @@ export interface MessageLog {
 }
 
 /**
- * Observe the service worker's inbound messages from inside the worker (an extra onMessage
+ * Observe the service worker's inbound messages (since this handle was created) from inside the worker (an extra onMessage
  * listener that never replies). Proves "no background AI/TTS traffic on selection alone".
  */
 export async function logWorkerMessages(worker: Worker): Promise<MessageLog> {
@@ -132,6 +132,11 @@ export async function logWorkerMessages(worker: Worker): Promise<MessageLog> {
       return undefined;
     });
   });
+  // The listener lives as long as the worker and is shared by every test; each handle only reports
+  // what arrived after it was created (an earlier test may have clicked Explain on purpose).
+  const startIndex = await worker.evaluate(
+    () => (globalThis as unknown as { __p4msgs?: unknown[] }).__p4msgs?.length ?? 0,
+  );
   return {
     read: async () => {
       const messages = await worker.evaluate(
@@ -144,7 +149,9 @@ export async function logWorkerMessages(worker: Worker): Promise<MessageLog> {
       );
       // A restarted worker loses the listener: an empty log would then prove nothing.
       if (messages === null) throw new Error('service worker restarted: message log lost');
-      return messages;
+      if (messages.length < startIndex)
+        throw new Error('service worker restarted: message log lost');
+      return messages.slice(startIndex);
     },
   };
 }

@@ -892,3 +892,193 @@ describe('placement coordinates', () => {
     }
   });
 });
+
+describe('card surface (the separately loaded explanation card, Phase 5)', () => {
+  const slot = (): HTMLElement | null => shadow().querySelector('[data-clavis="card-slot"]');
+  const surfaceOf = (index = 0) => (calls[index]?.context as RunContext).surface;
+
+  it('lends every run a surface; keyboard is false for a mouse press and true from a focused button', () => {
+    const handle = create();
+    handle.show(capture('bank'));
+    button('explain').click();
+    expect(surfaceOf(0)?.keyboard).toBe(false);
+    button('explain').focus();
+    button('explain').click();
+    expect(surfaceOf(1)?.keyboard).toBe(true);
+  });
+
+  it('open() swaps the state line for an empty slot and returns the same element every time', () => {
+    outcome = () => new Promise<void>(() => undefined);
+    create().show(capture('bank'));
+    button('explain').click();
+    expect(shadow().querySelector('[data-clavis="card"]')).not.toBeNull();
+    expect(slot()).toBeNull();
+    const first = surfaceOf()?.open() as HTMLElement;
+    expect(first.getAttribute('data-clavis')).toBe('card-slot');
+    expect(first.childElementCount).toBe(0);
+    expect(shadow().querySelector('[data-clavis="card"]')).toBeNull();
+    expect(panel().getAttribute('data-card')).toBe('explain');
+    expect(surfaceOf()?.open()).toBe(first);
+  });
+
+  it('keeps the card (and whatever was drawn in the slot) through toolbar re-renders and after the action settles', async () => {
+    let settle: () => void = () => undefined;
+    outcome = () => new Promise<void>((resolve) => (settle = resolve));
+    create().show(capture('bank'));
+    button('explain').click();
+    const element = surfaceOf()?.open() as HTMLElement;
+    const drawn = document.createElement('p');
+    drawn.textContent = 'drawn by the card';
+    element.append(drawn);
+    // The toolbar's own announcement re-renders its tree.
+    await vi.advanceTimersByTimeAsync(200);
+    expect(slot()).toBe(element);
+    expect(slot()?.contains(drawn)).toBe(true);
+    settle();
+    await vi.advanceTimersByTimeAsync(200);
+    expect(slot()).toBe(element);
+    expect(slot()?.contains(drawn)).toBe(true);
+    expect(shadow().querySelector('[data-clavis="card"]')).toBeNull();
+    // The button is usable again.
+    expect(button('explain').getAttribute('aria-disabled')).toBeNull();
+  });
+
+  it('a rejected action does not wipe a card it already opened', async () => {
+    let fail: (error: unknown) => void = () => undefined;
+    outcome = () => new Promise<void>((_resolve, reject) => (fail = reject));
+    create().show(capture('bank'));
+    button('explain').click();
+    const element = surfaceOf()?.open() as HTMLElement;
+    fail(new Error('late'));
+    await vi.advanceTimersByTimeAsync(200);
+    expect(slot()).toBe(element);
+  });
+
+  it('pressing Explain again aborts the old run, which can no longer open the surface', async () => {
+    outcome = () => Promise.resolve();
+    create().show(capture('bank'));
+    button('explain').click();
+    const old = surfaceOf(0);
+    old?.open();
+    await vi.advanceTimersByTimeAsync(0);
+    button('explain').click();
+    expect(signals[0]?.aborted).toBe(true);
+    expect(old?.open()).toBeNull();
+    // The new run starts from the state line again until it opens its own slot.
+    expect(slot()).toBeNull();
+    expect(surfaceOf(1)?.open()).not.toBeNull();
+  });
+
+  it('close() removes the card, aborts the run, keeps the toolbar and returns keyboard focus to Explain', () => {
+    outcome = () => new Promise<void>(() => undefined);
+    const handle = create();
+    handle.show(capture('bank'));
+    button('explain').focus();
+    button('explain').click();
+    const element = surfaceOf()?.open() as HTMLElement;
+    const inside = document.createElement('button');
+    element.append(inside);
+    inside.focus();
+    expect(shadow().activeElement).toBe(inside);
+    surfaceOf()?.close();
+    expect(slot()).toBeNull();
+    expect(signals[0]?.aborted).toBe(true);
+    expect(panel().hidden).toBe(false);
+    expect(button('explain').getAttribute('aria-disabled')).toBeNull();
+    expect(shadow().activeElement).toBe(button('explain'));
+  });
+
+  it('close() with the mouse does not move focus', () => {
+    outcome = () => new Promise<void>(() => undefined);
+    create().show(capture('bank'));
+    button('explain').click();
+    surfaceOf()?.open();
+    surfaceOf()?.close();
+    expect(shadow().activeElement).toBeNull();
+  });
+
+  it('Escape closes the toolbar with the card in it and reports the dismissal of the selection', () => {
+    outcome = () => new Promise<void>(() => undefined);
+    create().show(capture('bank'));
+    button('explain').click();
+    surfaceOf()?.open();
+    press('Escape');
+    expect(panel().hidden).toBe(true);
+    expect(signals[0]?.aborted).toBe(true);
+    expect(calls.at(-1)).toMatchObject({ action: 'dismiss', context: { reason: 'escape' } });
+  });
+
+  it('a new selection discards the card', () => {
+    outcome = () => new Promise<void>(() => undefined);
+    const handle = create();
+    handle.show(capture('bank'));
+    button('explain').click();
+    surfaceOf()?.open();
+    handle.show(capture('river'));
+    expect(slot()).toBeNull();
+    expect(surfaceOf()?.open()).toBeNull();
+  });
+
+  it('reposition() schedules a placement; it does nothing once the run is over', () => {
+    outcome = () => new Promise<void>(() => undefined);
+    const raf = vi.spyOn(window, 'requestAnimationFrame');
+    create().show(capture('bank'));
+    button('explain').click();
+    const surface = surfaceOf();
+    raf.mockClear();
+    surface?.reposition();
+    expect(raf).toHaveBeenCalledTimes(1);
+    surface?.close();
+    raf.mockClear();
+    surface?.reposition();
+    expect(raf).not.toHaveBeenCalled();
+  });
+
+  describe('keyboard handling is left to the card', () => {
+    function openWithControls(): { first: HTMLButtonElement; second: HTMLButtonElement } {
+      outcome = () => new Promise<void>(() => undefined);
+      setBody('<p>The old bank by the river.</p><a id="link" href="#x">link</a>');
+      const link = document.getElementById('link') as HTMLElement;
+      link.focus();
+      const handle = create();
+      handle.show(capture('bank'));
+      handle.focus();
+      button('explain').click();
+      const element = surfaceOf()?.open() as HTMLElement;
+      const first = document.createElement('button');
+      const second = document.createElement('button');
+      element.append(first, second);
+      first.focus();
+      return { first, second };
+    }
+
+    it('Tab inside the card is not turned into "leave the toolbar"', () => {
+      const { first } = openWithControls();
+      const event = new KeyboardEvent('keydown', {
+        key: 'Tab',
+        bubbles: true,
+        composed: true,
+        cancelable: true,
+      });
+      first.dispatchEvent(event);
+      expect(shadow().activeElement).toBe(first);
+    });
+
+    it('arrow keys inside the card do not move focus along the toolbar buttons', () => {
+      const { first } = openWithControls();
+      first.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true, composed: true }),
+      );
+      expect(shadow().activeElement).toBe(first);
+    });
+
+    it('the toolbar arrow group is only Listen and Explain, not the card controls', () => {
+      openWithControls();
+      button('explain').focus();
+      press('ArrowRight');
+      expect(shadow().activeElement).toBe(button('listen'));
+      press('End');
+      expect(shadow().activeElement).toBe(button('explain'));
+    });
+  });
+});

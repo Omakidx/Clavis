@@ -1,5 +1,10 @@
 import { GroqError } from '../ai/errors';
-import { idSchema, type ErrorCode, type MessageReply } from '../contracts';
+import { idSchema, type ErrorCode, type ErrorReason, type MessageReply } from '../contracts';
+
+/** Fixed message for an envelope that carries a `reason` (the plain code message would mislead). */
+const REASON_MESSAGES: Record<ErrorReason, string> = {
+  disclosure: 'Confirm that Clavis may send the selected text to Groq.',
+};
 
 /**
  * Reply envelopes. Messages are the fixed per-code strings from `GroqError` (named for
@@ -8,11 +13,19 @@ import { idSchema, type ErrorCode, type MessageReply } from '../contracts';
  */
 export function failure(
   code: ErrorCode,
-  options: { requestId?: string | undefined; retryAfterMs?: number | undefined } = {},
+  options: {
+    requestId?: string | undefined;
+    retryAfterMs?: number | undefined;
+    reason?: ErrorReason | undefined;
+  } = {},
 ): MessageReply<never> {
-  const envelope = new GroqError(code, {
+  const base = new GroqError(code, {
     ...(options.retryAfterMs === undefined ? {} : { retryAfterMs: options.retryAfterMs }),
   }).toEnvelope();
+  const envelope =
+    options.reason === undefined
+      ? base
+      : { ...base, message: REASON_MESSAGES[options.reason], reason: options.reason };
   return {
     ok: false,
     ...(options.requestId === undefined ? {} : { requestId: options.requestId }),

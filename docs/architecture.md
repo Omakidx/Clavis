@@ -184,6 +184,8 @@ All result strings are **plain text** (D-10). The UI renders them as text nodes;
 
 **Response normalization:** ask Groq for a **mode-specific minimal JSON schema** — `core` returns `title`, `summary`, `contextualMeaning`, `definition`, `examples` (2), optional `caveat`; each lazy mode returns only its own field(s). The adapter converts valid output into the unified response. Check which structured-output modes the chosen model supports; do not assume strict JSON Schema support on every Groq model. If schema mode fails due to unsupported capability, fall back to supported JSON mode with strong validation, or show an actionable error.
 
+**Phase 5 additions.** `AI_EXPLAIN` may carry `acknowledgeDisclosure: true` (only from content scripts, `/reader.html`, `/practice.html`, after a trusted click on the one-time first-send prompt); when the disclosure was never acknowledged the reply is `SETUP_REQUIRED` with `reason: 'disclosure'`. `LOAD_EXPLAIN_CARD` (website content scripts only) injects `content-scripts/explain-card.js` into exactly the sender's frame, once per document. `OPEN_SETTINGS` opens Settings at an optional section. The card renders into a slot inside the toolbar's closed shadow root via an isolated-world registry; it never reaches the page.
+
 ### Message contract
 
 ```ts
@@ -456,7 +458,7 @@ These rules are the single source of truth for key handling; other documents lin
 6. Removing the key clears the chosen storage area, in-memory references, connection status and any cache tied to it, and aborts in-flight requests. Key metadata (storage area, last4, verification, models) lives in the **same area as the key**, so a session-only key leaves nothing in `chrome.storage.local`. Key reads and writes `await whenStorageLockedDown()` and fail with `STORAGE_UNAVAILABLE` if it resolved `false`; deletion is allowed regardless.
 7. One user-supplied key per provider; no developer key is ever shipped. Groq is reached only over `https:` within the narrow host permission.
 8. Extension pages have privileged access, so they must avoid DOM-based XSS (no `innerHTML` with untrusted data).
-9. AI requests are limited per tab (or per extension page): one in flight — a new `AI_EXPLAIN` aborts the previous one — and a token bucket of 10 per minute (`RATE_LIMITED` with `retryAfterMs`). `AI_EXPLAIN` requires a key and the acknowledged disclosure.
+9. AI requests are limited per tab (or per extension page): one in flight — a new `AI_EXPLAIN` aborts the previous one — and a token bucket of 20 per minute (D-21; shared by the core answer and the lazy tabs) (`RATE_LIMITED` with `retryAfterMs`). `AI_EXPLAIN` requires a key and the acknowledged disclosure.
 
 ### Data flow declaration for privacy policy
 

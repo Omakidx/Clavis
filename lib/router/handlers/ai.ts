@@ -1,6 +1,6 @@
 import { GroqError } from '../../ai/errors';
 import type { ExplainOptions } from '../../ai/groq';
-import { MODEL_CANDIDATES } from '../../config/constants';
+import { FEATURES, MODE_FEATURE_FLAGS, MODEL_CANDIDATES } from '../../config/constants';
 import type {
   AiStatus,
   ErrorCode,
@@ -8,17 +8,22 @@ import type {
   ExplainResult,
   MessageReply,
   PublicSettings,
+  ReadingLevel,
 } from '../../contracts';
 import { logger } from '../../security/logger';
 import { StorageUnavailableError, type ApiKeyStore, type SettingsStore } from '../../storage';
 import { senderKey, type AiGuard } from '../limiter';
 import { failure, success } from '../replies';
 import type { RouteContext } from '../router';
+import { PRACTICE_PAGE_PATH, type ClassifiedSender } from '../sender';
 import type { KeyProvider, KeyService } from './key';
 
 export interface AiProvider extends KeyProvider {
   explain(request: ExplainRequest, options: ExplainOptions): Promise<ExplainResult>;
 }
+
+/** Which optional (Should) modes are enabled; `lib/config/constants` FEATURES by default. */
+export type FeatureFlags = Record<keyof typeof FEATURES, boolean>;
 
 export interface AiHandlerDeps {
   settings: SettingsStore;
@@ -27,6 +32,20 @@ export interface AiHandlerDeps {
   provider: AiProvider;
   guard: AiGuard;
   lockedDown(): Promise<boolean>;
+  /** Overridable for tests; the build-time flags otherwise. */
+  features?: FeatureFlags;
+}
+
+/**
+ * Senders that may carry `acknowledgeDisclosure`: the contexts that show the one-time "Send this
+ * to Groq?" prompt (the card in a web page's content world and the practice page). The reader is NOT
+ * allowed yet: it has no card until Phase 7, so add it here together with its card. The popup,
+ * options and onboarding pages have their own privileged ACCEPT_DISCLOSURE route and never call
+ * AI_EXPLAIN, so the flag from them is refused.
+ */
+export function mayAcknowledgeDisclosure(sender: ClassifiedSender): boolean {
+  if (sender.kind === 'content') return true;
+  return sender.kind === 'extension' && sender.path === PRACTICE_PAGE_PATH;
 }
 
 /** The model used for a request: the user's choice, else the D-09 candidate (never silently a paid tier). */
@@ -35,8 +54,20 @@ export function effectiveModel(preferred: string | undefined): string {
 }
 
 type Readiness =
-  | { state: 'ready'; apiKey: string; model: string; explanationLanguage: string }
+  | {
+      state: 'ready';
+      apiKey: string;
+      model: string;
+      explanationLanguage: string;
+      readingLevel: ReadingLevel;
+    }
   | { state: Exclude<AiStatus['state'], 'ready'>; model?: string };
+
+/** Whether a mode may be served: Must modes always, Should modes behind their feature flag. */
+export function modeEnabled(mode: ExplainRequest['mode'], features: FeatureFlags): boolean {
+  const flag = (MODE_FEATURE_FLAGS as Record<string, keyof FeatureFlags | undefined>)[mode];
+  return flag === undefined || features[flag];
+}
 
 /** `lockedDown` never rejects in production; a rejecting stand-in still fails closed. */
 async function isLockedDown(deps: AiHandlerDeps): Promise<boolean> {
@@ -86,14 +117,15 @@ async function evaluate(deps: AiHandlerDeps): Promise<Readiness> {
     apiKey: stored.apiKey,
     model,
     explanationLanguage: preferences.explanationLanguage,
+    readingLevel: preferences.readingLevel,
   };
 }
 
 const NOT_READY_CODE: Record<Exclude<AiStatus['state'], 'ready'>, ErrorCode> = {
   storage_unavailable: 'STORAGE_UNAVAILABLE',
   setup_required: 'SETUP_REQUIRED',
-  // The disclosure must be acknowledged on an extension page first (FR-002); the UI reads
-  // GET_AI_STATUS to tell this apart from a missing key.
+  // Not reached from AI_EXPLAIN: that route answers disclosure_required itself (with
+  // `reason: 'disclosure'`) so the card can show the one-time prompt.
   disclosure_required: 'SETUP_REQUIRED',
   invalid_key: 'INVALID_API_KEY',
 };
@@ -126,10 +158,15 @@ export function createAiHandlers(deps: AiHandlerDeps) {
       });
     },
 
-    /** AI_EXPLAIN. The caller has been authorized and the payload validated by the router. */
+    /**
+     * AI_EXPLAIN. The caller has been authorized and the payload validated by the router.
+     * Gates, in order: rate limit, mode (flagged-off modes), the acknowledgement flag's sender,
+     * readiness (storage, key, disclosure, last key check), then the provider. Never retried here.
+     */
     async explain(
       payload: ExplainRequest,
       context: RouteContext,
+      options: { acknowledgeDisclosure?: boolean } = {},
     ): Promise<MessageReply<ExplainResult>> {
       const { requestId } = payload;
       const sender = senderKey(context.sender);
@@ -139,8 +176,15 @@ export function createAiHandlers(deps: AiHandlerDeps) {
       if (!decision.ok) {
         return failure('RATE_LIMITED', { requestId, retryAfterMs: decision.retryAfterMs });
       }
-      // Phase 5 adds the lazy tab modes; until then only `core` is served.
-      if (payload.mode !== 'core') return failure('INVALID_REQUEST', { requestId });
+      // Should-priority modes stay off until their flags are on (Phase 8 decides).
+      if (!modeEnabled(payload.mode, deps.features ?? FEATURES)) {
+        return failure('INVALID_REQUEST', { requestId });
+      }
+      // The disclosure flag is only meaningful from the contexts that show the prompt.
+      const acknowledging = options.acknowledgeDisclosure === true;
+      if (acknowledging && !mayAcknowledgeDisclosure(context.sender)) {
+        return failure('INVALID_REQUEST', { requestId });
+      }
 
       // Register BEFORE reading the key: a SET/REMOVE_API_KEY or CLEAR_ALL_DATA that lands while
       // readiness is being evaluated aborts this entry (onKeyChanged -> abortAll), and the
@@ -149,19 +193,38 @@ export function createAiHandlers(deps: AiHandlerDeps) {
       const inFlight = deps.guard.inFlight.begin(sender, requestId);
       let apiKey: string | undefined;
       try {
-        const readiness = await evaluate(deps);
+        let readiness = await evaluate(deps);
         // Aborted while the key was being read (replaced, removed, cleared, superseded)?
         if (inFlight.signal.aborted) return failure('REQUEST_CANCELLED', { requestId });
+
+        if (readiness.state === 'disclosure_required') {
+          // A key exists but the user never acknowledged what is sent (FR-002, onboarding skipped).
+          // Without the flag the card shows "Send this to Groq?" and resends with it.
+          if (!acknowledging) {
+            return failure('SETUP_REQUIRED', { requestId, reason: 'disclosure' });
+          }
+          await deps.settings.acceptDisclosure();
+          readiness = await evaluate(deps);
+          if (inFlight.signal.aborted) return failure('REQUEST_CANCELLED', { requestId });
+        }
         if (readiness.state !== 'ready') {
           return failure(NOT_READY_CODE[readiness.state], { requestId });
         }
         apiKey = readiness.apiKey;
         const result = await deps.provider.explain(
           { ...payload, targetLanguage: payload.targetLanguage ?? readiness.explanationLanguage },
-          { apiKey, model: readiness.model, signal: inFlight.signal },
+          {
+            apiKey,
+            model: readiness.model,
+            readingLevel: readiness.readingLevel,
+            signal: inFlight.signal,
+          },
         );
         return success(result, requestId);
       } catch (error) {
+        if (error instanceof StorageUnavailableError) {
+          return failure('STORAGE_UNAVAILABLE', { requestId });
+        }
         if (!(error instanceof GroqError)) {
           logger.error('explain_unexpected_failure', { requestId });
           return failure('INTERNAL_ERROR', { requestId });

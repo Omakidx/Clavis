@@ -1,11 +1,11 @@
 import type { Frame, Page } from '@playwright/test';
 import { expect, test } from './fixtures';
 import { openExtensionPage } from './p3-ui-support/pages';
+import { CARD, cardOf } from './p5-card-support/harness';
 import { tb } from './spike-b-support/toolbar';
 
 // The practice page mounts the real selection observer and toolbar. Listen and Explain need
-// the Phase 3 background routes (TTS_SPEAK exists; AI_EXPLAIN gives SETUP_REQUIRED): re-run
-// after integration.
+// the background routes (TTS_SPEAK, AI_EXPLAIN, OPEN_SETTINGS); Explain draws the shared card.
 
 async function articleFrame(page: Page): Promise<Frame> {
   await expect.poll(() => page.frames().some((f) => f.url() === 'about:srcdoc')).toBe(true);
@@ -58,14 +58,16 @@ test.describe('practice page', () => {
     await tb(frame).waitShown();
     await tb(frame).click('explain');
 
-    const result = page.getByTestId('practice-result');
-    await expect(page.getByRole('alert')).toContainText('Connect your Groq key to use Explain.');
-    await expect(page.getByRole('button', { name: 'Connect Groq' })).toBeVisible();
-    await expect(result).toHaveCount(0);
+    // Phase 5: the practice page uses the same explanation card as a web page. It lives in the
+    // toolbar's closed shadow root inside the article frame, so it is read through the probe.
+    const card = cardOf(page, frame);
+    await card.waitFor(CARD.error);
+    expect(await card.text(CARD.error)).toContain('Connect your Groq key to use Explain.');
+    expect(await card.text(CARD.settings)).toBe('Connect Groq');
 
     const settings = context.waitForEvent('page');
-    await page.getByRole('button', { name: 'Connect Groq' }).click();
-    await (await settings).waitForURL(/\/options\.html$/);
+    await card.click(CARD.settings);
+    await (await settings).waitForURL(/\/options\.html#section-key$/);
     expect(errors).toEqual([]);
   });
 

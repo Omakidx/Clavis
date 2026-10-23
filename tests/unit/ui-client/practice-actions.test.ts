@@ -2,7 +2,8 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { LIMITS, TTS_RATES } from '../../../lib/config/constants';
 import type { SelectionSnapshot } from '../../../lib/contracts';
 import { api } from '../../../lib/ui-client/api';
-import { FALLBACK_PREFS, runExplain, runListen } from '../../../entrypoints/practice/actions';
+import * as actionsModule from '../../../entrypoints/practice/actions';
+import { FALLBACK_PREFS, runListen } from '../../../entrypoints/practice/actions';
 import { createFakeBackend, installBackend, installCatalog } from './support';
 
 const snapshot: SelectionSnapshot = {
@@ -17,20 +18,6 @@ const snapshot: SelectionSnapshot = {
 beforeEach(() => installCatalog());
 
 describe('practice page actions', () => {
-  it('Explain without a key ends in SETUP_REQUIRED with a Connect Groq action', async () => {
-    const backend = createFakeBackend();
-    installBackend(backend);
-    const state = await runExplain(snapshot, FALLBACK_PREFS);
-    // The fake backend validates the message with the real contract: INVALID_REQUEST would show here.
-    expect(state.kind).toBe('error');
-    if (state.kind === 'error') {
-      expect(state.error.code).toBe('SETUP_REQUIRED');
-      expect(state.error.action).toBe('connect');
-    }
-    expect(backend.calls.map((c) => c.type)).toEqual(['AI_EXPLAIN']);
-    expect(backend.calls[0]).toMatchObject({ payload: { mode: 'core', targetLanguage: 'en' } });
-  });
-
   it('Listen sends TTS_SPEAK with the saved rate and works without a key', async () => {
     const backend = createFakeBackend();
     installBackend(backend);
@@ -48,6 +35,8 @@ describe('practice page actions', () => {
   });
 
   it('exposes the api wrappers the page relies on', () => {
-    expect(typeof api.explain).toBe('function');
+    expect(typeof api.speak).toBe('function');
+    // Explain is no longer driven from the practice page: the shared card sends it (components/explanation).
+    expect('runExplain' in actionsModule).toBe(false);
   });
 });

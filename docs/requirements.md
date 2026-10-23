@@ -3,7 +3,7 @@
 **Status:** Implementation-ready specification (v1 baseline)  
 **Version:** 1.1-draft · **Last reviewed:** 2026-10-22  
 **Platform:** Google Chrome, Manifest V3, desktop first  
-**Product owner decisions:** Groq only for v1; user provides key; no mandatory accounts or first-party backend; custom PDF.js reader; native pronunciation for words **and** sentences. Further resolved decisions D-01 … D-20 are in [§11](#11-product-decisions).
+**Product owner decisions:** Groq only for v1; user provides key; no mandatory accounts or first-party backend; custom PDF.js reader; native pronunciation for words **and** sentences. Further resolved decisions D-01 … D-21 are in [§11](#11-product-decisions).
 
 ## 1. Problem, audience and success criteria
 
@@ -368,6 +368,7 @@ The team can test **Linux only** by hand. Other platforms get automated coverage
 | D-18 | **Minimum Chrome version 147** | pdfjs-dist 6 uses `Math.sumPrecise` (Chrome 147) without a fallback; other floors: `Uint8Array` base64 140, `Promise.try` 128, `URL.parse` 126, `matchOriginAsFallback` 119 (MDN browser-compat-data 8.1.7). The alternative, PDF.js's polyfilled legacy build, is larger | Manifest; platform matrix; ZIP audit |
 | D-19 | **No Tailwind for v1; plain CSS with shared design tokens** | Global resets (as in Tailwind's preflight) shift the PDF.js text layer (Spike C finding 3); extension pages are simple forms that don't need a utility framework | Tech stack §1, §6; shared classes are namespaced `clavis-*` |
 | D-20 | **Observer budget raised from 15 KB to 18 KB gzip** | The 15 KB figure protected the 150 ms first-toolbar target; measured p95 is 58.5 ms (1× CPU) / 133.9 ms (4×) on a loaded machine. Fitting into 15 KB meant dropping pinch-zoom placement | `scripts/size-budgets.json`; tech stack §6 |
+| D-21 | **Per-tab AI rate limit raised from 10 to 20 requests per minute** | One selection can use up to four requests (core + three lazy tabs), so 10/min throttled ordinary reading; webpages can't trigger requests (trusted clicks only, Phase 2 HIGH-1), so the limit now mainly guards cost | `AI_RATE_LIMIT` in lib/config; architecture §9 rule 9 |
 | D-16 | **Disclosure copy approved** as written in [§4.1](#approved-disclosure-copy-fr-002-fr-009-fr-071) | Defines exactly what users see before anything is sent to Groq | Onboarding, first Explain, settings |
 
 ### Still open

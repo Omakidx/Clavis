@@ -1,15 +1,20 @@
 import { bundledPreactLoader } from '../components/tooltip/bundled-loader';
 import { t } from '../lib/i18n';
 import { createSelectionController } from '../lib/selection/controller';
+import { loadedExplainCard, loadExplainCard } from '../lib/selection/card-loader';
 import { ownsFocus } from '../lib/selection/focus';
 import { createLocalActions } from '../lib/selection/local-actions';
 import { isShowNoticeMessage } from '../lib/selection/notice';
-import { OBSERVER_GLOBAL, type SelectionControllerLike } from '../lib/selection/ui-api';
+import {
+  OBSERVER_GLOBAL,
+  type SelectionControllerLike,
+  type ToolbarActions,
+} from '../lib/selection/ui-api';
 import { isOpenSelectionMessage } from '../lib/site-access/messages';
 
 // Framework-free selection observer with a bundled Preact toolbar (D-08, spike B option c;
-// budget <= 18 KB gzipped for the whole file, D-20). Do not import React here: the Phase 5
-// explanation card is loaded lazily on the first Explain click.
+// budget <= 18 KB gzipped for the whole file, D-20). Do not import React or the explanation card
+// (components/explanation) here: the card is its own bundle, loaded on the first Explain click.
 //
 // D-02: registered at RUNTIME via browser.scripting.registerContentScripts after the
 // user grants optional host permissions (lib/site-access), so it never appears in the
@@ -25,6 +30,11 @@ export default defineContentScript({
   registration: 'runtime',
   allFrames: true,
   runAt: 'document_idle',
+  // WXT announces every start with `window.postMessage({ type: '<extension id>:<name>:wxt:...' }, '*')`,
+  // which tells any page script the extension id (fingerprinting). Off: the document CustomEvent
+  // that WXT also dispatches is a forgeable "a newer script started" signal, so teardown below
+  // never trusts it; symbol-keyed replacement (OBSERVER_GLOBAL) handles re-injection instead.
+  noScriptStartedPostMessage: true,
   main(ctx) {
     // After an extension update the old script can outlive its runtime (every call then fails
     // with "Extension context invalidated"): never start from such a context.
@@ -35,14 +45,24 @@ export default defineContentScript({
     // the newest instance replaces the old one, which removes its listeners and its toolbar.
     world[OBSERVER_GLOBAL]?.stop();
 
-    const controller = createSelectionController({
-      loadToolbar: bundledPreactLoader,
-      // Phase 4: Listen and Explain only drive local visual states. Phase 5 and 6 pass their
-      // own ToolbarActions (AI_EXPLAIN, TTS_SPEAK) here.
-      actions: createLocalActions(),
-    });
-    world[OBSERVER_GLOBAL] = controller;
+    const local = createLocalActions();
+    const actions: ToolbarActions = {
+      // Phase 6 replaces this with TTS_SPEAK; until then Listen only drives its local state.
+      ...(local.listen === undefined ? {} : { listen: local.listen }),
+      // Phase 5: the card is loaded by the first Explain (LOAD_EXPLAIN_CARD -> the background
+      // injects content-scripts/explain-card.js into this frame) and draws inside the toolbar.
+      // The request, its states and its errors all live in the card; nothing is sent before this
+      // press (FR-017).
+      async explain(context) {
+        const card = await loadExplainCard();
+        await card.present(context);
+      },
+      // A trim makes a new snapshot: the old selection's explanation is not wanted any more.
+      trim: () => loadedExplainCard()?.dismiss(),
+      dismiss: (context) => loadedExplainCard()?.dismiss(context.snapshot.selectionId),
+    };
 
+    const controller = createSelectionController({ loadToolbar: bundledPreactLoader, actions });
     const onMessage = (
       message: unknown,
       _sender: unknown,
@@ -70,15 +90,29 @@ export default defineContentScript({
     };
     browser.runtime.onMessage.addListener(onMessage);
 
-    // Extension update or a newer injection: remove listeners, observer and toolbar host.
+    // Remove listeners, observer, toolbar host and card. Runs for a newer injection (through the
+    // symbol-keyed global, which a page cannot reach) and when the runtime is gone.
+    let stopped = false;
+    const instance: SelectionControllerLike = {
+      stop() {
+        if (stopped) return;
+        stopped = true;
+        try {
+          browser.runtime.onMessage.removeListener(onMessage);
+        } catch {
+          // The runtime is already gone; the listener went with it.
+        }
+        controller.stop();
+        loadedExplainCard()?.destroy();
+        if (world[OBSERVER_GLOBAL] === instance) delete world[OBSERVER_GLOBAL];
+      },
+    };
+    world[OBSERVER_GLOBAL] = instance;
+
+    // WXT also aborts the context when a document event with its name arrives, and a page can
+    // dispatch one. Tear down only when the extension runtime is truly gone (update or removal).
     ctx.onInvalidated(() => {
-      try {
-        browser.runtime.onMessage.removeListener(onMessage);
-      } catch {
-        // The runtime is already gone; the listener went with it.
-      }
-      controller.stop();
-      if (world[OBSERVER_GLOBAL] === controller) delete world[OBSERVER_GLOBAL];
+      if ((browser.runtime as { id?: string } | undefined)?.id === undefined) instance.stop();
     });
   },
 });

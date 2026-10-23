@@ -20,8 +20,12 @@ export interface ToolbarViewProps {
   kind: SelectionKind;
   /** The notice text (mode `notice`). */
   notice: string;
-  /** Set after Listen or Explain: the card with the captured text. `note` is the state line. */
-  card: { action: 'listen' | 'explain'; text: string; note: string } | null;
+  /**
+   * Set after Listen or Explain: the card with the captured text. `note` is the state line.
+   * `slot` replaces both with an empty container the separately loaded explanation card draws in
+   * (CardSurface in lib/selection/ui-api.ts); the toolbar never renders model text itself.
+   */
+  card: { action: 'listen' | 'explain'; text: string; note: string; slot?: boolean } | null;
   /** Set after the trim action: the exact text that would be used, and its length. */
   trimmed: { text: string; length: number } | null;
   /** The button that is working (aria-disabled, highlighted) until its action settles. */
@@ -92,7 +96,13 @@ export function toolbarView<N>(props: ToolbarViewProps, h: CreateElement<N>): N 
 
   return h(
     'div',
-    { className: 'panel', 'data-clavis': 'panel', 'data-kind': props.kind, 'data-mode': mode },
+    {
+      className: 'panel',
+      'data-clavis': 'panel',
+      'data-kind': props.kind,
+      'data-mode': mode,
+      'data-card': card?.slot === true ? 'explain' : null,
+    },
     head,
     mode === 'actions'
       ? toolbar(button('listen', t('toolbarListen')), button('explain', t('toolbarExplain')))
@@ -119,12 +129,16 @@ export function toolbarView<N>(props: ToolbarViewProps, h: CreateElement<N>): N 
         ),
     card === null
       ? null
-      : h(
-          'div',
-          { className: 'card', 'data-clavis': 'card', 'data-action': card.action },
-          h('p', { className: 'card__note', 'data-clavis': 'card-note' }, card.note),
-          h('p', { className: 'card__text', 'data-clavis': 'card-text' }, card.text),
-        ),
+      : card.slot === true
+        ? // A different tag than the state-line card, so switching between them never reuses a node
+          // that holds the loaded card's own tree.
+          h('section', { className: 'card-slot', 'data-clavis': 'card-slot' })
+        : h(
+            'div',
+            { className: 'card', 'data-clavis': 'card', 'data-action': card.action },
+            h('p', { className: 'card__note', 'data-clavis': 'card-note' }, card.note),
+            h('p', { className: 'card__text', 'data-clavis': 'card-text' }, card.text),
+          ),
     h('div', { className: 'sr-only', role: 'status', 'data-clavis': 'live' }, props.live),
   );
 }

@@ -1,9 +1,9 @@
 # Execution phases — Clavis
 
-**Document status:** v1 end-to-end implementation playbook (rev. 1.1 — decisions D-01 … D-20)  
+**Document status:** v1 end-to-end implementation playbook (rev. 1.1 — decisions D-01 … D-21)  
 **Baseline:** 2026-10-22 · **Goal:** deliver a privacy-conscious, production-ready Chrome MV3 extension with Groq BYOK, word/sentence pronunciation, contextual explanations, and a custom PDF reader.
 
-> Use this as the project's **build checklist and milestone tracker**. Feature IDs correspond to [requirements.md](requirements.md); implementation boundaries are in [architecture.md](architecture.md); approved tools are in [tech-stack.md](tech-stack.md). Product decisions D-01 … D-20 are in [requirements.md §11](requirements.md#11-product-decisions).
+> Use this as the project's **build checklist and milestone tracker**. Feature IDs correspond to [requirements.md](requirements.md); implementation boundaries are in [architecture.md](architecture.md); approved tools are in [tech-stack.md](tech-stack.md). Product decisions D-01 … D-21 are in [requirements.md §11](requirements.md#11-product-decisions).
 
 ## 0. Delivery philosophy and estimates
 
@@ -35,12 +35,12 @@ flowchart TD
 
 | Phase | Approx. effort | Exit gate |
 | --- | --- | --- |
-| 0 — Specification & risks | Done 2026-10-22 | Scope frozen, decisions D-01 … D-20 logged |
+| 0 — Specification & risks | Done 2026-10-22 | Scope frozen, decisions D-01 … D-21 logged |
 | 1 — Scaffold & CI | Done 2026-10-22 | Unpacked extension loads; lint/test/build pipeline works |
 | 2 — Feasibility spikes | Engineering done 2026-10-22; awaiting user runs | Groq call + model comparison, permission flow + toolbar latency, PDF viewer text layer and TTS capability proven |
 | 3 — Onboarding & BYOK | Done 2026-10-22 | Site access, valid/invalid keys, trusted storage and settings covered |
 | 4 — Web highlight toolbar | Done 2026-10-22 | Reliable selection/position/dismiss/keyboard behavior on both injection paths |
-| 5 — AI explanation | 3–4 days | Core request + Must tabs function with typed responses |
+| 5 — AI explanation | Done 2026-10-23 (eval run pending) | Core request + Must tabs function with typed responses |
 | 6 — Listen/TTS | 1–3 days | Word + sentence playback with usable no-voice fallback |
 | 7 — Custom PDF reader | 3–5 days | Local PDF in viewer components + text selection + reader controls |
 | 8 — Unified UX | 2–4 days | Web/PDF consistent; side panel, copy, Should tabs if on schedule |
@@ -68,7 +68,7 @@ Effort counts are overlapping planning estimates, not additive deadlines; use th
 - [x] Select the target Chrome versions/OS testing matrix — Linux by hand, Windows/macOS automated, minimum Chrome tentatively 116, later set to 147 by D-18 ([platform matrix](requirements.md#platform-matrix-d-14), D-14).
 - [x] Record legal/privacy decisions and remaining open items — MIT license (D-13, `LICENSE` added), privacy policy on GitHub Pages with a [draft](privacy-policy.md) (D-15); publisher, support email and logo deferred to Phase 10 ([still open](requirements.md#still-open)).
 
-**Deliverables (done 2026-10-22):** approved scope and decisions D-01 … D-20 ([requirements.md §11](requirements.md#11-product-decisions)); ADRs A-001 … A-013 ([architecture.md §1](architecture.md#1-architectural-decisions-adrs)); requirement checklist, prioritized backlog and risk register ([backlog.md](backlog.md)); privacy policy draft ([privacy-policy.md](privacy-policy.md)).  
+**Deliverables (done 2026-10-22):** approved scope and decisions D-01 … D-21 ([requirements.md §11](requirements.md#11-product-decisions)); ADRs A-001 … A-013 ([architecture.md §1](architecture.md#1-architectural-decisions-adrs)); requirement checklist, prioritized backlog and risk register ([backlog.md](backlog.md)); privacy policy draft ([privacy-policy.md](privacy-policy.md)).  
 **Gate:** No launch-time features are ambiguous or promised beyond demonstrated browser capabilities. **Passed** — remaining unknowns are either Phase 2 spike outputs with defined decision criteria or Phase 10 publishing details.
 
 ## Phase 1 — Repository, WXT scaffold and developer tooling
@@ -221,21 +221,28 @@ Effort counts are overlapping planning estimates, not additive deadlines; use th
 
 **Tasks**
 
-- [ ] Implement `AIProvider` abstraction with single Groq adapter (only provider shipped).
-- [ ] Add background `AI_EXPLAIN` message handler with request/schema validation, user-key retrieval and model setting.
-- [ ] Design system prompts treating source text as **untrusted data**, not AI instructions.
-- [ ] Implement the `core` prompt (contextual meaning + definition + 2 examples) and the Must lazy-tab prompts: roots/etymology, related words, simplification (D-05). Grammar and translation prompts are Should, behind a feature flag.
-- [ ] Implement bounded per-mode JSON schemas; adapt to selected model's supported response format and the token budgets from Spike A.
-- [ ] Validate model response via Zod; map it to shared `ExplainResult`; render all fields as plain text (D-10).
-- [ ] Build explanation card: header, core answer, lazy tabs that request on first open and reuse the per-selection cache afterwards, close/copy, uncertainty notes.
-- [ ] Verify with network inspection: one request per Explain click, at most one more per newly opened tab, none when reopening a loaded tab.
-- [ ] Handle long response in side panel if that feature is enabled; never block the main page.
-- [ ] Implement requestId + selectionId checks, timeouts, cancellation and stale-response discard.
-- [ ] Add rate-limit handling with `Retry-After`, network errors, missing key, unavailable model, malformed output and clear Retry/Settings actions.
-- [ ] Prompt regression fixtures: `bank` senses, idioms, phrase vs sentence, factual ambiguity, invented etymology, unfamiliar languages, injection attempts.
-- [ ] Verify no raw selected text, key or auth headers appear in application logs or browser-visible page DOM.
+- [x] Groq provider with every mode: `core`, `etymology`, `related_words`, `simplify` (Must); `grammar`, `translate` (Should, implemented but off via `FEATURES`).
+- [x] `AI_EXPLAIN` for all modes behind the gate: rate limit (20/min per tab, D-21) → mode flag → sender → readiness → provider; one in-flight request per tab; never auto-retried.
+- [x] Prompts treat selected text, context and hints as untrusted data (escaped delimiters, safety rules in every system prompt, reminder after the quoted block); reading level and explanation language respected; uncertainty marked; the etymology prompt refuses to invent origins.
+- [x] Strict JSON schema per mode with `json_object` fallback; per-model capability cache (survives worker restart, cleared on key/model change); per-mode token budgets (placeholders until the eval run).
+- [x] Results validated and mapped to `ExplainResult`; rendered as plain text only (D-10).
+- [x] Explanation card, loaded separately on the first Explain (`LOAD_EXPLAIN_CARD`, frame-precise; 14.5 KB of a 20 KB budget): core answer, lazy tabs by selection kind, per-selection cache, copy, close, uncertainty notes, model label.
+- [x] Request counting verified: one request per Explain, one more per newly opened tab, none on reopen.
+- [x] requestId/selectionId checks, client timeout backstop, cancellation (AI_CANCEL) and stale-response discard; tab requests queued behind the one in-flight slot.
+- [x] Every error state with an action (Connect Groq, Update key, Choose another model, rate-limit countdown, Try again); `OPEN_SETTINGS` route.
+- [x] One-time first-send confirmation with the approved copy (FR-002, D-16), trusted click only.
+- [x] Evaluation script with regression fixtures (`bank` senses, idiom, technical term, ambiguous sentence, invented word, injection variants, non-English, RTL) — `scripts/eval/explain-eval.ts`; **the live run needs the user's key** ([how to run](decisions/p5-prompt-eval.md)).
+- [x] No selected text, key or auth headers in logs or the page DOM (E2E console checks; card in the closed root).
+- [x] [Security review](decisions/phase-5-security-review.md): no Critical/High/Medium; Low findings fixed (WXT start-message fingerprinting and forged invalidation, in-page copy fallback removed, confirm arming delay, per-request delimiter nonces).
+- [ ] Side panel for long answers — Phase 8 (FR-042, Should).
 
-**Deliverables:** Core explanation and every Must tab accessible and validated; no malformed JSON crashes.  
+**Phase 5 follow-ups:**
+
+- After the user's eval run: settle D-09 (default model), tune `MODE_TOKEN_BUDGETS`, decide whether strict schemas must drop `maxLength`/`minItems` keywords for gpt-oss, and decide the Grammar/Translate flags (Phase 8).
+- Phase 6: pressing Listen after Explain currently supersedes the run and removes the card — Listen should not discard an open explanation.
+- Optional: add `model` to the logger's metadata allowlist; update `spike-a-groq.md` to point at `scripts/eval/explain-eval.ts` (the old command still works through a shim).
+
+**Deliverables (2026-10-23):** core explanation and every Must tab accessible and validated; no malformed JSON crashes.  
 **Gate:** FR-030–035 and FR-038–041 and security checks pass; Groq call only on explicit action.
 
 ## Phase 6 — Pronunciation for words and sentences

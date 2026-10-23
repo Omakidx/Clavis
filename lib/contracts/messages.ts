@@ -16,6 +16,29 @@ export const aiExplainMessageSchema = z.strictObject({
   v,
   type: z.literal('AI_EXPLAIN'),
   payload: explainRequestSchema,
+  /**
+   * Set only after the user confirmed the one-time "Send this to Groq?" prompt in the card
+   * (requirements §4.1 firstSendBody, D-16) with a trusted click. When the disclosure was never
+   * acknowledged, the background records the acknowledgement and proceeds; without it the
+   * background replies SETUP_REQUIRED with `reason: 'disclosure'` on the error envelope. Ignored once acknowledged.
+   */
+  acknowledgeDisclosure: z.literal(true).optional(),
+});
+
+/**
+ * Content script → background: inject the explanation card script into the sender's frame
+ * (D-08: the card is not part of the always-loaded observer). Idempotent per frame.
+ */
+export const loadExplainCardMessageSchema = z.strictObject({
+  v,
+  type: z.literal('LOAD_EXPLAIN_CARD'),
+});
+
+/** Card / practice page / reader → background: open the Settings page, optionally at a section. */
+export const openSettingsMessageSchema = z.strictObject({
+  v,
+  type: z.literal('OPEN_SETTINGS'),
+  section: z.enum(['key', 'model', 'privacy']).optional(),
 });
 
 export const aiCancelMessageSchema = z.strictObject({
@@ -56,6 +79,8 @@ export const publicMessageSchema = z.discriminatedUnion('type', [
   ttsStopMessageSchema,
   getPublicSettingsMessageSchema,
   getAiStatusMessageSchema,
+  loadExplainCardMessageSchema,
+  openSettingsMessageSchema,
 ]);
 export type PublicMessage = z.infer<typeof publicMessageSchema>;
 

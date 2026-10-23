@@ -2,8 +2,14 @@ import { vi } from 'vitest';
 import { GroqError } from '../../../lib/ai/errors';
 import type { GroqModel } from '../../../lib/ai/groq';
 import type { ExplainResult } from '../../../lib/contracts';
-import { createAiHandlers, type AiProvider } from '../../../lib/router/handlers/ai';
+import {
+  createAiHandlers,
+  type AiHandlerDeps,
+  type AiProvider,
+} from '../../../lib/router/handlers/ai';
+import { createCardHandlers } from '../../../lib/router/handlers/card';
 import { createKeyService } from '../../../lib/router/handlers/key';
+import { createNavigationHandlers } from '../../../lib/router/handlers/navigation';
 import { createSettingsHandlers } from '../../../lib/router/handlers/settings';
 import { createAiGuard } from '../../../lib/router/limiter';
 import { createMessageListener, type Route } from '../../../lib/router/router';
@@ -58,10 +64,17 @@ export const explainMessage = (requestId = REQ_A, over: object = {}) => ({
 export const PUBLIC_MESSAGES: Record<string, unknown> = {
   AI_EXPLAIN: explainMessage(),
   AI_CANCEL: { v: 1, type: 'AI_CANCEL', requestId: REQ_A },
+
   TTS_SPEAK: { v: 1, type: 'TTS_SPEAK', requestId: REQ_A, text: 'bank', rate: 1 },
   TTS_STOP: { v: 1, type: 'TTS_STOP' },
   GET_PUBLIC_SETTINGS: { v: 1, type: 'GET_PUBLIC_SETTINGS' },
   GET_AI_STATUS: { v: 1, type: 'GET_AI_STATUS' },
+};
+
+/** Public routes with their own, narrower sender rules (not part of the generic public matrix). */
+export const CARD_MESSAGES: Record<string, unknown> = {
+  LOAD_EXPLAIN_CARD: { v: 1, type: 'LOAD_EXPLAIN_CARD' },
+  OPEN_SETTINGS: { v: 1, type: 'OPEN_SETTINGS' },
 };
 
 export const KEY_MESSAGES: Record<string, unknown> = {
@@ -105,6 +118,8 @@ export const MODELS: GroqModel[] = [
 export interface HarnessOptions {
   lockedDown?: boolean;
   now?: () => number;
+  features?: AiHandlerDeps['features'];
+  onModelContextChanged?: () => void;
 }
 
 /** The real router, handlers, stores and guard over in-memory storage and a scripted provider. */
@@ -140,6 +155,7 @@ export function createHarness(options: HarnessOptions = {}) {
     provider,
     guard,
     lockedDown,
+    ...(options.features === undefined ? {} : { features: options.features }),
   });
   const settings = createSettingsHandlers({
     settings: settingsStore,
@@ -147,6 +163,9 @@ export function createHarness(options: HarnessOptions = {}) {
     siteAccess,
     guard,
     areas: [local, session],
+    ...(options.onModelContextChanged === undefined
+      ? {}
+      : { onModelContextChanged: options.onModelContextChanged }),
   });
 
   const chromeTts = new FakeEngine('chrome-tts', [voice('chrome-tts', 'en-US')]);
@@ -161,8 +180,21 @@ export function createHarness(options: HarnessOptions = {}) {
     tabs: { sendMessage: vi.fn(() => Promise.resolve({ ok: true, shown: true })) },
   };
 
+  const card = createCardHandlers({ scripting: injection.scripting as never });
+  const browserNav = {
+    runtime: { openOptionsPage: vi.fn(() => Promise.resolve()) },
+    tabs: { create: vi.fn((_properties: { url: string }) => Promise.resolve({})) },
+  };
+  const navigation = createNavigationHandlers({
+    ...browserNav,
+    optionsUrl: `${ORIGIN}/options.html`,
+    now,
+  });
+
   const routes: Route[] = buildRoutes({
     ai,
+    card,
+    navigation,
     keys: keyService,
     settings,
     speech,
@@ -205,6 +237,7 @@ export function createHarness(options: HarnessOptions = {}) {
     provider,
     siteAccess,
     injection,
+    browserNav,
     chromeTts,
     speechService,
     routes,

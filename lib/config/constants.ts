@@ -92,11 +92,43 @@ export const REQUEST_TIMEOUT_MS = {
  * Per-sender limits on AI requests (Phase 2 security review, HIGH-1 follow-up).
  * A "sender" is one tab, or one tab-less extension page. The token bucket holds at most
  * `capacity` requests and refills evenly over `windowMs`, so the sustained rate is
- * capacity / windowMs (10 per minute). At most one AI_EXPLAIN is in flight per sender.
+ * capacity / windowMs (20 per minute, D-21: core + up to three lazy tabs per selection). At most
+ * one AI_EXPLAIN is in flight per sender.
  */
 export const AI_RATE_LIMIT = {
-  capacity: 10,
+  capacity: 20,
   windowMs: 60_000,
   /** Upper bound on tracked senders, so a flood of tab ids cannot grow memory without bound. */
   maxTrackedSenders: 256,
+} as const;
+
+/**
+ * Feature flags for Should-priority features (requirements §2). Off until their prompt
+ * regression fixtures pass (Phase 8 decides); the card hides flagged tabs and the background
+ * rejects flagged modes with INVALID_REQUEST.
+ */
+export const FEATURES = {
+  grammarTab: false,
+  translateTab: false,
+} as const;
+
+/** Feature flag per explain mode that is not part of the Must set (see `FEATURES`). */
+export const MODE_FEATURE_FLAGS = {
+  grammar: 'grammarTab',
+  translate: 'translateTab',
+} as const satisfies Record<string, keyof typeof FEATURES>;
+
+/**
+ * Build output of the explanation card script (D-08: loaded on the first Explain, never with the
+ * observer). Manifest-relative path handed to `scripting.executeScript` by LOAD_EXPLAIN_CARD;
+ * the one place to change if the card entrypoint moves. WXT places a content-script entrypoint
+ * named `explain-card` at this path.
+ */
+export const EXPLAIN_CARD_SCRIPT_FILE = 'content-scripts/explain-card.js';
+
+/** Settings page sections OPEN_SETTINGS can jump to (anchor ids in the options page). */
+export const SETTINGS_SECTION_ANCHORS = {
+  key: 'section-key',
+  model: 'section-model',
+  privacy: 'section-privacy',
 } as const;

@@ -47,6 +47,19 @@
   display: none;
 }
 
+/* The explanation card (loaded separately, its own sheet) gets a wider, viewport-bounded slot. */
+.panel[data-card] {
+  max-width: min(420px, calc(100vw - 16px));
+}
+
+.card-slot {
+  box-sizing: border-box;
+  width: min(420px, calc(100vw - 16px));
+  max-height: min(34rem, calc(100vh - 72px));
+  display: flex;
+  flex-direction: column;
+}
+
 .toolbar {
   display: flex;
   flex-wrap: wrap;

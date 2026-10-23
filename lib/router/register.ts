@@ -1,11 +1,14 @@
 import { browser } from 'wxt/browser';
+import { createCapabilityCache } from '../ai/capability-cache';
 import { GroqProvider } from '../ai/groq';
 import { whenStorageLockedDown } from '../security/storage-lockdown';
 import { registerSiteAccess } from '../site-access/background';
 import { createSpeech } from '../speech/background';
 import { createApiKeyStore, createSettingsStore } from '../storage';
 import { createAiHandlers } from './handlers/ai';
+import { createCardHandlers } from './handlers/card';
 import { createKeyService } from './handlers/key';
+import { createNavigationHandlers } from './handlers/navigation';
 import { createSettingsHandlers } from './handlers/settings';
 import { createAiGuard, senderKey } from './limiter';
 import { createMessageListener } from './router';
@@ -19,7 +22,10 @@ import { buildRoutes } from './routes';
  * Exactly one `runtime.onMessage` listener exists in the background: the router's.
  */
 export function registerBackground(): void {
-  const provider = new GroqProvider();
+  // What the account's models accept (json_schema, reasoning_effort), kept in storage.session so a
+  // worker restart does not re-learn it with a rejected request. Non-secret; swept by CLEAR_ALL_DATA.
+  const capabilityCache = createCapabilityCache({ store: browser.storage.session });
+  const provider = new GroqProvider({ capabilityCache });
   const settingsStore = createSettingsStore({ area: browser.storage.local });
   const keyStore = createApiKeyStore({
     local: browser.storage.local,
@@ -33,7 +39,11 @@ export function registerBackground(): void {
     provider,
     now: Date.now,
     // A replaced or removed key must not keep serving a request that started with it.
-    onKeyChanged: () => guard.inFlight.abortAll(),
+    onKeyChanged: () => {
+      guard.inFlight.abortAll();
+      // Another key can belong to an account with other models.
+      void capabilityCache.invalidate();
+    },
   });
 
   const { controller, injection } = registerSiteAccess({
@@ -58,6 +68,12 @@ export function registerBackground(): void {
       guard,
       lockedDown: whenStorageLockedDown,
     }),
+    card: createCardHandlers({ scripting: browser.scripting }),
+    navigation: createNavigationHandlers({
+      runtime: browser.runtime,
+      tabs: browser.tabs,
+      optionsUrl: browser.runtime.getURL('/options.html'),
+    }),
     keys: keyService,
     settings: createSettingsHandlers({
       settings: settingsStore,
@@ -65,6 +81,7 @@ export function registerBackground(): void {
       siteAccess: controller,
       guard,
       areas: [browser.storage.local, browser.storage.session],
+      onModelContextChanged: () => void capabilityCache.invalidate(),
     }),
     speech: createSpeech(),
     injection,

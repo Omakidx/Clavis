@@ -16,6 +16,8 @@ import {
 } from '../speech/messages';
 import { rejectedSpeakReply, type SpeechHandlers } from '../speech/background';
 import type { createAiHandlers } from './handlers/ai';
+import type { CardHandlers } from './handlers/card';
+import type { NavigationHandlers } from './handlers/navigation';
 import type { KeyService } from './handlers/key';
 import type { SettingsHandlers } from './handlers/settings';
 import {
@@ -52,6 +54,19 @@ export const PUBLIC_SENDERS: SenderRule = {
  */
 export const KEY_SENDERS: SenderRule = { pages: [options, onboarding] };
 
+/**
+ * LOAD_EXPLAIN_CARD: website content scripts only. It injects into the SENDER's own frame, so a
+ * page that is not ours (the reader, the practice page) has nothing to load, and no extension
+ * page may inject a script into a tab on a content script's behalf.
+ */
+export const CARD_LOAD_SENDERS: SenderRule = { content: true };
+
+/** OPEN_SETTINGS: where "Open settings" buttons live (the card, the practice page, the reader, the popup). */
+export const OPEN_SETTINGS_SENDERS: SenderRule = {
+  content: true,
+  pages: [popup, reader, PRACTICE_PAGE_PATH],
+};
+
 /** Other privileged routes: settings and status. Adds the popup. */
 export const SETTINGS_SENDERS: SenderRule = { pages: [options, onboarding, popup] };
 
@@ -83,14 +98,15 @@ interface RouteExtras {
 function publicRoute<K extends PublicMessage['type']>(
   type: K,
   handle: (message: PublicOf<K>, context: RouteContext) => unknown,
-  extras: RouteExtras = {},
+  extras: RouteExtras & { allow?: SenderRule } = {},
 ): Route {
+  const { allow = PUBLIC_SENDERS, ...rest } = extras;
   return defineRoute<PublicOf<K>>({
     type,
-    allow: PUBLIC_SENDERS,
+    allow,
     parse: contract<PublicMessage, K>(parsePublicMessage, type),
     handle,
-    ...extras,
+    ...rest,
   });
 }
 
@@ -113,6 +129,8 @@ const injectRejected = (): unknown => ({ ok: false, reason: 'failed' });
 
 export interface RouteServices {
   ai: ReturnType<typeof createAiHandlers>;
+  card: CardHandlers;
+  navigation: NavigationHandlers;
   keys: KeyService;
   settings: SettingsHandlers;
   speech: SpeechHandlers;
@@ -124,11 +142,15 @@ export interface RouteServices {
  * Anything not listed is not answered.
  */
 export function buildRoutes(services: RouteServices): Route[] {
-  const { ai, keys, settings, speech, injection } = services;
+  const { ai, card, navigation, keys, settings, speech, injection } = services;
 
   return [
     // ---- public ---------------------------------------------------------
-    publicRoute('AI_EXPLAIN', (message, context) => ai.explain(message.payload, context)),
+    publicRoute('AI_EXPLAIN', (message, context) =>
+      ai.explain(message.payload, context, {
+        acknowledgeDisclosure: message.acknowledgeDisclosure === true,
+      }),
+    ),
     publicRoute('AI_CANCEL', (message, context) => ai.cancel(message.requestId, context)),
     publicRoute(
       'TTS_SPEAK',
@@ -141,6 +163,14 @@ export function buildRoutes(services: RouteServices): Route[] {
     ),
     publicRoute('GET_PUBLIC_SETTINGS', () => ai.getPublicSettings()),
     publicRoute('GET_AI_STATUS', () => ai.getAiStatus()),
+    publicRoute('LOAD_EXPLAIN_CARD', (_message, context) => card.loadExplainCard(context), {
+      allow: CARD_LOAD_SENDERS,
+    }),
+    publicRoute(
+      'OPEN_SETTINGS',
+      (message, context) => navigation.openSettings(message.section, context),
+      { allow: OPEN_SETTINGS_SENDERS },
+    ),
 
     // ---- privileged: the key --------------------------------------------
     privilegedRoute('SET_API_KEY', KEY_SENDERS, (message) =>

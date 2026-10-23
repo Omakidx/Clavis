@@ -462,7 +462,6 @@ describe('GroqProvider.explain', () => {
         code: 'INVALID_API_KEY',
       });
     }
-    await expect(provider.explain(request({ mode: 'etymology' }), opts())).rejects.toThrow(/core/);
     await expect(
       provider.explain({ ...request(), requestId: 'nope' } as ExplainRequest, opts()),
     ).rejects.toThrow(/Invalid explain request/);

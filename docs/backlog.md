@@ -18,7 +18,7 @@ Work in this order. Phases 3, 4 and 7 can overlap once Phase 2 closes; see the d
 | 6 | Spike D — `chrome.tts` on Linux + offscreen fallback (D-07) | 2 | 9 | Done; voice check awaits the user |
 | 7 | Onboarding, disclosure, site access, key lifecycle, settings | 3 | 8 | Done |
 | 8 | Selection observer + toolbar on both injection paths | 4 | 8, 9 | Done |
-| 9 | Core Explain + Must tabs (roots, related words, simplify) | 5 | 11 | Not started |
+| 9 | Core Explain + Must tabs (roots, related words, simplify) | 5 | 11 | Done |
 | 10 | Listen / `SpeechService` | 6 | 11 | Not started |
 | 11 | PDF reader | 7 | 11 | Not started |
 | 12 | Unified UX, side panel, copy; Should tabs if on schedule | 8 | 13 | Not started |
@@ -53,16 +53,16 @@ Work in this order. Phases 3, 4 and 7 can overlap once Phase 2 closes; see the d
 | FR-022 | Normal/slow, Stop, Replay | 6 | Not started |
 | FR-023 | No-voice detection and message | 6 | Not started |
 | FR-024 | Speak only selected text | 6 | Not started |
-| FR-030 | Core explanation (one request) | 5 | Not started |
-| FR-031 | Definition (in core) | 5 | Not started |
-| FR-032 | Examples (in core) | 5 | Not started |
-| FR-033 | Roots tab | 5 | Not started |
-| FR-034 | Related words tab | 5 | Not started |
-| FR-035 | Simplify tab | 5 | Not started |
-| FR-038 | On-demand calls, per-selection cache | 5 | Not started |
-| FR-039 | Loading/error/rate-limit states | 5 | Not started |
-| FR-040 | Model capability checks | 5 | Not started |
-| FR-041 | Plain-text output only | 5 | Not started |
+| FR-030 | Core explanation (one request) | 5 | Done |
+| FR-031 | Definition (in core) | 5 | Done |
+| FR-032 | Examples (in core) | 5 | Done |
+| FR-033 | Roots tab | 5 | Done |
+| FR-034 | Related words tab | 5 | Done |
+| FR-035 | Simplify tab | 5 | Done |
+| FR-038 | On-demand calls, per-selection cache | 5 | Done |
+| FR-039 | Loading/error/rate-limit states | 5 | Done |
+| FR-040 | Model capability checks | 5 | Done |
+| FR-041 | Plain-text output only | 5 | Done |
 | FR-050 | Open local PDF (picker, drag-drop) | 7 | Not started |
 | FR-051 | Render with PDF.js viewer components | 7 | Not started |
 | FR-052 | Aligned selectable text layer | 7 | Not started |
@@ -85,7 +85,7 @@ Work in this order. Phases 3, 4 and 7 can overlap once Phase 2 closes; see the d
 | ID | Short name | Phase | Status |
 | --- | --- | --- | --- |
 | FR-008 | Rerun tutorial from Settings | 8 | Done (rerun tutorial in Settings) |
-| FR-019 | Copy answer | 8 | Not started |
+| FR-019 | Copy answer | 8 | Done (copy in the card) |
 | FR-025 | Voice chooser | 6 | Not started |
 | FR-036 | Grammar tab | 8 | Not started |
 | FR-037 | Translate tab | 8 | Not started |

@@ -1,3 +1,4 @@
+import { AI_RATE_LIMIT } from '../../../lib/config/constants';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { GroqProvider } from '../../../lib/ai/groq';
 import {
@@ -192,15 +193,6 @@ describe('AI_EXPLAIN readiness gate', () => {
     });
     expect(h.provider.explain).not.toHaveBeenCalled();
   });
-
-  it('INVALID_REQUEST for modes other than core (Phase 5), after the sender checks', async () => {
-    const h = createHarness();
-    await makeReady(h);
-    expect(
-      await h.call(explainMessage(REQ_A, { mode: 'etymology' }), contentSender()),
-    ).toMatchObject({ ok: false, requestId: REQ_A, error: { code: 'INVALID_REQUEST' } });
-    expect(h.provider.explain).not.toHaveBeenCalled();
-  });
 });
 
 describe('AI_EXPLAIN', () => {
@@ -389,22 +381,23 @@ describe('one in-flight request per sender, and a rate limit', () => {
       vi.useRealTimers();
     });
 
-    it('allows 10 per minute per tab, then RATE_LIMITED with retryAfterMs; other tabs unaffected', async () => {
+    it('allows the per-tab capacity per minute, then RATE_LIMITED with retryAfterMs; other tabs unaffected', async () => {
       const h = createHarness();
       await makeReady(h);
-      for (let i = 0; i < 10; i++) {
+      const refillMs = AI_RATE_LIMIT.windowMs / AI_RATE_LIMIT.capacity;
+      for (let i = 0; i < AI_RATE_LIMIT.capacity; i++) {
         expect(await h.call(explainMessage(), contentSender(5))).toMatchObject({ ok: true });
       }
       const limited = await h.call(explainMessage(), contentSender(5));
       expect(limited).toEqual({
         ok: false,
         requestId: REQ_A,
-        error: expect.objectContaining({ code: 'RATE_LIMITED', retryAfterMs: 6_000 }),
+        error: expect.objectContaining({ code: 'RATE_LIMITED', retryAfterMs: refillMs }),
       });
-      expect(h.provider.explain).toHaveBeenCalledTimes(10);
+      expect(h.provider.explain).toHaveBeenCalledTimes(AI_RATE_LIMIT.capacity);
       expect(await h.call(explainMessage(), contentSender(6))).toMatchObject({ ok: true });
 
-      vi.advanceTimersByTime(6_000);
+      vi.advanceTimersByTime(refillMs);
       expect(await h.call(explainMessage(), contentSender(5))).toMatchObject({ ok: true });
     });
 
@@ -414,7 +407,8 @@ describe('one in-flight request per sender, and a rate limit', () => {
       const pending = slowProvider(h);
       const first = h.call(explainMessage(REQ_A), contentSender(5));
       await vi.waitFor(() => expect(pending).toHaveLength(1));
-      for (let i = 0; i < 9; i++) h.guard.buckets.take('tab:5');
+      // The first request used one token; drain the rest.
+      for (let i = 0; i < AI_RATE_LIMIT.capacity - 1; i++) h.guard.buckets.take('tab:5');
       expect(await h.call(explainMessage(REQ_B), contentSender(5))).toMatchObject({
         ok: false,
         error: { code: 'RATE_LIMITED' },

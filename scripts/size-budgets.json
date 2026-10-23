@@ -1,5 +1,5 @@
 {
-  "$comment": "Content-script budget from docs/tech-stack.md section 6 (D-08, raised to 18 KB by D-20). KB means 1024 bytes. Sizes are gzip level 9 of the built file. The toolbar (Preact) is bundled into the observer; the explanation card loads separately.",
+  "$comment": "Content-script budget from docs/tech-stack.md section 6 (D-08, raised to 18 KB by D-20). KB means 1024 bytes. Sizes are gzip level 9 of the built file. The toolbar (Preact) is bundled into the observer; the explanation card loads separately (Phase 5) with its own budget: it carries its own Preact copy, the card styles and the session logic, and must stay free of zod and React.",
   "buildDir": ".output/chrome-mv3",
   "budgets": [
     {
@@ -7,6 +7,13 @@
       "description": "Always-loaded selection observer with the bundled Preact toolbar",
       "files": ["content-scripts/content.js"],
       "maxGzipBytes": 18432,
+      "required": true
+    },
+    {
+      "id": "explain-card",
+      "description": "Explanation card, injected on the first Explain (Phase 5, D-08); not part of the observer",
+      "files": ["content-scripts/explain-card.js"],
+      "maxGzipBytes": 20480,
       "required": true
     }
   ]

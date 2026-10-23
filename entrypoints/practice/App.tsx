@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { createExplainCard } from '../../components/explanation';
 import { Button, LiveStatus } from '../../components/common/ui';
 import { Page } from '../../components/common/Page';
 import { createPreactRenderer } from '../../components/tooltip/preact-renderer';
@@ -9,25 +10,23 @@ import {
   createSelectionController,
   type SelectionController,
 } from '../../lib/selection/controller';
-import type { RunContext, ToolbarActions } from '../../lib/selection/ui-api';
+import type { RunContext } from '../../lib/selection/ui-api';
 import { api } from '../../lib/ui-client/api';
 import { Article } from './Article';
 import { ResultPanel } from './ResultPanel';
-import {
-  FALLBACK_PREFS,
-  runExplain,
-  runListen,
-  type PracticePrefs,
-  type PracticeState,
-} from './actions';
+import { FALLBACK_PREFS, runListen, type PracticePrefs, type PracticeState } from './actions';
 import './practice.css';
 
 /**
  * Content scripts do not run on extension pages, so the practice page mounts the same selection
  * observer and toolbar itself. `captureSelection` only accepts http(s)/about: documents, so the
  * article lives in an `about:srcdoc` frame of this page (same origin, so we can reach into it)
- * and the observer and toolbar are created for THAT window and document. No lib/selection or
- * components/tooltip code is modified.
+ * and the observer and toolbar are created for THAT window and document.
+ *
+ * Explain uses the same explanation card as a web page (components/explanation): it is imported
+ * here directly (an extension page has no isolated-world loading step) and draws in the toolbar
+ * through the same `CardSurface`, so the demo behaves like the real thing, including the
+ * "Connect Groq" state without a key. Only Listen reports in the result panel below.
  */
 const FRAME_DOC =
   '<!doctype html><html lang="en"><head><meta charset="utf-8"></head><body></body></html>';
@@ -41,7 +40,7 @@ export function App() {
   const prefs = useRef<PracticePrefs>(FALLBACK_PREFS);
   /** Only the newest action may update the panel; an older, slower reply is dropped. */
   const latest = useRef(0);
-  const lastAction = useRef<{ action: 'listen' | 'explain'; context: RunContext } | null>(null);
+  const lastListen = useRef<RunContext | null>(null);
 
   // The practice page works without any backend answer: defaults apply until preferences arrive.
   useEffect(() => {
@@ -60,46 +59,41 @@ export function App() {
     };
   }, []);
 
-  const perform = useCallback(async (action: 'listen' | 'explain', context: RunContext) => {
-    lastAction.current = { action, context };
+  const listen = useCallback(async (context: RunContext) => {
+    lastListen.current = context;
     const id = ++latest.current;
     const { snapshot } = context;
     setHint(null);
-    setState({ kind: 'working', action, text: snapshot.text });
-    const next =
-      action === 'listen'
-        ? await runListen(snapshot, prefs.current)
-        : await runExplain(snapshot, prefs.current);
+    setState({ kind: 'working', action: 'listen', text: snapshot.text });
+    const next = await runListen(snapshot, prefs.current);
     // Superseded, replaced or dismissed while it ran: the toolbar aborted the signal.
     if (id === latest.current && !context.signal.aborted) setState(next);
   }, []);
-
-  // The practice page implements the toolbar's action interface itself, against the real routes.
-  const actions = useMemo<ToolbarActions>(
-    () => ({
-      listen: (context) => void perform('listen', context),
-      explain: (context) => void perform('explain', context),
-    }),
-    [perform],
-  );
 
   const frameReady = frameDoc !== null;
   useEffect(() => {
     const doc = frameDoc;
     const win = doc?.defaultView;
     if (!doc || !win) return;
+    const card = createExplainCard();
     const selection = createSelectionController({
       win,
       loadToolbar: (options) =>
         Promise.resolve(createToolbar(createPreactRenderer(), options, doc)),
-      actions,
+      actions: {
+        listen: (context) => void listen(context),
+        explain: (context) => card.present(context),
+        trim: () => card.dismiss(),
+        dismiss: (context) => card.dismiss(context.snapshot.selectionId),
+      },
     });
     controller.current = selection;
     return () => {
       selection.stop();
+      card.destroy();
       controller.current = null;
     };
-  }, [frameDoc, actions]);
+  }, [frameDoc, listen]);
 
   // Size the frame to its article so the page, not the frame, scrolls.
   useEffect(() => {
@@ -158,10 +152,9 @@ export function App() {
       <ResultPanel
         state={state}
         onRetry={() => {
-          const again = lastAction.current;
+          const again = lastListen.current;
           // A retry is a new run: the old signal was aborted with the toolbar's dismissal.
-          if (again)
-            void perform(again.action, { ...again.context, signal: new AbortController().signal });
+          if (again) void listen({ ...again, signal: new AbortController().signal });
         }}
       />
     </Page>

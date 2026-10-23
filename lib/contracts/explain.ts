@@ -85,11 +85,21 @@ export const coreOutputSchema = z.object({
 });
 export type CoreOutput = z.infer<typeof coreOutputSchema>;
 
+/**
+ * What the shared result keeps of an etymology answer: the overview and how sure the model is.
+ * The model's optional caveat is moved to `ExplainResult.caveat` by the adapter.
+ */
 export const etymologyOutputSchema = z.object({
   overview: boundedText(TEXT_LIMITS.etymology),
   confidence: confidenceSchema,
 });
 export type EtymologyOutput = z.infer<typeof etymologyOutputSchema>;
+
+const caveatField = boundedText(TEXT_LIMITS.caveat).optional();
+
+/** Etymology as the model returns it: the result fields plus an optional uncertainty note. */
+export const etymologyModelOutputSchema = etymologyOutputSchema.extend({ caveat: caveatField });
+export type EtymologyModelOutput = z.infer<typeof etymologyModelOutputSchema>;
 
 /** Empty arrays are valid and mean "Not applicable". */
 export const relatedWordsOutputSchema = z.object({
@@ -100,24 +110,35 @@ export type RelatedWordsOutput = z.infer<typeof relatedWordsOutputSchema>;
 
 export const simplifyOutputSchema = z.object({
   simplifiedText: boundedText(TEXT_LIMITS.rewritten),
+  /** Set when the rewrite could not stay faithful or the context was not enough. */
+  caveat: caveatField,
 });
 export type SimplifyOutput = z.infer<typeof simplifyOutputSchema>;
 
 export const grammarOutputSchema = z.object({
   grammar: boundedText(TEXT_LIMITS.grammar),
+  caveat: caveatField,
 });
 export type GrammarOutput = z.infer<typeof grammarOutputSchema>;
 
-export const translateOutputSchema = z.object({
+/** What the shared result keeps of a translation (FR-037: literal form vs contextual sense). */
+export const translationSchema = z.object({
   language: boundedText(TEXT_LIMITS.languageName),
+  /** The natural, contextual translation. */
   text: boundedText(TEXT_LIMITS.rewritten),
+  /** Word-for-word rendering, present only when it differs meaningfully from `text`. */
+  literal: boundedText(TEXT_LIMITS.rewritten).optional(),
 });
+export type Translation = z.infer<typeof translationSchema>;
+
+/** Translation as the model returns it: the result fields plus an optional uncertainty note. */
+export const translateOutputSchema = translationSchema.extend({ caveat: caveatField });
 export type TranslateOutput = z.infer<typeof translateOutputSchema>;
 
 /** Output schema per mode, keyed by `ExplainMode`. */
 export const modeOutputSchemas = {
   core: coreOutputSchema,
-  etymology: etymologyOutputSchema,
+  etymology: etymologyModelOutputSchema,
   related_words: relatedWordsOutputSchema,
   simplify: simplifyOutputSchema,
   grammar: grammarOutputSchema,
@@ -145,7 +166,7 @@ export const explainResultSchema = z.strictObject({
   antonyms: relatedWordsListSchema.optional(),
   grammar: boundedText(TEXT_LIMITS.grammar).optional(),
   simplifiedText: boundedText(TEXT_LIMITS.rewritten).optional(),
-  translation: translateOutputSchema.optional(),
+  translation: translationSchema.optional(),
   caveat: boundedText(TEXT_LIMITS.caveat).optional(),
   provider: z.literal('groq'),
   model: modelIdSchema,

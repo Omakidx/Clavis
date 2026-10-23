@@ -1,5 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AI_RATE_LIMIT } from '../../../lib/config/constants';
+
+// These tests exercise the bucket mechanics with a fixed 10-per-minute config, independent of
+// the product setting (AI_RATE_LIMIT, D-21).
+const TEST_LIMIT = { ...AI_RATE_LIMIT, capacity: 10, windowMs: 60_000 };
+const CAP = TEST_LIMIT.capacity;
+const REFILL_MS = TEST_LIMIT.windowMs / TEST_LIMIT.capacity;
 import {
   InFlightRequests,
   TokenBuckets,
@@ -16,27 +22,27 @@ afterEach(() => {
 });
 
 const buckets = (over: Partial<RateLimitConfig> = {}) =>
-  new TokenBuckets({ ...AI_RATE_LIMIT, ...over });
+  new TokenBuckets({ ...TEST_LIMIT, ...over });
 
 describe('TokenBuckets', () => {
-  it('allows a burst up to capacity (10), then says how long until the next token', () => {
+  it('allows a burst up to capacity, then says how long until the next token', () => {
     const b = buckets();
-    for (let i = 0; i < 10; i++) expect(b.take('tab:1')).toEqual({ ok: true });
-    // 10 per minute = one token per 6 s.
-    expect(b.take('tab:1')).toEqual({ ok: false, retryAfterMs: 6_000 });
+    for (let i = 0; i < CAP; i++) expect(b.take('tab:1')).toEqual({ ok: true });
+    // capacity per window = one token every REFILL_MS.
+    expect(b.take('tab:1')).toEqual({ ok: false, retryAfterMs: REFILL_MS });
   });
 
-  it('refills evenly: one token per 6 s, never more than capacity', () => {
+  it('refills evenly: one token per REFILL_MS, never more than capacity', () => {
     const b = buckets();
-    for (let i = 0; i < 10; i++) b.take('tab:1');
-    vi.advanceTimersByTime(5_999);
+    for (let i = 0; i < CAP; i++) b.take('tab:1');
+    vi.advanceTimersByTime(REFILL_MS - 1);
     expect(b.take('tab:1').ok).toBe(false);
     vi.advanceTimersByTime(1);
     expect(b.take('tab:1')).toEqual({ ok: true });
     expect(b.take('tab:1').ok).toBe(false);
 
     vi.advanceTimersByTime(10 * 60_000);
-    for (let i = 0; i < 10; i++) expect(b.take('tab:1').ok).toBe(true);
+    for (let i = 0; i < CAP; i++) expect(b.take('tab:1').ok).toBe(true);
     expect(b.take('tab:1').ok).toBe(false);
   });
 
