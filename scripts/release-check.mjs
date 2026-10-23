@@ -96,7 +96,7 @@ if (
   process.env['CLAVIS_FORCE_FEATURES'] !== undefined &&
   process.env['CLAVIS_FORCE_FEATURES'] !== ''
 ) {
-  fail('CLAVIS_FORCE_FEATURES is set: that is a test build (Grammar and Translate forced on)');
+  fail('CLAVIS_FORCE_FEATURES is set: that is a test build (the Grammar tab forced on)');
 }
 const dirty = (git('status', '--porcelain') ?? '').length > 0;
 if (dirty && args.has('--require-clean'))

@@ -5,7 +5,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { flush } from '../explanation/support';
 import { installCatalog, makeDeps, makeHandoff, mountPanel, stateOf } from './support';
 
-// The shipped flags are off; this file runs the panel as it will behave when they are flipped.
+// Translate ships on and Grammar off; this file forces Grammar on too (the CLAVIS_FORCE_FEATURES
+// case) to cover the panel as it will behave when Grammar is flipped. panel.test.tsx covers the shipped mix.
 vi.mock('../../../lib/config/constants', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../lib/config/constants')>()),
   FEATURES: { grammarTab: true, translateTab: true },
@@ -18,7 +19,7 @@ beforeEach(() => {
 });
 afterEach(cleanup);
 
-describe('side panel with Grammar and Translate switched on', () => {
+describe('side panel with Grammar switched on as well as Translate', () => {
   it('offers both sections and loads Translate with the language of the hand-off', async () => {
     const setup = makeDeps(
       stateOf({ ...makeHandoff({ kind: 'sentence', text: 'She broke the ice.' }) }),

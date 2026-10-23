@@ -21,7 +21,7 @@ Work in this order. Phases 3, 4 and 7 can overlap once Phase 2 closes; see the d
 | 9 | Core Explain + Must tabs (roots, related words, simplify) | 5 | 11 | Done |
 | 10 | Listen / `SpeechService` | 6 | 11 | Done (audible check pending, D-07/D-14) |
 | 11 | PDF reader | 7 | 11 | Done |
-| 12 | Unified UX, side panel, copy; Should tabs if on schedule | 8 | 13 | Done (Grammar/Translate flags wait for the live eval) |
+| 12 | Unified UX, side panel, copy; Should tabs if on schedule | 8 | 13 | Done (Translate on, Grammar off, D-25) |
 | 13 | QA, security, performance, privacy verification | 9 | 14 | Done (RC 1.0.0; human checks listed in the test report) |
 | 14 | Store package, privacy policy publish, submission | 10 | — | Not started |
 
@@ -87,8 +87,8 @@ Work in this order. Phases 3, 4 and 7 can overlap once Phase 2 closes; see the d
 | FR-008 | Rerun tutorial from Settings | 8 | Done (rerun tutorial in Settings) |
 | FR-019 | Copy answer | 8 | Done (copy in the card) |
 | FR-025 | Voice chooser | 6 | Done (Settings → Voice) |
-| FR-036 | Grammar tab | 8 | Built behind `FEATURES.grammarTab` (off) |
-| FR-037 | Translate tab | 8 | Built behind `FEATURES.translateTab` (off) |
+| FR-036 | Grammar tab | Later | Built behind `FEATURES.grammarTab`, off (D-25: 90% schema validity on the default model) |
+| FR-037 | Translate tab | 8 | Done (D-25) |
 | FR-042 | Side panel for long answers | 8 | Done (per-tab panel, D-24) |
 | FR-043 | Opt-in cross-selection cache | Later | Deferred (D-24) |
 | FR-057 | PDF find-in-document | 7 | Done (find bar, Ctrl+F) |
@@ -96,7 +96,7 @@ Work in this order. Phases 3, 4 and 7 can overlap once Phase 2 closes; see the d
 
 ### Could / Later / Won't
 
-FR-026 (IPA and recorded audio) is a Could. FR-043 (cross-selection cache, D-24), FR-058 (remote PDF URLs) and FR-079 (vocabulary export) are Later. FR-060 (OCR, annotation, full-document translation) is Won't. None are scheduled for v1.
+FR-026 (IPA and recorded audio) is a Could. FR-036 (Grammar tab, D-25), FR-043 (cross-selection cache, D-24), FR-058 (remote PDF URLs) and FR-079 (vocabulary export) are Later. FR-060 (OCR, annotation, full-document translation) is Won't. None are scheduled for v1.
 
 ## 3. Risk register
 

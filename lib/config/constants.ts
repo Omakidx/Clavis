@@ -111,13 +111,13 @@ export const AI_RATE_LIMIT = {
 } as const;
 
 /**
- * Feature flags for Should-priority features (requirements §2). Off until their prompt
- * regression fixtures pass (Phase 8 decides); the card hides flagged tabs and the background
- * rejects flagged modes with INVALID_REQUEST.
+ * Feature flags for Should-priority features (requirements §2), switched on only after their
+ * prompt regression fixtures pass on the default model (D-25: Translate on, Grammar off). The card
+ * hides flagged tabs and the background rejects flagged modes with INVALID_REQUEST.
  */
 export const FEATURES = {
   grammarTab: false,
-  translateTab: false,
+  translateTab: true,
 } as const;
 
 /** Feature flag per explain mode that is not part of the Must set (see `FEATURES`). */

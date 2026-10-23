@@ -117,7 +117,7 @@ test.describe('Explain from the PDF reader', () => {
     await tb(page).click('explain');
     const card = cardOf(page);
     await card.waitFor(CARD.ready('core'));
-    expect((await card.tabs())?.map((tab) => tab.label)).toEqual(['Core', 'Simplify']);
+    expect((await card.tabs())?.map((tab) => tab.label)).toEqual(['Core', 'Simplify', 'Translate']);
 
     const [message] = aiMessages(await sentMessages(page));
     expect(message!.payload!.snapshot).toMatchObject({

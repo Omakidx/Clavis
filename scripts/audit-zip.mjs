@@ -400,7 +400,7 @@ function main() {
     if (SCRIPT_EXT.test(entry.name) && text.includes(FORCED_FEATURES_MARKER)) {
       fail(
         'forced-features',
-        `${entry.name} comes from a CLAVIS_FORCE_FEATURES test build (Grammar and Translate forced on). Rebuild without that variable.`,
+        `${entry.name} comes from a CLAVIS_FORCE_FEATURES test build (the Grammar tab forced on). Rebuild without that variable.`,
       );
     }
 

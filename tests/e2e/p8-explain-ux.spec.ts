@@ -62,12 +62,17 @@ test.afterEach(() => {
   answer = 'normal';
 });
 
-test('a word gets Roots and Related words, a phrase also Simplify, a sentence only Simplify', async () => {
+test('a word gets Roots and Related words, a phrase also Simplify, a sentence only Simplify, and all of them Translate', async () => {
   const word = await h.open();
   try {
     const card = await explainWord(word.page, 'cartographer');
     await card.waitFor(CARD.ready('core'));
-    expect((await card.tabs())?.map((t) => t.label)).toEqual(['Core', 'Roots', 'Related words']);
+    expect((await card.tabs())?.map((t) => t.label)).toEqual([
+      'Core',
+      'Roots',
+      'Related words',
+      'Translate',
+    ]);
   } finally {
     await word.dispose();
   }
@@ -84,6 +89,7 @@ test('a word gets Roots and Related words, a phrase also Simplify, a sentence on
       'Roots',
       'Related words',
       'Simplify',
+      'Translate',
     ]);
   } finally {
     await phrase.dispose();
@@ -95,7 +101,7 @@ test('a word gets Roots and Related words, a phrase also Simplify, a sentence on
     await tb(sentence.page).click('explain');
     const card = cardOf(sentence.page);
     await card.waitFor(CARD.ready('core'));
-    expect((await card.tabs())?.map((t) => t.label)).toEqual(['Core', 'Simplify']);
+    expect((await card.tabs())?.map((t) => t.label)).toEqual(['Core', 'Simplify', 'Translate']);
   } finally {
     await sentence.dispose();
   }

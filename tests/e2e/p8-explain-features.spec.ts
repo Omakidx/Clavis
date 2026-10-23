@@ -11,15 +11,16 @@ import {
 } from './p5-card-support/harness';
 import { openPanelPage, tabIdOf } from './p8-sidepanel-support/panel';
 
-// Phase 8: the Grammar and Translate tabs (FR-036, FR-037) in a build with the flags FORCED ON:
+// The Grammar and Translate tabs (FR-036, FR-037) in a build with every flag FORCED ON (Grammar is the
+// one that ships off):
 //
 //   CLAVIS_FORCE_FEATURES=1 WXT_OUT_DIR=.output-p8-flags npx wxt build
 //   CLAVIS_FORCE_FEATURES=1 CLAVIS_EXTENSION_DIR=.output-p8-flags/chrome-mv3 \
 //     npx playwright test tests/e2e/p8-explain-features.spec.ts
 //
-// (lib/config/constants.ts keeps both flags false; wxt.config.ts only flips them for this build.)
-// Without the env var the spec is skipped: the shipped build must NOT show these tabs, which
-// tests/e2e/p5-card-flow.spec.ts asserts.
+// (lib/config/constants.ts ships Translate on and Grammar off; wxt.config.ts only flips Grammar for
+// this build.) Without the env var the spec is skipped: the shipped build must NOT show the Grammar
+// tab, which tests/e2e/p8-accept-flags.spec.ts asserts together with the Translate tab it does show.
 test.skip(process.env['CLAVIS_FORCE_FEATURES'] !== '1', 'needs the forced-flags build');
 
 let h: CardHarness;

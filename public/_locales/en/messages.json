@@ -1531,7 +1531,7 @@
   },
   "cardTabTranslate": {
     "message": "Translate",
-    "description": "Tab in the explanation card: translation. Hidden until the feature is switched on."
+    "description": "Tab in the explanation card (and a section in the side panel): translation of the selection into the language the person chose for explanations."
   },
   "cardLoading": {
     "message": "Explaining…",

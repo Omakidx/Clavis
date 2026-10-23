@@ -137,6 +137,25 @@ describe('lazy tabs and cache', () => {
     expect(calls[1]?.request).toMatchObject({ mode: 'translate', targetLanguage: 'fr' });
   });
 
+  it('with the shipped flags it offers Translate (not Grammar): one request when opened, none on reopen', async () => {
+    // `features: undefined` falls back to FEATURES from lib/config/constants (Translate on, Grammar off).
+    const { session, calls } = make('sentence', { features: undefined, targetLanguage: 'fr' });
+    expect(session.state.tabs).toEqual(['core', 'simplify', 'translate']);
+    session.attach();
+    calls[0]?.succeed();
+    await flush();
+    session.selectTab('translate');
+    expect(calls).toHaveLength(2);
+    expect(calls[1]?.request).toMatchObject({ mode: 'translate', targetLanguage: 'fr' });
+    calls[1]?.succeed({ translation: { language: 'French', text: 'Elle a brisé la glace.' } });
+    await flush();
+    session.selectTab('core');
+    session.selectTab('translate');
+    await flush();
+    expect(calls).toHaveLength(2);
+    expect(session.state.entries.translate?.status).toBe('ready');
+  });
+
   it('a failed tab shows its own error and is not retried by reopening it', async () => {
     const { session, calls } = make('word');
     session.attach();

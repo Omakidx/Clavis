@@ -42,11 +42,31 @@ describe('tabs per selection kind (D-05)', () => {
     expect(tabsFor('sentence', OFF)).toEqual(['core', 'simplify']);
     expect(tabsFor('passage', OFF)).toEqual(['core', 'simplify']);
   });
-  it('hides Grammar and Translate while their flags are off, which is the shipped default', () => {
+  it('ships Translate for every kind and hides Grammar: the production default (FR-037 on, FR-036 off)', () => {
+    expect(tabsFor('word')).toEqual(['core', 'etymology', 'related_words', 'translate']);
+    expect(tabsFor('phrase')).toEqual([
+      'core',
+      'etymology',
+      'related_words',
+      'simplify',
+      'translate',
+    ]);
+    expect(tabsFor('sentence')).toEqual(['core', 'simplify', 'translate']);
+    expect(tabsFor('passage')).toEqual(['core', 'simplify', 'translate']);
     for (const kind of ['word', 'phrase', 'sentence', 'passage'] as const) {
       expect(tabsFor(kind)).not.toContain('grammar');
-      expect(tabsFor(kind)).not.toContain('translate');
     }
+  });
+  it('hides both tabs when both flags are off, and Translate alone when only Grammar is on', () => {
+    for (const kind of ['word', 'phrase', 'sentence', 'passage'] as const) {
+      expect(tabsFor(kind, OFF)).not.toContain('grammar');
+      expect(tabsFor(kind, OFF)).not.toContain('translate');
+    }
+    expect(tabsFor('sentence', { grammarTab: true, translateTab: false })).toEqual([
+      'core',
+      'simplify',
+      'grammar',
+    ]);
   });
   it('adds Grammar (not for a single word) and Translate when the flags are on', () => {
     expect(tabsFor('sentence', ON)).toEqual(['core', 'simplify', 'grammar', 'translate']);

@@ -3,7 +3,7 @@
 **Status:** Implementation-ready specification (v1 baseline)  
 **Version:** 1.1-draft · **Last reviewed:** 2026-10-22  
 **Platform:** Google Chrome, Manifest V3, desktop first  
-**Product owner decisions:** Groq only for v1; user provides key; no mandatory accounts or first-party backend; custom PDF.js reader; native pronunciation for words **and** sentences. Further resolved decisions D-01 … D-24 are in [§11](#11-product-decisions).
+**Product owner decisions:** Groq only for v1; user provides key; no mandatory accounts or first-party backend; custom PDF.js reader; native pronunciation for words **and** sentences. Further resolved decisions D-01 … D-25 are in [§11](#11-product-decisions).
 
 ## 1. Problem, audience and success criteria
 
@@ -175,7 +175,7 @@ This is the approved user-facing wording. Implementation may adjust layout and f
 | FR-033 | Must | **Roots tab:** etymology, origin and morphological roots, requested when the tab is opened | Output distinguishes reliable roots from conjecture; display uncertainty if unknown |
 | FR-034 | Must | **Related words tab:** synonyms and antonyms where semantically meaningful, requested when opened | Terms match intended sense; display `Not applicable` when relevant |
 | FR-035 | Must | **Simplify tab:** plain-language rewrite for phrases, sentences and passages, requested when opened | Rewrite preserves meaning; no hallucinated facts |
-| FR-036 | Should | **Grammar tab:** grammatical function and expression/idiom breakdown | Models return usable breakdown for fixture idioms and simple sentences |
+| FR-036 | Later (D-25) | **Grammar tab:** grammatical function and expression/idiom breakdown | Models return usable breakdown for fixture idioms and simple sentences |
 | FR-037 | Should | **Translate tab:** translation into the user's selected language | Translation separates literal form from contextual sense where appropriate |
 | FR-038 | Must | On-demand Groq calls with bounded context and requested mode | Request created only after an explicit action; opening an already-loaded tab for the same selection makes no new request; inputs validated; model output runtime validated |
 | FR-039 | Must | Loading, success, empty, timeout, permission, key, model and rate-limit states | Explicit labeled states and retry options; no infinite spinner |
@@ -373,6 +373,7 @@ The team can test **Linux only** by hand. Other platforms get automated coverage
 | D-22 | **Listen uses on-device voices only by default**; an online voice (e.g. Chrome's Google network voices in the Web Speech fallback) is used only when the user explicitly chooses it in Settings → Voice, where it is labelled *online* with a note, and the toolbar marks each online playback | Keeps the approved disclosure ("Listen uses the voices on your computer") true by default; the Phase 6 code review found the fallback can expose network voices, especially on Linux | lib/speech voice resolution; Settings → Voice; privacy policy; §6 inventory |
 | D-23 | **Keep PDF.js CMaps in the package** | About 1 MB of the 2.6 MB ZIP, but without them CJK PDFs that don't embed their fonts render incorrectly; the store ZIP stays under its 3.2 MB budget | wxt.config.ts asset hook; size budgets |
 | D-24 | **Side panel ships in v1 (FR-042); the cross-selection answer cache is deferred (FR-043 → Later)** (2026-10-23) | User's Phase 8 choice. The side panel gives long answers room and needs only `sidePanel`, which shows no install warning. A cache across selections would store selected text on disk (TTL, clearing UI, privacy-policy change) for a small saving; answers stay cached per selection in memory | FR-042, FR-043; architecture §3 |
+| D-25 | **Translate tab ships in v1 (FR-037); the Grammar tab stays off (FR-036 → Later)** (2026-10-23) | User's live Groq eval, 4 runs pooled ([p5-prompt-eval.md](decisions/p5-prompt-eval.md)): Translate 96/96 valid on gpt-oss-20b and -120b, correct contextual and literal renderings for French, Japanese and Arabic. Grammar 36/40 (90%) on the default gpt-oss-20b — three failures on injection fixtures (failing safe) but one on an ordinary sentence — below the ≥ 95% gate; -120b was 40/40. Revisit Grammar with a prompt/schema change or one retry on `json_validate_failed` | FR-036, FR-037; `FEATURES` in lib/config/constants.ts |
 | D-16 | **Disclosure copy approved** as written in [§4.1](#approved-disclosure-copy-fr-002-fr-009-fr-071) | Defines exactly what users see before anything is sent to Groq | Onboarding, first Explain, settings |
 
 ### Still open

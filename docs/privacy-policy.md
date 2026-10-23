@@ -37,7 +37,7 @@ Clavis does **not** collect browsing history, page addresses, analytics, adverti
 Clavis asks Groq for an explanation in these cases:
 
 - You click **Explain** in the toolbar.
-- You open another explanation tab in the card or in the side panel (Roots, Related words or Simplify). Each one is a separate request.
+- You open another explanation tab in the card or in the side panel (Roots, Related words, Simplify or Translate). Each one is a separate request.
 - You right-click selected text and choose **Explain with Clavis**.
 - You click the Clavis icon and choose **Explain on this page**.
 
@@ -46,7 +46,7 @@ Each request goes from Clavis's background worker to `https://api.groq.com` and 
 - the selected text (at most 2,000 characters);
 - up to 1,000 characters of nearby text, taken from the same block of the page or PDF;
 - the language tag the page declares for itself, if it has one;
-- the explanation type (the main explanation, roots, related words or a plainer rewrite) and whether the selection is a word, phrase, sentence or passage;
+- the explanation type (the main explanation, roots, related words, a plainer rewrite or a translation) and whether the selection is a word, phrase, sentence or passage;
 - your explanation language, reading level and detail level, where that explanation type uses them;
 - the name of the AI model you chose;
 - fixed instructions written by Clavis, and your Groq API key in the request header.

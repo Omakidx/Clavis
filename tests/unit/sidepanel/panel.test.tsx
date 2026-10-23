@@ -47,9 +47,12 @@ describe('opening the panel', () => {
       'core',
       'etymology',
       'related_words',
+      'translate',
     ]);
     const headings = screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent);
-    expect(headings).toEqual(expect.arrayContaining(['Core', 'Roots', 'Related words']));
+    expect(headings).toEqual(
+      expect.arrayContaining(['Core', 'Roots', 'Related words', 'Translate']),
+    );
     for (const el of sections()) {
       expect(el.getAttribute('aria-labelledby')).toMatch(/^sp-heading-/);
       expect(document.getElementById(el.getAttribute('aria-labelledby') ?? '')).not.toBeNull();
@@ -62,7 +65,32 @@ describe('opening the panel', () => {
   it('only offers the sections the card would (a sentence has no Roots)', async () => {
     const setup = makeDeps(stateOf(makeHandoff({ kind: 'sentence', text: 'She broke the ice.' })));
     await mountPanel(setup);
-    expect(sections().map((el) => el.getAttribute('data-mode'))).toEqual(['core', 'simplify']);
+    expect(sections().map((el) => el.getAttribute('data-mode'))).toEqual([
+      'core',
+      'simplify',
+      'translate',
+    ]);
+  });
+
+  it("offers Translate but not Grammar (production flags); Translate sends one request, only on Load, in the user's language", async () => {
+    const setup = makeDeps(stateOf(makeHandoff({ kind: 'sentence', text: 'She broke the ice.' })));
+    await mountPanel(setup);
+    await flush();
+    expect(sections().map((el) => el.getAttribute('data-mode'))).not.toContain('grammar');
+    expect(setup.fake.calls).toHaveLength(0);
+    const user = userEvent.setup();
+    await user.click(within(section('translate')).getByTestId('panel-load'));
+    expect(setup.fake.calls).toHaveLength(1);
+    expect(setup.fake.calls[0]?.request).toMatchObject({ mode: 'translate', targetLanguage: 'en' });
+    await act(async () => {
+      setup.fake.calls[0]?.succeed({
+        translation: { language: 'English', text: 'Elle a brisé la glace.' },
+      });
+      await flush();
+    });
+    expect(section('translate')).toHaveTextContent('Translation into English');
+    expect(within(section('translate')).queryByTestId('panel-load')).toBeNull();
+    expect(setup.fake.calls).toHaveLength(1);
   });
 
   it('has a labelled list of links to the sections that moves focus to the heading', async () => {
@@ -74,6 +102,7 @@ describe('opening the panel', () => {
       'core',
       'etymology',
       'related_words',
+      'translate',
     ]);
     // A part that is not loaded says so to a screen reader.
     expect(links[1]).toHaveTextContent('Roots (not loaded)');

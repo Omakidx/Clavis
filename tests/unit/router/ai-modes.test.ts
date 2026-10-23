@@ -48,18 +48,41 @@ describe('AI_EXPLAIN modes', () => {
     },
   );
 
-  it('keeps the Should modes off while their flags are off (INVALID_REQUEST, no provider call)', async () => {
-    expect(FEATURES).toEqual({ grammarTab: false, translateTab: false });
+  it('ships Translate and keeps Grammar off: the production flags (FR-037 on, FR-036 off)', async () => {
+    expect(FEATURES).toEqual({ grammarTab: false, translateTab: true });
     expect(MODE_FEATURE_FLAGS).toEqual({ grammar: 'grammarTab', translate: 'translateTab' });
+    // Grammar is refused before any provider work.
+    expect(await h.call(explainMessage(REQ_A, { mode: 'grammar' }), contentSender())).toMatchObject(
+      { ok: false, requestId: REQ_A, error: { code: 'INVALID_REQUEST' } },
+    );
+    expect(h.provider.explain).not.toHaveBeenCalled();
+    // Translate is served with its target language.
+    const translated = reply.parse(
+      await h.call(
+        explainMessage(REQ_B, { mode: 'translate', targetLanguage: 'fr' }),
+        contentSender(),
+      ),
+    );
+    expect(translated).toMatchObject({ ok: true, requestId: REQ_B });
+    expect(h.provider.explain).toHaveBeenCalledTimes(1);
+    expect(h.provider.explain.mock.calls[0]![0]).toMatchObject({
+      mode: 'translate',
+      targetLanguage: 'fr',
+    });
+  });
+
+  it('refuses both Should modes when both flags are off, and each flag is independent', async () => {
+    const off = createHarness({ features: { grammarTab: false, translateTab: false } });
+    await makeReady(off);
     for (const [mode, extra] of [
       ['grammar', {}],
       ['translate', { targetLanguage: 'fr' }],
     ] as const) {
       expect(
-        await h.call(explainMessage(REQ_A, { mode, ...extra }), contentSender()),
+        await off.call(explainMessage(REQ_A, { mode, ...extra }), contentSender()),
       ).toMatchObject({ ok: false, requestId: REQ_A, error: { code: 'INVALID_REQUEST' } });
     }
-    expect(h.provider.explain).not.toHaveBeenCalled();
+    expect(off.provider.explain).not.toHaveBeenCalled();
   });
 
   it('implements the Should modes behind their flags', async () => {

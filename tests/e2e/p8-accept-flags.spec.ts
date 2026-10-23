@@ -2,6 +2,7 @@ import { readFileSync, readdirSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { expect, test } from '@playwright/test';
 import { clavisKeys, readStorage, send } from './p3-support/background';
+import { contentWorld } from './p3-support/content-world';
 import { openExtensionPage } from './p3-ui-support/pages';
 import { CARD, cardOf } from './p5-card-support/harness';
 import { explainMessage } from './p5-support/groq';
@@ -13,11 +14,11 @@ import { setUpKey } from './p8-accept-support/setup';
 import { openWebpage, startWorld, type World } from './p8-accept-support/world';
 import { openPanelPage, tabIdOf } from './p8-sidepanel-support/panel';
 
-// Phase 8, what the PRODUCTION build must and must not contain (D-24, FR-036, FR-037, FR-042,
-// FR-043): the side panel ships; the Grammar and Translate tabs stay flagged off until a live
-// evaluation (a forced-flags build is a test build and must never ship); the cross-selection
-// answer cache (FR-043, Later) does not exist: nothing about a selection or an answer is stored,
-// and asking again asks Groq again.
+// What the PRODUCTION build must and must not contain (D-24, FR-036, FR-037, FR-042, FR-043): the
+// side panel ships; the Translate tab ships (its live evaluation passed, 96/96); the Grammar tab
+// stays flagged off (90% on the default model, below the bar) and a forced-flags build is a test
+// build that must never ship; the cross-selection answer cache (FR-043, Later) does not exist:
+// nothing about a selection or an answer is stored, and asking again asks Groq again.
 test.describe.configure({ mode: 'serial', timeout: 120_000 });
 
 let world: World;
@@ -39,20 +40,20 @@ function walk(dir: string): string[] {
   });
 }
 
-test('the build has the flags off and was not made with the forced-flags test switch', async () => {
+test('the build has Translate on, Grammar off and was not made with the forced-flags test switch', async () => {
   const sources = walk(extensionPath).filter((f) => /\.(js|mjs)$/.test(f));
   const marker = sources.filter((f) =>
     readFileSync(f, 'utf8').includes('CLAVIS_FORCED_FEATURES_BUILD_NEVER_SHIP'),
   );
   expect(marker, 'forced-flags marker in the build').toEqual([]);
-  // Wherever the flags are compiled in, both are false.
+  // Wherever the flags are compiled in: Grammar is false (!1) and Translate is true (!0).
   const flagged = sources
     .map((f) => readFileSync(f, 'utf8'))
     .flatMap((text) => [...text.matchAll(/grammarTab:(!?\d|!?\w+),translateTab:(!?\d|!?\w+)/g)]);
   expect(flagged.length).toBeGreaterThan(0);
   for (const hit of flagged) {
     expect(hit[1], 'grammarTab').toBe('!1');
-    expect(hit[2], 'translateTab').toBe('!1');
+    expect(hit[2], 'translateTab').toBe('!0');
   }
 });
 
@@ -72,7 +73,8 @@ test('the manifest ships the side panel (FR-042) with no shared default panel, a
   await page.close();
 });
 
-test('no tab set, in the card or in the side panel, ever offers Grammar or Translate', async () => {
+test('every tab set, in the card and in the side panel, offers Translate and never Grammar', async () => {
+  calls.length = 0;
   for (const [name, from, to] of [
     ['word', 'cartographer', 'cartographer'],
     ['phrase', 'old bank', 'beside'],
@@ -89,7 +91,7 @@ test('no tab set, in the card or in the side panel, ever offers Grammar or Trans
       await card.waitFor(CARD.ready('core'));
       const labels = ((await card.tabs()) ?? []).map((t) => t.label.toLowerCase());
       expect(labels, `card tabs for a ${name}`).not.toContain('grammar');
-      expect(labels, `card tabs for a ${name}`).not.toContain('translate');
+      expect(labels.at(-1), `card tabs for a ${name}`).toBe('translate');
       await card.click(CARD.sidePanel);
       await expect.poll(() => card.text(CARD.live)).toBe('Opened in the side panel.');
       const panel = await openPanelPage(
@@ -97,45 +99,103 @@ test('no tab set, in the card or in the side panel, ever offers Grammar or Trans
         world.ext.extensionId,
         await tabIdOf(world.ext.serviceWorker, page),
       );
+      await expect(panel.getByTestId('panel-section').first()).toBeVisible();
       const parts = await panel
         .getByTestId('panel-section')
         .evaluateAll((els) => els.map((el) => el.getAttribute('data-mode')));
       expect(parts, `panel parts for a ${name}`).not.toContain('grammar');
-      expect(parts, `panel parts for a ${name}`).not.toContain('translate');
-      expect(await panel.locator('body').innerText()).not.toMatch(/grammar|translat/i);
+      expect(parts.at(-1), `panel parts for a ${name}`).toBe('translate');
+      expect(await panel.locator('body').innerText()).not.toMatch(/grammar/i);
       await panel.close();
     } finally {
       await dispose();
     }
   }
-  expect(calls.map((c) => c.mode).filter((m) => m === 'grammar' || m === 'translate')).toEqual([]);
+  // Opening the card and the panel asks for the core answer only: Translate waits for its tab.
+  expect(calls.map((c) => c.mode).filter((m) => m !== 'core')).toEqual([]);
 });
 
-test('Settings does not mention Grammar, Translate or a cache', async () => {
+test('Translate asks once when its tab is opened, in the explanation language, and not again on reopen', async () => {
+  const options = (await openExtensionPage(world.ext.context, world.ext.extensionId, 'options'))
+    .page;
+  await send(options, { v: 1, type: 'UPDATE_PREFERENCES', patch: { explanationLanguage: 'fr' } });
+  const prompts: string[] = [];
+  const record = (request: import('@playwright/test').Request): void => {
+    if (request.url().endsWith('/chat/completions')) prompts.push(request.postData() ?? '');
+  };
+  world.ext.context.on('request', record);
+  const { page, dispose } = await openWebpage(world, 'article.html?translate=1');
+  try {
+    await page.bringToFront();
+    await dragSelect(page, page, 'The old bank stood', 'two hundred years.');
+    await tb(page).waitShown();
+    calls.length = 0;
+    await tb(page).click('explain');
+    const card = cardOf(page);
+    await card.waitFor(CARD.ready('core'));
+    expect(calls.map((c) => c.mode)).toEqual(['core']);
+    await card.click(CARD.tab('translate'));
+    await card.waitFor(CARD.ready('translate'));
+    expect(calls.map((c) => c.mode)).toEqual(['core', 'translate']);
+    const translate = prompts.filter((p) => p.includes('(mode: translate)'));
+    expect(translate).toHaveLength(1);
+    expect(translate[0]).toContain('BCP-47 tag \\"fr\\"');
+    expect(await card.text(CARD.panel('translate'))).toContain('Translation into French');
+    // Reopening a loaded tab, and closing and re-pressing Explain on the same selection, are free.
+    await card.click(CARD.tab('core'));
+    await card.click(CARD.tab('translate'));
+    await page.waitForTimeout(300);
+    expect(calls.map((c) => c.mode)).toEqual(['core', 'translate']);
+  } finally {
+    world.ext.context.off('request', record);
+    await send(options, {
+      v: 1,
+      type: 'UPDATE_PREFERENCES',
+      patch: { explanationLanguage: 'en' },
+    });
+    await options.close();
+    await dispose();
+  }
+});
+
+test('Settings does not mention Grammar or a cache', async () => {
   const { page } = await openExtensionPage(world.ext.context, world.ext.extensionId, 'options');
   await expect(page.getByTestId('voice-counts')).toBeVisible({ timeout: 15_000 });
   await page.evaluate(() =>
     document.querySelectorAll('details').forEach((d) => d.setAttribute('open', '')),
   );
   const text = await page.locator('body').innerText();
-  expect(text).not.toMatch(/grammar|translat|cache|history|vocabulary/i);
+  expect(text).not.toMatch(/grammar|cache|history|vocabulary/i);
   await page.close();
 });
 
-test('a request for a Grammar or Translate answer is refused by the service worker and never reaches Groq', async () => {
-  const { page } = await openExtensionPage(world.ext.context, world.ext.extensionId, 'options');
-  world.groqUrls.length = 0;
-  calls.length = 0;
-  for (const mode of ['grammar', 'translate']) {
-    const reply = await send(
-      page,
-      explainMessage(mode, { targetLanguage: 'French', acknowledge: true }),
-    );
-    expect(reply?.ok, mode).toBe(false);
+test('the service worker refuses a Grammar request, never sending it to Groq, and serves Translate', async () => {
+  // From a web page's content-script world: the context the card lives in, and the only kind of
+  // sender AI_EXPLAIN accepts (an extension page is refused whatever the mode).
+  const page = await world.ext.context.newPage();
+  const content = await contentWorld(page);
+  await page.goto(`${world.server.origin}/article.html?refuse=1`);
+  await content.ready();
+  const call = (message: unknown): Promise<{ ok: boolean } | undefined> =>
+    content.evaluate(`chrome.runtime.sendMessage(${JSON.stringify(message)})`);
+  try {
+    world.groqUrls.length = 0;
+    calls.length = 0;
+    expect(await call(explainMessage('grammar')), 'grammar').toMatchObject({
+      ok: false,
+      error: { code: 'INVALID_REQUEST' },
+    });
+    expect(calls).toEqual([]);
+    expect(world.groqUrls.filter((u) => u.endsWith('/chat/completions'))).toEqual([]);
+    expect(
+      await call(explainMessage('translate', { targetLanguage: 'fr' })),
+      'translate',
+    ).toMatchObject({ ok: true, data: { mode: 'translate' } });
+    expect(calls.map((c) => c.mode)).toEqual(['translate']);
+  } finally {
+    await content.dispose();
+    await page.close();
   }
-  expect(calls).toEqual([]);
-  expect(world.groqUrls.filter((u) => u.endsWith('/chat/completions'))).toEqual([]);
-  await page.close();
 });
 
 test('FR-043 is absent: explaining the same text again asks Groq again, and nothing about it is stored', async () => {

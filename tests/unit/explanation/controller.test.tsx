@@ -366,3 +366,47 @@ describe('Translate language (feature flag)', () => {
     expect(on.fake.calls[1]?.request).toMatchObject({ mode: 'translate', targetLanguage: 'fr' });
   });
 });
+
+describe('production flags (Translate on, Grammar off)', () => {
+  it('draws the Translate tab, never Grammar, with the language looked up once and one request per open', async () => {
+    const fake = createFakeBackend();
+    fake.state.language = 'de';
+    const spy = vi.spyOn(fake.backend, 'explanationLanguage');
+    // No `features` override: the card uses FEATURES from lib/config/constants.
+    const card = createExplainCard({
+      backend: fake.backend,
+      newId: () => `id-${(ids += 1)}`,
+      now: () => Date.now(),
+      copy: () => Promise.resolve(true),
+    });
+    const r = run(makeSnapshot('sentence', 'Hello there.'));
+    await present(card, r);
+    expect(spy).toHaveBeenCalledTimes(1);
+    const tabs = Array.from(r.slot.querySelectorAll('[data-clavis="card-tab"]')).map(
+      (el) => (el as HTMLElement).dataset['tab'],
+    );
+    expect(tabs).toEqual(['core', 'simplify', 'translate']);
+    await act(async () => {
+      fake.calls[0]?.succeed();
+      await flush();
+    });
+    const click = async (mode: string): Promise<void> => {
+      await act(async () => {
+        (
+          r.slot.querySelector(`[data-clavis="card-tab"][data-tab="${mode}"]`) as HTMLElement
+        ).click();
+        await flush();
+      });
+    };
+    await click('translate');
+    expect(fake.calls).toHaveLength(2);
+    expect(fake.calls[1]?.request).toMatchObject({ mode: 'translate', targetLanguage: 'de' });
+    await act(async () => {
+      fake.calls[1]?.succeed({ translation: { language: 'German', text: 'Hallo.' } });
+      await flush();
+    });
+    await click('core');
+    await click('translate');
+    expect(fake.calls).toHaveLength(2);
+  });
+});

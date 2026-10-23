@@ -248,21 +248,23 @@ describe('fixtures and plan', () => {
     }
   });
 
-  it('runs the Must modes by default and the flagged ones only on request', async () => {
+  it('runs the shipped modes by default (the Must set plus Translate) and Grammar only on request', async () => {
     expect(selectModes({ includeShould: false })).toEqual([
       'core',
       'etymology',
       'related_words',
       'simplify',
+      'translate',
     ]);
     expect(selectModes({ includeShould: true })).toEqual([...EXPLAIN_MODES]);
     expect(selectModes({ includeShould: false, modes: ['grammar', 'core'] })).toEqual(['core']);
     expect(selectModes({ includeShould: true, modes: ['grammar'] })).toEqual(['grammar']);
 
     const cases = await loadCases();
-    const must = buildPlan(cases, { includeShould: false });
-    expect(must.every((p) => !['grammar', 'translate'].includes(p.mode))).toBe(true);
-    expect(buildPlan(cases, { includeShould: true }).length).toBeGreaterThan(must.length);
+    const shipped = buildPlan(cases, { includeShould: false });
+    expect(shipped.every((p) => p.mode !== 'grammar')).toBe(true);
+    expect(shipped.some((p) => p.mode === 'translate')).toBe(true);
+    expect(buildPlan(cases, { includeShould: true }).length).toBeGreaterThan(shipped.length);
     expect(
       buildPlan(cases, { includeShould: false, caseIds: ['bank-river'] }).map((p) => p.mode),
     ).toEqual(['core', 'etymology', 'related_words']);
@@ -379,9 +381,9 @@ describe('runEval --mock', () => {
     ]);
     expect(report.trials.length).toBe(report.planned);
     expect(report.trials.every((t) => t.model && t.mode && t.caseId)).toBe(true);
-    // Every Must mode and no Should mode.
+    // Every Must mode and Translate (switched on), but not Grammar (still off).
     expect(new Set(report.trials.map((t) => t.mode))).toEqual(
-      new Set(['core', 'etymology', 'related_words', 'simplify']),
+      new Set(['core', 'etymology', 'related_words', 'simplify', 'translate']),
     );
     // The mock's 120b model rejects json_schema once, then the cache starts it in json_object.
     const s120 = report.summaries.find((s) => s.model === 'openai/gpt-oss-120b');
@@ -397,7 +399,7 @@ describe('runEval --mock', () => {
     expect(report.trials.some((t) => t.errorStage === 'truncated')).toBe(true);
   });
 
-  it('includes the flagged modes only with --include-should', async () => {
+  it('includes the still-flagged Grammar mode only with --include-should', async () => {
     const cases = await loadCases();
     const report = await runEval(
       options({ includeShould: true, caseIds: ['idiom-broke-the-ice'] }),

@@ -73,22 +73,36 @@ test('keyboard only: Explain, Tab through the card, arrow between tabs without a
     expect(await card.focused()).toBe('card-tab:etymology');
     await page.keyboard.press('ArrowRight');
     expect(await card.focused()).toBe('card-tab:related_words');
+    await page.keyboard.press('ArrowRight');
+    expect(await card.focused()).toBe('card-tab:translate');
     await page.keyboard.press('End');
-    expect(await card.focused()).toBe('card-tab:related_words');
+    expect(await card.focused()).toBe('card-tab:translate');
     await page.keyboard.press('Home');
     expect(await card.focused()).toBe('card-tab:core');
+    await page.keyboard.press('ArrowLeft');
+    expect(await card.focused()).toBe('card-tab:translate');
     await page.keyboard.press('ArrowLeft');
     expect(await card.focused()).toBe('card-tab:related_words');
     // Moving focus around requested nothing, and the toolbar's arrow group stayed out of it.
     await page.waitForTimeout(250);
     expect(h.groq.chats()).toHaveLength(0);
-    expect((await card.tabs())?.map((tab) => tab.selected)).toEqual(['true', 'false', 'false']);
-    expect((await card.tabs())?.map((tab) => tab.tabindex)).toEqual(['-1', '-1', '0']);
+    expect((await card.tabs())?.map((tab) => tab.selected)).toEqual([
+      'true',
+      'false',
+      'false',
+      'false',
+    ]);
+    expect((await card.tabs())?.map((tab) => tab.tabindex)).toEqual(['-1', '-1', '0', '-1']);
 
     await page.keyboard.press('Enter');
     await card.waitFor(CARD.ready('related_words'));
     expect(h.groq.chats()).toHaveLength(1);
-    expect((await card.tabs())?.map((tab) => tab.selected)).toEqual(['false', 'false', 'true']);
+    expect((await card.tabs())?.map((tab) => tab.selected)).toEqual([
+      'false',
+      'false',
+      'true',
+      'false',
+    ]);
   } finally {
     await dispose();
   }

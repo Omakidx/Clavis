@@ -16,8 +16,8 @@
  *
  * Flags:
  *   --runs N                  repetitions per model x case x mode (default 1)
- *   --modes a,b               only these modes (default: every Must mode; see --include-should)
- *   --include-should          also run the flagged-off modes (grammar, translate)
+ *   --modes a,b               only these modes (default: every mode whose feature flag is on; see --include-should)
+ *   --include-should          also run the modes whose feature flag is still off (grammar)
  *   --cases id,id             only these fixture ids
  *   --models id,id            these models instead of the default set (must be in the account list)
  *   --reading-level L         simple | standard | advanced (default standard)
@@ -463,7 +463,7 @@ export function summarizeModes(model: string, trials: Trial[]): ModeSummary[] {
   return out;
 }
 
-/** The modes a run covers: the Must set, plus the flagged-off ones when asked. */
+/** The modes a run covers: the Must set and the enabled Should modes, plus the flagged-off ones when asked. */
 export function selectModes(options: Pick<Options, 'modes' | 'includeShould'>): ExplainMode[] {
   const enabled = (mode: ExplainMode): boolean => {
     const flag = (MODE_FEATURE_FLAGS as Record<string, keyof typeof FEATURES | undefined>)[mode];

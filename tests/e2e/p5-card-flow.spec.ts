@@ -70,6 +70,7 @@ test('core answer, then Roots costs exactly one more request, and reopening it c
       'Core',
       'Roots',
       'Related words',
+      'Translate',
     ]);
     // Nothing was prefetched for the tabs nobody opened.
     expect(await card.status('etymology')).toBe('idle');
@@ -129,7 +130,7 @@ test('a sentence gets Core and Simplify only; Simplify is requested on first ope
     await tb(page).click('explain');
     const card = cardOf(page);
     await card.waitFor(CARD.ready('core'));
-    expect((await card.tabs())?.map((tab) => tab.label)).toEqual(['Core', 'Simplify']);
+    expect((await card.tabs())?.map((tab) => tab.label)).toEqual(['Core', 'Simplify', 'Translate']);
 
     await card.click(CARD.tab('simplify'));
     await card.waitFor(CARD.ready('simplify'));

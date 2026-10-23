@@ -40,7 +40,8 @@ beforeEach(() => {
 });
 afterEach(() => vi.useRealTimers());
 
-const MODES: ExplainMode[] = ['core', 'etymology', 'related_words', 'simplify'];
+// The tabs of a word under the shipped flags: Translate is on (FR-037), Grammar off (FR-036).
+const MODES: ExplainMode[] = ['core', 'etymology', 'related_words', 'translate'];
 const STALE = 'STALE-ANSWER-OF-ANOTHER-REQUEST';
 
 /** Every text the session state could show a person. */
@@ -64,7 +65,7 @@ async function oneRun(seed: number): Promise<void> {
     backend: fake.backend,
     newId,
     now: () => Date.now(),
-    features: { grammarTab: false, translateTab: false },
+    targetLanguage: 'fr',
   });
   let destroyed = false;
   let notifiedAfterDestroy = 0;

@@ -52,10 +52,12 @@ test('the card opens a PER-TAB panel and hands over what it loaded; opening it s
     const panel = await openPanelPage(h.ext.context, h.ext.extensionId, tabId);
     await expect(panel.getByTestId('panel-selected')).toHaveText('cartographer');
     await expect(panel.getByRole('heading', { level: 1 })).toHaveText('Clavis explanation');
-    await expect(panelSections(panel)).toHaveCount(3);
+    // Core, Roots, Related words, and Translate (shipped on): nothing but Core and Roots is loaded.
+    await expect(panelSections(panel)).toHaveCount(4);
     await expect(panelSections(panel).nth(0)).toHaveAttribute('data-status', 'ready');
     await expect(panelSections(panel).nth(1)).toHaveAttribute('data-status', 'ready');
     await expect(panelSections(panel).nth(2)).toHaveAttribute('data-status', 'idle');
+    await expect(panelSections(panel).nth(3)).toHaveAttribute('data-status', 'idle');
     await expect(panelSections(panel).nth(0)).toContainText('We sat on the bank.');
     await expect(panelSections(panel).nth(1)).toContainText('From Old Norse banki');
     // Opening cost nothing: no request to Groq at all (D-05, FR-017).

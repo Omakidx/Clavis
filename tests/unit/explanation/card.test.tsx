@@ -727,7 +727,7 @@ describe('text direction', () => {
   });
 });
 
-describe('Grammar and Translate tabs with their flags forced on (FR-036, FR-037)', () => {
+describe('Grammar and Translate tabs with both flags forced on (FR-036, FR-037; Grammar ships off, Translate on)', () => {
   const ON = { grammarTab: true, translateTab: true };
 
   async function flagged(kind: Parameters<typeof makeSnapshot>[0], text: string, language = 'fr') {

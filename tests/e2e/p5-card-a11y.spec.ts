@@ -63,7 +63,8 @@ const SCENARIOS: Scenario[] = [
   { name: 'long answer (side panel suggested)', scenario: 'coreLong' },
   { name: 'right-to-left answer', scenario: 'coreRtl', kind: 'phrase' },
   { name: 'error: offline', scenario: 'error:NETWORK_ERROR:offline' },
-  { name: 'Grammar and Translate tabs (flags forced on)', scenario: 'flags', kind: 'sentence' },
+  { name: 'Translate tab (the shipped flags)', scenario: 'translate', kind: 'sentence' },
+  { name: 'Grammar and Translate tabs (Grammar forced on)', scenario: 'flags', kind: 'sentence' },
 ];
 
 async function openPage(
@@ -185,6 +186,14 @@ test.describe('structure, targets and preferences', () => {
         },
         {
           name: 'Related words',
+          selected: 'false',
+          tabindex: '-1',
+          panelRole: 'tabpanel',
+          panelLabelledBy: true,
+          panelHidden: true,
+        },
+        {
+          name: 'Translate',
           selected: 'false',
           tabindex: '-1',
           panelRole: 'tabpanel',

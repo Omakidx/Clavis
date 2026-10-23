@@ -78,6 +78,8 @@ FR-001 (welcome page once; setup persists across a browser restart; a relaunch w
 
 All four fail without `test.fail` for the stated reason (assertion output kept in the run log: P1a "Copy at y=510..539 of 450"; P1b "y=386..415 of 313"; P2 "No Groq key yet?" found; P3 host "omakidx.github.io" not in the verified hosts; P4 the sentence has no mention of the Extensions menu).
 
+**Update (2026-10-23, Phase 9, D-25):** the live eval switched Translate on; Grammar stays off. `p8-accept-flags` now checks that state (Translate in card and panel for every kind, one request, Grammar refused by the service worker).
+
 **Dispositions (2026-10-23, before the Phase 8 commit):** P1 fixed (the card's height is fitted to the host window or frame so its footer stays visible; Explain clears a Listen problem note; the practice frame is taller), P2 fixed (shown only without a key), P4 fixed (the help says to pin Clavis from the Extensions menu); their `test.fail` lines were removed and the tests pass. P3 stays open until the privacy policy is published (Phase 10, D-15). O-1: the context-menu item and the popup's Explain on this page now start Explain directly (FR-018); Alt+Shift+E keeps opening the toolbar with focus. O-2: FR-035 now lists phrases. O-4: the error catalogue now has both titles. O-6: the spec comment was corrected.
 
 ## Observations (not defects)

@@ -46,9 +46,10 @@ export default defineConfig({
         "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'; media-src 'none'; frame-src 'none'; form-action 'none'; base-uri 'none'",
     },
   },
-  // Test builds only: CLAVIS_FORCE_FEATURES=1 builds with FEATURES.grammarTab and FEATURES.translateTab
-  // on, so the Grammar and Translate tabs can be exercised end to end WITHOUT editing
-  // lib/config/constants.ts. The shipped flags stay the literals in that file (flip them there).
+  // Test builds only: CLAVIS_FORCE_FEATURES=1 builds with every Should-priority flag on
+  // (FEATURES.grammarTab, still off in the shipped build, and FEATURES.translateTab, which ships on),
+  // so the Grammar tab can be exercised end to end WITHOUT editing lib/config/constants.ts. The
+  // shipped flags stay the literals in that file (flip them there).
   vite: () => ({
     plugins:
       process.env.CLAVIS_FORCE_FEATURES === '1'
@@ -61,6 +62,8 @@ export default defineConfig({
                 // The flag's initializer also sets a global named FORCED_FEATURES_MARKER, a side
                 // effect the minifier keeps, so every bundle that reads FEATURES carries the name
                 // and scripts/audit-zip.mjs refuses the ZIP of such a build.
+                // Translate ships on, so only Grammar needs forcing; Translate is forced as well so
+                // the build stays "every flag on" if its shipped literal is ever flipped back.
                 return code
                   .replace(
                     'grammarTab: false',

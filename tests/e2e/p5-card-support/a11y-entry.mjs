@@ -128,7 +128,8 @@ export async function show(root, options) {
   };
   const result = (request) => ({ kind: 'result', result: RESULTS[request.mode](request) });
   if (scenario === 'loading') answer = () => 'never';
-  else if (['core', 'roots', 'coreLong', 'coreRtl', 'flags'].includes(scenario)) answer = result;
+  else if (['core', 'roots', 'coreLong', 'coreRtl', 'flags', 'translate'].includes(scenario))
+    answer = result;
   else if (scenario === 'disclosure') answer = () => ({ kind: 'disclosure' });
   else if (scenario === 'error')
     answer = () => error(detail, detail === 'RATE_LIMITED' ? 3_600_000 : undefined);
@@ -145,7 +146,8 @@ export async function show(root, options) {
     features:
       scenario === 'flags'
         ? { grammarTab: true, translateTab: true }
-        : { grammarTab: false, translateTab: false },
+        : // The shipped flags: Translate on (FR-037), Grammar off (FR-036).
+          { grammarTab: false, translateTab: true },
     targetLanguage: 'ar',
   });
   mountCard(slot, {
@@ -167,6 +169,10 @@ export async function show(root, options) {
       await new Promise((resolve) => setTimeout(resolve, 20));
       session.selectTab(mode);
     }
+  }
+  if (scenario === 'translate') {
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    session.selectTab('translate');
   }
   if (scenario === 'roots') {
     await new Promise((resolve) => setTimeout(resolve, 20));

@@ -13,10 +13,11 @@ import { openWebpage, startWorld, type World } from './p8-accept-support/world';
 //
 //   docs/execution-phases.md Phase 8: "Roots and Related words for words and phrases; Simplify for
 //   phrases, sentences and passages". UJ-03: a sentence shows "no irrelevant word-only tabs".
-//   Grammar and Translate are flagged off until a live evaluation (see p8-accept-flags.spec.ts).
+//   FR-037 (Translate, ships on after a passing live evaluation) is offered for every selection
+//   kind; FR-036 (Grammar) stays flagged off (see p8-accept-flags.spec.ts).
 //
-// => word: Core, Roots, Related words | phrase: Core, Roots, Related words, Simplify
-//    sentence: Core, Simplify         | passage: Core, Simplify
+// => word: Core, Roots, Related words, Translate | phrase: Core, Roots, Related words, Simplify, Translate
+//    sentence: Core, Simplify, Translate         | passage: Core, Simplify, Translate
 //
 // (requirements.md FR-035 says Simplify is for "sentences and passages" and does not mention
 // phrases: a documentation difference, reported in docs/decisions/p8-acceptance.md.)
@@ -35,10 +36,10 @@ test.afterAll(async () => {
 });
 
 const TABS = {
-  word: ['Core', 'Roots', 'Related words'],
-  phrase: ['Core', 'Roots', 'Related words', 'Simplify'],
-  sentence: ['Core', 'Simplify'],
-  passage: ['Core', 'Simplify'],
+  word: ['Core', 'Roots', 'Related words', 'Translate'],
+  phrase: ['Core', 'Roots', 'Related words', 'Simplify', 'Translate'],
+  sentence: ['Core', 'Simplify', 'Translate'],
+  passage: ['Core', 'Simplify', 'Translate'],
 } as const;
 const KIND_LABEL = { word: 'Word', phrase: 'Phrase', sentence: 'Sentence', passage: 'Passage' };
 
@@ -80,6 +81,14 @@ for (const kind of ['word', 'phrase', 'sentence', 'passage'] as const) {
       await card.click(CARD.tab(mode));
       await page.waitForTimeout(250);
       expect(calls).toHaveLength(2);
+      // Translate is lazy too, for every kind: one request when opened, none on reopen.
+      await card.click(CARD.tab('translate'));
+      await card.waitFor(CARD.ready('translate'));
+      expect(calls.map((c) => c.mode)).toEqual(['core', mode, 'translate']);
+      await card.click(CARD.tab('core'));
+      await card.click(CARD.tab('translate'));
+      await page.waitForTimeout(250);
+      expect(calls).toHaveLength(3);
     } finally {
       await dispose();
     }

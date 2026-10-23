@@ -152,24 +152,33 @@ test('every Must mode returns a validated result with exactly one Groq request e
   await page.close();
 });
 
-test('the Should modes stay off: INVALID_REQUEST and no Groq request', async () => {
+test('Grammar stays off (INVALID_REQUEST, no Groq request); Translate is served with its target language', async () => {
   const { page, world } = await contentContext();
   groq.reset();
-  for (const message of [
-    explainMessage('grammar'),
-    explainMessage('translate', { targetLanguage: 'fr' }),
-  ]) {
-    expect(await call(world, message)).toMatchObject({
-      ok: false,
-      error: { code: 'INVALID_REQUEST' },
-    });
-  }
-  // The contract still refuses translate without a target language, before anything else.
+  expect(await call(world, explainMessage('grammar'))).toMatchObject({
+    ok: false,
+    error: { code: 'INVALID_REQUEST' },
+  });
+  // The contract refuses translate without a target language, before anything else.
   expect(await call(world, explainMessage('translate'))).toMatchObject({
     ok: false,
     error: { code: 'INVALID_REQUEST' },
   });
   expect(groq.chats()).toHaveLength(0);
+
+  const reply = replySchema.parse(
+    await call(world, explainMessage('translate', { targetLanguage: 'fr' })),
+  );
+  expect(reply.ok).toBe(true);
+  if (reply.ok) {
+    expect(reply.data.mode).toBe('translate');
+    expect(reply.data.translation?.text).toBeDefined();
+  }
+  expect(groq.chats()).toHaveLength(1);
+  const chat = groq.chats()[0]!;
+  expect(chat.body?.response_format.json_schema?.name).toBe('clavis_translate');
+  expect(chat.body?.messages[1]?.content).toContain('(mode: translate)');
+  expect(chat.body?.messages[1]?.content).toContain('BCP-47 tag "fr"');
   await world.dispose();
   await page.close();
 });
