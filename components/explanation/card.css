@@ -161,6 +161,12 @@
   margin-top: 10px;
 }
 
+/* Model text keeps its own line breaks (a grammar breakdown, a rewrite in paragraphs). */
+.ec__result p:not(.ec__label),
+.ec__result li {
+  white-space: pre-line;
+}
+
 .ec__label {
   color: var(--muted);
   font-size: 12px;
@@ -242,6 +248,22 @@
   border-top: 1px solid var(--line);
 }
 
+.ec__hint {
+  flex: none;
+  margin: 0;
+  padding: 4px 12px;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 12px;
+}
+
+/* A long answer: the side panel button is the suggested next step (still a normal button). */
+.ec__btn--suggest {
+  border-color: var(--ec-accent);
+  border-width: 2px;
+  font-weight: 600;
+}
+
 .ec__model {
   color: var(--muted);
   font-size: 12px;
@@ -275,6 +297,9 @@
 @media (forced-colors: active) {
   .ec {
     box-shadow: none;
+  }
+  .ec__btn--suggest {
+    border-color: Highlight;
   }
   .ec__btn--primary {
     background: ButtonFace;

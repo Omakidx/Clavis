@@ -133,7 +133,7 @@ export function Reader() {
         <div className="reader__heading">
           <h1 className="reader__title">{t('readerTitle')}</h1>
           {name === '' ? null : (
-            <span className="reader__file" title={name} data-testid="file-name">
+            <span className="reader__file" title={name} dir="auto" data-testid="file-name">
               {name}
             </span>
           )}

@@ -142,7 +142,9 @@
   position: absolute;
   inset: 0;
   display: flex;
-  align-items: center;
+  /* `safe`: when the message is taller than the stage (narrow window, 200% zoom) it starts at the
+     top and scrolls, instead of being centred with its heading cut off above the edge. */
+  align-items: safe center;
   justify-content: center;
   overflow: auto;
   padding: var(--space-4);

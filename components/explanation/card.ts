@@ -43,6 +43,26 @@ function ensureStyles(slot: HTMLElement): void {
   }
 }
 
+/** Space kept free around the card, and the least height worth giving it (its header, tabs and footer). */
+const FIT_MARGIN = 8;
+const FIT_MIN = 160;
+
+/**
+ * Keep the whole card, footer included, inside the visible window (or the frame it is drawn in):
+ * whatever else the toolbar shows around the slot (its buttons, a Listen note) is subtracted from
+ * the window's height and the rest is the card's own limit, so a long answer scrolls INSIDE the
+ * card while Copy and Open in side panel stay on screen. Set through CSSOM, which a page's CSP
+ * does not block. It reads sizes that do not depend on the card's own height, so it settles at once.
+ */
+function fitSlot(slot: HTMLElement): void {
+  const win = slot.ownerDocument.defaultView;
+  const panel = slot.parentElement;
+  if (win === null || panel === null) return;
+  const others = panel.getBoundingClientRect().height - slot.getBoundingClientRect().height;
+  const room = Math.max(FIT_MIN, Math.floor(win.innerHeight - others - 2 * FIT_MARGIN));
+  slot.style.maxHeight = `min(34rem, ${room}px)`;
+}
+
 /**
  * The explanation card (D-08): loaded separately from the always-on observer, it draws inside the
  * toolbar's closed shadow root through the `CardSurface` the toolbar lends (lib/selection/ui-api.ts).
@@ -123,15 +143,27 @@ export function createExplainCard(overrides: Partial<CardDeps> = {}): ExplainCar
       // A superseding run drew a new slot: the previous tree goes first.
       removeView();
       ensureStyles(slot);
+      const win = slot.ownerDocument.defaultView;
+      const refit = (): void => fitSlot(slot);
+      win?.addEventListener('resize', refit);
       const host: CardHost = {
         keyboard: surface.keyboard,
-        reposition: () => surface.reposition(),
+        reposition: () => {
+          refit();
+          surface.reposition();
+        },
         close: () => surface.close(),
         openSettings: (section) => deps.backend.openSettings(section),
+        openSidePanel: (handoff) => deps.backend.openSidePanel(handoff),
+        online: () => slot.ownerDocument.defaultView?.navigator.onLine !== false,
         copy: (text) => deps.copy(slot.ownerDocument, text),
         now: deps.now,
       };
-      unmount = mountCard(slot, { session: current, host });
+      const removeCard = mountCard(slot, { session: current, host });
+      unmount = () => {
+        win?.removeEventListener('resize', refit);
+        removeCard();
+      };
       current.attach();
       signal.addEventListener(
         'abort',

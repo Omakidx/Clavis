@@ -458,3 +458,111 @@ describe('toCardError', () => {
     expect(toCardError('RATE_LIMITED', 0, 5).retryAt).toBeUndefined();
   });
 });
+
+describe('side panel hand-off (FR-042)', () => {
+  const resultOf = (
+    mode: 'core' | 'etymology' | 'translate',
+    requestId = '00000000-0000-4000-8000-0000000000aa',
+  ) =>
+    ({
+      requestId,
+      selectedText: 'bank',
+      mode,
+      title: 'bank',
+      summary: 'A summary.',
+      provider: 'groq',
+      model: 'openai/gpt-oss-20b',
+      ...(mode === 'translate' ? { translation: { language: 'French', text: 'banque' } } : {}),
+    }) as const;
+
+  it('has nothing to hand over until a tab has loaded', () => {
+    const { session } = make();
+    expect(session.handoff()).toBeNull();
+    session.attach();
+    expect(session.handoff()).toBeNull();
+  });
+
+  it('hands over the snapshot and the loaded tabs in tab order, never a loading or failed one', async () => {
+    const { session, calls, snapshot } = make('word');
+    session.attach();
+    calls[0]?.succeed();
+    await flush();
+    session.selectTab('etymology');
+    expect(session.handoff()?.results.map((r) => r.mode)).toEqual(['core']);
+    calls[1]?.reply({ kind: 'error', code: 'NETWORK_ERROR' });
+    await flush();
+    session.selectTab('related_words');
+    calls[2]?.succeed();
+    await flush();
+    const handoff = session.handoff();
+    expect(handoff?.snapshot).toBe(snapshot);
+    expect(handoff?.results.map((r) => r.mode)).toEqual(['core', 'related_words']);
+    expect(handoff?.active).toBe('related_words');
+    expect(handoff?.results[0]).not.toHaveProperty('selectedText');
+    expect(handoff).not.toHaveProperty('targetLanguage');
+  });
+
+  it('names the translation language only when a translation is part of it', async () => {
+    const { session, calls } = make('sentence', {
+      features: { grammarTab: false, translateTab: true },
+      targetLanguage: 'fr',
+    });
+    session.attach();
+    calls[0]?.succeed();
+    await flush();
+    expect(session.handoff()).not.toHaveProperty('targetLanguage');
+    session.selectTab('translate');
+    calls[1]?.succeed();
+    await flush();
+    expect(session.handoff()?.targetLanguage).toBe('fr');
+  });
+
+  it('seed adopts loaded results without sending anything, and attach({ requestCore: false }) asks for nothing', () => {
+    const { session, calls } = make('word');
+    session.seed([resultOf('core'), resultOf('etymology')], 'etymology');
+    session.attach({ requestCore: false });
+    expect(calls).toHaveLength(0);
+    expect(session.state.entries.core?.status).toBe('ready');
+    expect(session.state.entries.etymology?.status).toBe('ready');
+    expect(session.state.active).toBe('etymology');
+    // Opening a loaded tab is free (D-05); an unloaded one is requested only when asked for.
+    session.selectTab('core');
+    expect(calls).toHaveLength(0);
+    session.selectTab('related_words');
+    expect(calls).toHaveLength(1);
+    expect(calls[0]?.request.mode).toBe('related_words');
+  });
+
+  it('without a core result the panel session still waits for the user to ask', () => {
+    const { session, calls } = make('word');
+    session.seed([resultOf('etymology')]);
+    session.attach({ requestCore: false });
+    expect(calls).toHaveLength(0);
+    expect(session.state.entries.core).toBeUndefined();
+  });
+
+  it('seed ignores a mode that is not offered for the selection, keeps what is loaded, replaces an error', async () => {
+    const { session, calls } = make('sentence');
+    session.seed([resultOf('etymology')]); // Roots is a word/phrase tab
+    expect(session.state.entries.etymology).toBeUndefined();
+    session.attach();
+    calls[0]?.reply({ kind: 'error', code: 'TIMEOUT' });
+    await flush();
+    expect(session.state.entries.core?.status).toBe('error');
+    session.seed([resultOf('core', '00000000-0000-4000-8000-0000000000bb')]);
+    expect(session.state.entries.core?.status).toBe('ready');
+    session.seed([resultOf('core', '00000000-0000-4000-8000-0000000000cc')]);
+    expect(session.state.entries.core?.result?.requestId).toBe(
+      '00000000-0000-4000-8000-0000000000bb',
+    );
+  });
+
+  it('a seeded session never sends again for the seeded modes, even after detach and attach', () => {
+    const { session, calls } = make('word');
+    session.seed([resultOf('core')]);
+    session.attach({ requestCore: false });
+    session.detach();
+    session.attach();
+    expect(calls).toHaveLength(0);
+  });
+});

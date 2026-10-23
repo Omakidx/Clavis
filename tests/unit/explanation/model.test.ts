@@ -28,8 +28,15 @@ describe('tabs per selection kind (D-05)', () => {
   it('word: Core, Roots, Related words', () => {
     expect(tabsFor('word', OFF)).toEqual(['core', 'etymology', 'related_words']);
   });
-  it('phrase: Core, Related words, Simplify', () => {
-    expect(tabsFor('phrase', OFF)).toEqual(['core', 'related_words', 'simplify']);
+  it('phrase: Core, Roots, Related words, Simplify (an idiom has an origin and near-synonyms)', () => {
+    expect(tabsFor('phrase', OFF)).toEqual(['core', 'etymology', 'related_words', 'simplify']);
+  });
+  it('Roots and Related words only for words and phrases, Simplify never for a word', () => {
+    for (const kind of ['sentence', 'passage'] as const) {
+      expect(tabsFor(kind, ON)).not.toContain('etymology');
+      expect(tabsFor(kind, ON)).not.toContain('related_words');
+    }
+    expect(tabsFor('word', ON)).not.toContain('simplify');
   });
   it('sentence and passage: Core, Simplify (no word-only tabs)', () => {
     expect(tabsFor('sentence', OFF)).toEqual(['core', 'simplify']);

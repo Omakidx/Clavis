@@ -7,6 +7,8 @@ import { Page } from '../../components/common/Page';
 import { createPreactRenderer } from '../../components/tooltip/preact-renderer';
 import { createToolbar } from '../../components/tooltip/toolbar';
 import { t } from '../../lib/i18n';
+import { api } from '../../lib/ui-client/api';
+import { useResource } from '../../lib/ui-client/use-resource';
 import {
   createSelectionController,
   type SelectionController,
@@ -38,6 +40,9 @@ export function App() {
   const [state, setState] = useState<PracticeState>({ kind: 'idle' });
   const [hint, setHint] = useState<string | null>(null);
   const controller = useRef<SelectionController | null>(null);
+  // Public status only (GET_PUBLIC_SETTINGS, allowed for this page): is a key connected?
+  const settings = useResource(api.getPublicSettings);
+  const noKey = settings.state.status === 'ready' && !settings.state.data.hasKey;
 
   // Listen is the same controller as the content script's. The background reports TTS_EVENT to
   // this page with tabs.sendMessage (targeted at this document, like a web page's frame).
@@ -112,7 +117,7 @@ export function App() {
   return (
     <Page title={t('practiceTitle')}>
       <p>{t('practiceIntro')}</p>
-      <p className="clavis-muted">{t('practiceNoKey')}</p>
+      {noKey ? <p className="clavis-muted">{t('practiceNoKey')}</p> : null}
       <h2>{t('practiceTryTitle')}</h2>
       <ul>
         <li>{t('practiceTry1')}</li>

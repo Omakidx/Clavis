@@ -9,6 +9,8 @@ export default tseslint.config(
       '.output/**',
       '.output-*/**',
       '.wxt/**',
+      // Scratch extension of the Phase 8 side panel gesture spike: plain browser JS, not project code.
+      'tests/e2e/p8-sidepanel-support/spike-ext/**',
       'node_modules/**',
       'coverage/**',
       'playwright-report/**',

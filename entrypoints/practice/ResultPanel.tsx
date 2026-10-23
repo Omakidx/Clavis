@@ -23,14 +23,18 @@ export function ResultPanel({ state, onOpenVoiceSettings }: ResultPanelProps) {
   } else if (state.kind === 'playing') {
     body = (
       <>
-        <p>{t('practiceSelected', state.text)}</p>
+        <p>
+          {t('practiceSelected')} <bdi dir="auto">{state.text}</bdi>
+        </p>
         <p>{t('practiceListening')}</p>
       </>
     );
   } else if (state.kind === 'ended') {
     body = (
       <>
-        <p>{t('practiceSelected', state.text)}</p>
+        <p>
+          {t('practiceSelected')} <bdi dir="auto">{state.text}</bdi>
+        </p>
         <p>{t('listenDone')}</p>
       </>
     );

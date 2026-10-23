@@ -3,7 +3,7 @@
 **Status:** Implementation-ready specification (v1 baseline)  
 **Version:** 1.1-draft · **Last reviewed:** 2026-10-22  
 **Platform:** Google Chrome, Manifest V3, desktop first  
-**Product owner decisions:** Groq only for v1; user provides key; no mandatory accounts or first-party backend; custom PDF.js reader; native pronunciation for words **and** sentences. Further resolved decisions D-01 … D-23 are in [§11](#11-product-decisions).
+**Product owner decisions:** Groq only for v1; user provides key; no mandatory accounts or first-party backend; custom PDF.js reader; native pronunciation for words **and** sentences. Further resolved decisions D-01 … D-24 are in [§11](#11-product-decisions).
 
 ## 1. Problem, audience and success criteria
 
@@ -146,7 +146,7 @@ This is the approved user-facing wording. Implementation may adjust layout and f
 | FR-015 | Must | Respect allowed site/page permissions and exclusions | No injection on unsupported/restricted pages; controls correctly reflect user site access |
 | FR-016 | Must | Accessible roles/labels, focus management and reduced-motion support | Keyboard-only smoke test and automated accessibility checks pass |
 | FR-017 | Must | Never transmit text on highlight alone | Instrumented network test shows no Groq request until an explicit AI action |
-| FR-018 | Must | Right-click **Explain with Clavis** and toolbar-icon click work on the current tab without all-sites access | With site access declined, both paths inject into the current tab only (via `activeTab`) and open the card for the current selection |
+| FR-018 | Must | Right-click **Explain with Clavis** and toolbar-icon click work on the current tab without all-sites access | With site access declined, both paths inject into the current tab only (via `activeTab`) and open the card for the current selection; the Alt+Shift+E shortcut opens the toolbar with focus on its first action |
 | FR-019 | Should | Copy answer | Clipboard contains the visible result text |
 
 **Selection constraints (normative):** default maximum selected text is **2,000 characters**; bounded context **≤ 1,000 characters** total. These are adjustable engineering defaults, not Groq maxima. For a selection over the limit, show **"Selection too long"** with one action, **Use the first 2,000 characters**, which shows the trimmed text before sending; never silently send the entire article. (Explain-in-chunks is a Could.) Do not collect password inputs, hidden text, editable form content or sensitive page metadata in v1; skip text in input/textarea/contenteditable by default.
@@ -174,7 +174,7 @@ This is the approved user-facing wording. Implementation may adjust layout and f
 | FR-032 | Must | Realistic usage examples (part of core) | 2 contextual examples by default; examples are clearly model-generated |
 | FR-033 | Must | **Roots tab:** etymology, origin and morphological roots, requested when the tab is opened | Output distinguishes reliable roots from conjecture; display uncertainty if unknown |
 | FR-034 | Must | **Related words tab:** synonyms and antonyms where semantically meaningful, requested when opened | Terms match intended sense; display `Not applicable` when relevant |
-| FR-035 | Must | **Simplify tab:** plain-language rewrite for sentences and passages, requested when opened | Rewrite preserves meaning; no hallucinated facts |
+| FR-035 | Must | **Simplify tab:** plain-language rewrite for phrases, sentences and passages, requested when opened | Rewrite preserves meaning; no hallucinated facts |
 | FR-036 | Should | **Grammar tab:** grammatical function and expression/idiom breakdown | Models return usable breakdown for fixture idioms and simple sentences |
 | FR-037 | Should | **Translate tab:** translation into the user's selected language | Translation separates literal form from contextual sense where appropriate |
 | FR-038 | Must | On-demand Groq calls with bounded context and requested mode | Request created only after an explicit action; opening an already-loaded tab for the same selection makes no new request; inputs validated; model output runtime validated |
@@ -182,7 +182,7 @@ This is the approved user-facing wording. Implementation may adjust layout and f
 | FR-040 | Must | Model ID/API capabilities checked or fail safely | Unsupported models/schema settings fall back to supported request mode or show error |
 | FR-041 | Must | Output as structured plain-text UI (never model HTML or rendered Markdown) | HTML/script/Markdown payloads appear only as literal text; XSS regression passes |
 | FR-042 | Should | Compact card plus longer side-panel view | Long responses don't exceed viewport; side panel preserves selection snapshot |
-| FR-043 | Should | Cache repeated same text/context/action locally for short TTL, opt-in | Cache is local; key isn't part of plain cache entry; private pages not cached by default |
+| FR-043 | Later (D-24) | Cache repeated same text/context/action locally for short TTL, opt-in | Cache is local; key isn't part of plain cache entry; private pages not cached by default |
 
 **AI quality conditions:** generated outputs are educational guidance, not official dictionary entries. Never guarantee historical etymology or scientific accuracy. Do not make web claims without web retrieval; this release uses Groq text inference, **not** verified live search.
 
@@ -274,7 +274,7 @@ The exact permission list, and why each permission is needed, is maintained in [
 | Missing/invalid key | **Connect Groq** / **Update key** button | Fail fast; no anonymous use of developer key |
 | Invalid/unavailable model | **Choose another model** | List available or use safe known fallback with user confirmation |
 | Groq `429` | **Rate limit reached** and human-readable retry guidance | Honor header; bounded retries |
-| Network offline/timeout | **Can't connect** / Retry | `AbortController` timeout; no infinite loading |
+| Network offline/timeout | **You're offline** when the browser reports offline, otherwise **Can't connect** / Retry | `AbortController` timeout; no infinite loading |
 | Bad/unsafe model JSON | **Couldn't format explanation** / Retry | Strict runtime schema checking; safe text fallback only if valid |
 | TTS no voice | **Voice not available on this device** | Detect before promising playback |
 | TTS ended/error | Stop spinner, enable Replay | TTS event/error handling |
@@ -372,6 +372,7 @@ The team can test **Linux only** by hand. Other platforms get automated coverage
 | D-21 | **Per-tab AI rate limit raised from 10 to 20 requests per minute** | One selection can use up to four requests (core + three lazy tabs), so 10/min throttled ordinary reading; webpages can't trigger requests (trusted clicks only, Phase 2 HIGH-1), so the limit now mainly guards cost | `AI_RATE_LIMIT` in lib/config; architecture §9 rule 9 |
 | D-22 | **Listen uses on-device voices only by default**; an online voice (e.g. Chrome's Google network voices in the Web Speech fallback) is used only when the user explicitly chooses it in Settings → Voice, where it is labelled *online* with a note, and the toolbar marks each online playback | Keeps the approved disclosure ("Listen uses the voices on your computer") true by default; the Phase 6 code review found the fallback can expose network voices, especially on Linux | lib/speech voice resolution; Settings → Voice; privacy policy; §6 inventory |
 | D-23 | **Keep PDF.js CMaps in the package** | About 1 MB of the 2.6 MB ZIP, but without them CJK PDFs that don't embed their fonts render incorrectly; the store ZIP stays under its 3.2 MB budget | wxt.config.ts asset hook; size budgets |
+| D-24 | **Side panel ships in v1 (FR-042); the cross-selection answer cache is deferred (FR-043 → Later)** (2026-10-23) | User's Phase 8 choice. The side panel gives long answers room and needs only `sidePanel`, which shows no install warning. A cache across selections would store selected text on disk (TTL, clearing UI, privacy-policy change) for a small saving; answers stay cached per selection in memory | FR-042, FR-043; architecture §3 |
 | D-16 | **Disclosure copy approved** as written in [§4.1](#approved-disclosure-copy-fr-002-fr-009-fr-071) | Defines exactly what users see before anything is sent to Groq | Onboarding, first Explain, settings |
 
 ### Still open

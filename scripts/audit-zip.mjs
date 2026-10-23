@@ -49,6 +49,8 @@ function newestChromeZip() {
 
 const TEXT_EXT = /\.(?:html?|m?js|cjs|css|json|svg|txt|md|xml|webmanifest)$/i;
 const SCRIPT_EXT = /\.(?:m?js|cjs)$/i;
+/** Must equal FORCED_FEATURES_MARKER in wxt.config.ts. */
+const FORCED_FEATURES_MARKER = 'CLAVIS_FORCED_FEATURES_BUILD_NEVER_SHIP';
 const HTML_EXT = /\.html?$/i;
 
 // File names that must never be in a store package.
@@ -292,6 +294,15 @@ function main() {
     // latin1 keeps byte offsets and lets the secret patterns also match inside binaries.
     const text = data.toString('latin1');
     stats.scanned++;
+
+    // A test build with the Should-priority flags forced on (wxt.config.ts, CLAVIS_FORCE_FEATURES=1)
+    // marks every chunk; such a build must never be zipped for release.
+    if (SCRIPT_EXT.test(entry.name) && text.includes(FORCED_FEATURES_MARKER)) {
+      fail(
+        'forced-features',
+        `${entry.name} comes from a CLAVIS_FORCE_FEATURES test build (Grammar and Translate forced on). Rebuild without that variable.`,
+      );
+    }
 
     for (const [pattern, label] of SECRET_PATTERNS) {
       for (const match of text.matchAll(pattern)) {

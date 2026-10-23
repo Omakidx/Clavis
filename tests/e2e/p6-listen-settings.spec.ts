@@ -20,7 +20,7 @@ const sendFromPage = (page: import('@playwright/test').Page, message: unknown) =
   ) as Promise<{ ok: boolean; data?: { platform: string; engines: Record<string, unknown> } }>;
 
 test.describe('Voice section, no voices on this device', () => {
-  test('shows zero voices per engine, the Linux hint, and disables what cannot work', async ({
+  test('shows zero voices, the Linux hint, and disables what cannot work', async ({
     context,
     extensionId,
   }) => {
@@ -35,8 +35,7 @@ test.describe('Voice section, no voices on this device', () => {
     const section = page.getByRole('region', { name: 'Voice' });
     await expect(section).toBeVisible();
     const counts = section.getByTestId('voice-counts');
-    await expect(counts).toContainText('Chrome voices: 0');
-    await expect(counts).toContainText(/Fallback voices: (0|not in use)/);
+    await expect(counts).toContainText('On-device voices: 0. Online voices: 0.');
     await expect(section.getByText('No voices found on this device')).toBeVisible();
     if (report.data?.platform === 'linux') {
       await expect(
@@ -82,7 +81,7 @@ test.describe('Voice section, no voices on this device', () => {
 });
 
 test.describe('Voice section, with voices (scripted chrome.tts)', () => {
-  test('lists voices by engine, saves the choice, and Test voice speaks with that voice', async ({
+  test('lists voices on-device and online, saves the choice, and Test voice speaks with that voice', async ({
     context,
     extensionId,
     serviceWorker,
@@ -90,10 +89,15 @@ test.describe('Voice section, with voices (scripted chrome.tts)', () => {
     await installScriptedTts(serviceWorker);
     const { page, errors } = await openExtensionPage(context, extensionId, 'options');
     const section = page.getByRole('region', { name: 'Voice' });
-    await expect(section.getByTestId('voice-counts')).toContainText('Chrome voices: 3');
+    await expect(section.getByTestId('voice-counts')).toContainText(
+      'On-device voices: 2. Online voices: 1.',
+    );
     await expect(section.getByText('No voices found on this device')).toHaveCount(0);
     const chooser = section.getByRole('combobox', { name: 'Voice', exact: true });
-    await expect(chooser.locator('optgroup[label="Chrome voices"] option')).toHaveCount(3);
+    await expect(chooser.locator('optgroup[label="On this device"] option')).toHaveCount(2);
+    await expect(
+      chooser.locator('optgroup[label="Online (sends the text to a service)"] option'),
+    ).toHaveCount(1);
     await expect(chooser.locator('option').first()).toHaveText('Automatic (best match)');
     await expect(chooser.locator('option', { hasText: 'Test Voix FR' })).toHaveText(
       'Test Voix FR (fr-FR) (online)',

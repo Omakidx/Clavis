@@ -2,12 +2,13 @@ import { browser } from 'wxt/browser';
 import { MESSAGE_VERSION } from '../../lib/config/constants';
 import type { ErrorCode } from '../../lib/contracts/errors';
 import type { ExplainRequest, ExplainResult } from '../../lib/contracts/explain';
+import type { SidePanelHandoff } from '../../lib/contracts/sidepanel';
 import type { ClientErrorCode } from '../../lib/ui-client/errors';
 import { readExplainResult } from './model';
 
 /**
- * The card's side of the background routes AI_EXPLAIN, AI_CANCEL, OPEN_SETTINGS and
- * GET_PUBLIC_SETTINGS (lib/contracts/messages.ts). Hand-written and zod-free on purpose: the
+ * The card's side of the background routes AI_EXPLAIN, AI_CANCEL, OPEN_SETTINGS,
+ * OPEN_SIDE_PANEL and GET_PUBLIC_SETTINGS (lib/contracts/messages.ts). Hand-written and zod-free on purpose: the
  * card script has its own size budget, and `lib/ui-client/api.ts` pulls in every contract schema.
  * The reply is still checked before it is drawn (`readExplainResult`), and nothing in it is ever
  * shown as HTML.
@@ -35,6 +36,12 @@ export interface ExplainBackend {
   openSettings(section?: SettingsSection): Promise<boolean>;
   /** The user's explanation language (needed by the Translate tab only). */
   explanationLanguage(): Promise<string | undefined>;
+  /**
+   * Hand the explanation to the side panel and open it (FR-042). Must be called synchronously from
+   * the trusted click that asked for it: Chrome lets the background open the panel only while that
+   * user gesture is alive, and the gesture does not survive an `await` before this call.
+   */
+  openSidePanel(handoff: SidePanelHandoff): Promise<boolean>;
 }
 
 export type Send = (message: unknown) => Promise<unknown>;
@@ -119,6 +126,10 @@ export function createBackend(send: Send = (message) => browser.runtime.sendMess
     },
     async openSettings(section) {
       const reply = await call({ type: 'OPEN_SETTINGS', ...(section ? { section } : {}) });
+      return isRecord(reply) && reply['ok'] === true;
+    },
+    async openSidePanel(handoff) {
+      const reply = await call({ type: 'OPEN_SIDE_PANEL', handoff });
       return isRecord(reply) && reply['ok'] === true;
     },
     async explanationLanguage() {

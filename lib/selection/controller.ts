@@ -19,7 +19,7 @@ export interface SelectionController {
    * Context-menu / toolbar-icon path: capture whatever is selected now and show
    * the toolbar for it. Resolves to whether a toolbar was shown.
    */
-  openForCurrentSelection(options?: { focus?: boolean }): Promise<boolean>;
+  openForCurrentSelection(options?: { focus?: boolean; explain?: boolean }): Promise<boolean>;
   /** Show a message that is not about a selection (see `ToolbarHandle.showNotice`). */
   showNotice(message: string): Promise<boolean>;
   stop(): void;
@@ -112,6 +112,7 @@ export function createSelectionController(
       const reuse = shown && current !== null && sameRange(current.range, captured.range);
       if (!reuse && !(await present(captured))) return false;
       if (openOptions?.focus === true) toolbar?.focus();
+      if (openOptions?.explain === true) toolbar?.explain?.();
       return true;
     },
     async showNotice(message) {

@@ -70,6 +70,7 @@ export function FindBar({
         aria-label={t('readerFindLabel')}
         autoComplete="off"
         spellCheck={false}
+        dir="auto"
         data-testid="find-input"
         value={query}
         onChange={(e) => onQuery(e.target.value)}

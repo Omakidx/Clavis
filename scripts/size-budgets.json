@@ -24,11 +24,29 @@
         "chunks/reader-*.js",
         "chunks/i18n-*.js",
         "chunks/constants-*.js",
+        "chunks/jsx-runtime-*.js",
         "chunks/trust-*.js",
         "chunks/listen-*.js"
       ],
       "aggregate": true,
       "maxGzipBytes": 98304,
+      "required": true
+    },
+    {
+      "id": "sidepanel-page-js",
+      "description": "Side panel page JavaScript (Phase 8, FR-042): the React shell, the shared React chunk (the chunk that holds react and react-dom, whatever the bundler names it), the zod contracts used to validate the hand-off, the shared session logic and Listen. Loaded only when the user opens the panel",
+      "files": [
+        "chunks/sidepanel-*.js",
+        "chunks/constants-*.js",
+        "chunks/jsx-runtime-*.js",
+        "chunks/ui-*.js",
+        "chunks/messages-*.js",
+        "chunks/errors-*.js",
+        "chunks/session-*.js",
+        "chunks/listen-*.js"
+      ],
+      "aggregate": true,
+      "maxGzipBytes": 112640,
       "required": true
     },
     {

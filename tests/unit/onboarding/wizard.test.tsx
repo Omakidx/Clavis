@@ -2,7 +2,10 @@
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it } from 'vitest';
+import { DoneStep } from '../../../components/onboarding/steps/DoneStep';
 import { Wizard } from '../../../components/onboarding/Wizard';
+import { useKeyStatus } from '../../../lib/ui-client/use-key-status';
+import { useSettings } from '../../../lib/ui-client/use-settings';
 import catalog from '../../../public/_locales/en/messages.json';
 import {
   createFakeBackend,
@@ -171,6 +174,11 @@ describe('Groq key steps (FR-003, FR-004, UJ-05)', () => {
     await user.click(next());
     expect(heading()).toHaveTextContent(text('onbDoneTitle'));
     expect(screen.getByText(text('onbDoneNoKey'))).toBeVisible();
+    // Site access was declined, so the way to use Clavis without it comes with the summary (FR-018).
+    const help = screen.getByTestId('site-access-help');
+    expect(within(help).getByText(text('siteHelpContextMenu'))).toBeVisible();
+    expect(within(help).getByText(text('siteHelpShortcut'))).toBeVisible();
+    expect(within(help).getByText(text('siteHelpTurnOn'))).toBeVisible();
     await user.click(screen.getByRole('button', { name: 'Finish setup' }));
     await waitFor(() => expect(backend.state.onboarding.completed).toBe(true));
     expect(await screen.findByText(text('onbDoneSaved'))).toBeVisible();
@@ -361,5 +369,37 @@ describe('service worker restarts', () => {
       await screen.findByRole('button', { name: 'I understand' }, { timeout: 3000 }),
     );
     await waitFor(() => expect(backend.state.onboarding.disclosureAcceptedAt).not.toBeNull());
+  });
+});
+
+describe('finish step and website access', () => {
+  function DoneHarness() {
+    const settings = useSettings();
+    const keys = useKeyStatus();
+    return (
+      <DoneStep
+        settings={settings}
+        keys={keys}
+        skipKey={() => undefined}
+        goTo={() => undefined}
+        focusNext={() => undefined}
+      />
+    );
+  }
+
+  it('shows the help for working without website access only when access was declined', async () => {
+    installCatalog();
+    installBackend(createFakeBackend({ onboarding: { siteAccessChoice: 'granted' } }));
+    installPermissions({ granted: true });
+    render(<DoneHarness />);
+    expect(await screen.findByTestId('setup-summary')).toBeVisible();
+    expect(screen.queryByTestId('site-access-help')).toBeNull();
+    cleanup();
+
+    installCatalog();
+    installBackend(createFakeBackend({ onboarding: { siteAccessChoice: 'declined' } }));
+    installPermissions({ granted: false });
+    render(<DoneHarness />);
+    expect(await screen.findByTestId('site-access-help')).toBeVisible();
   });
 });

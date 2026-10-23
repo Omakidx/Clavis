@@ -83,7 +83,6 @@
   background: transparent;
   color: var(--on-bar);
   font: inherit;
-  text-align: center;
   cursor: pointer;
 }
 
@@ -92,13 +91,9 @@
   background: var(--hover);
 }
 
-.button[data-state='working'] {
+/* Only Explain shows a busy cursor; a starting Listen can be cancelled, so it stays clickable. */
+.button[data-action='explain'][data-state='working'] {
   cursor: progress;
-}
-
-/* A starting Listen can be cancelled, so it is a normal clickable button. */
-.button[data-action='listen'][data-state='working'] {
-  cursor: pointer;
 }
 
 /* Stop (Listen is playing) and the Slow toggle when it is on. A border keeps "on" visible without colour. */
@@ -188,11 +183,9 @@
   width: 1px;
   height: 1px;
   margin: -1px;
-  padding: 0;
   overflow: hidden;
   clip-path: inset(50%);
   white-space: nowrap;
-  border: 0;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -208,12 +201,8 @@
   }
 }
 
-/* High contrast: the browser forces system colours; keep real borders and a visible hover. */
+/* High contrast: the browser forces system colours and drops shadows; keep a visible hover. */
 @media (forced-colors: active) {
-  .toolbar,
-  .card {
-    box-shadow: none;
-  }
   .button:hover,
   .button[data-state='working'],
   .button[data-state='playing'],

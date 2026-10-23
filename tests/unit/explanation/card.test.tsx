@@ -3,12 +3,14 @@ import { act } from 'preact/test-utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { mountCard, type CardHost } from '../../../components/explanation/ExplanationCard';
 import { ExplainSession } from '../../../components/explanation/session';
+import { sidePanelHandoffSchema } from '../../../lib/contracts/sidepanel';
 import * as trust from '../../../lib/selection/trust';
 import { createFakeBackend, installCatalog, makeSnapshot } from './support';
 
 let root: HTMLElement;
 let unmount: (() => void) | undefined;
 let trusted = true;
+let browserOnline = true;
 
 interface Setup {
   fake: ReturnType<typeof createFakeBackend>;
@@ -17,6 +19,7 @@ interface Setup {
     reposition: ReturnType<typeof vi.fn>;
     close: ReturnType<typeof vi.fn>;
     copy: ReturnType<typeof vi.fn>;
+    openSidePanel: ReturnType<typeof vi.fn>;
   };
 }
 
@@ -30,7 +33,7 @@ async function setup(
   const session = new ExplainSession({
     snapshot: makeSnapshot(kind, text),
     backend: fake.backend,
-    newId: () => `id-${(ids += 1)}`,
+    newId: () => `00000000-0000-4000-8000-${String((ids += 1)).padStart(12, '0')}`,
     now: () => Date.now(),
     features: { grammarTab: false, translateTab: false },
   });
@@ -40,6 +43,10 @@ async function setup(
     close: vi.fn(),
     openSettings: (section?: Parameters<CardHost['openSettings']>[0]) =>
       fake.backend.openSettings(section),
+    openSidePanel: vi.fn((handoff: Parameters<CardHost['openSidePanel']>[0]) =>
+      fake.backend.openSidePanel(handoff),
+    ),
+    online: () => browserOnline,
     copy: vi.fn().mockResolvedValue(true),
     now: () => Date.now(),
     ...hostOverrides,
@@ -74,6 +81,7 @@ async function press(el: Element, key: string): Promise<void> {
 beforeEach(() => {
   installCatalog();
   trusted = true;
+  browserOnline = true;
   vi.spyOn(trust, 'isTrustedEvent').mockImplementation(() => trusted);
   vi.useFakeTimers();
   root = document.createElement('div');
@@ -109,7 +117,7 @@ describe('structure and accessibility', () => {
 
   it.each([
     ['word', ['Core', 'Roots', 'Related words']],
-    ['phrase', ['Core', 'Related words', 'Simplify']],
+    ['phrase', ['Core', 'Roots', 'Related words', 'Simplify']],
     ['sentence', ['Core', 'Simplify']],
     ['passage', ['Core', 'Simplify']],
   ] as const)('shows the right tabs for a %s', async (kind, labels) => {
@@ -533,5 +541,287 @@ describe('copy and close', () => {
     const { host } = await setup('word');
     await click($('[data-clavis="card-close"]'));
     expect(host.close).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('open in side panel (FR-042)', () => {
+  const button = () => $('[data-clavis="card-side-panel"]');
+
+  it('is inactive until the core answer is ready', async () => {
+    const { fake, host } = await setup('word');
+    expect(button().getAttribute('aria-disabled')).toBe('true');
+    await click(button());
+    expect(host.openSidePanel).not.toHaveBeenCalled();
+    fake.calls[0]?.succeed();
+    await act(() => Promise.resolve());
+    expect(button().getAttribute('aria-disabled')).toBeNull();
+    expect(button().textContent).toBe('Open in side panel');
+  });
+
+  it('hands over the selection and every loaded tab, without selectedText, and announces it', async () => {
+    const { fake, host, session } = await setup('word', 'bank');
+    fake.calls[0]?.succeed();
+    await act(() => Promise.resolve());
+    await click(tab('etymology'));
+    fake.calls[1]?.succeed();
+    await act(() => Promise.resolve());
+    await click(button());
+    expect(host.openSidePanel).toHaveBeenCalledTimes(1);
+    const handoff = fake.handoffs[0]!;
+    expect(sidePanelHandoffSchema.safeParse(handoff).success).toBe(true);
+    expect(handoff.snapshot.text).toBe('bank');
+    expect(handoff.snapshot.contextBefore).toBe('They sat on the ');
+    expect(handoff.results.map((r) => r.mode)).toEqual(['core', 'etymology']);
+    expect(handoff.active).toBe('etymology');
+    for (const result of handoff.results) expect(result).not.toHaveProperty('selectedText');
+    expect(JSON.stringify(handoff)).not.toMatch(/gsk_|apiKey/);
+    // Nothing was requested for it, and the card kept its own state.
+    expect(fake.calls).toHaveLength(2);
+    expect(session.state.entries.core?.status).toBe('ready');
+    await act(() => {
+      vi.advanceTimersByTime(100);
+    });
+    expect($('[data-clavis="card-live"]').textContent).toBe('Opened in the side panel.');
+  });
+
+  it('asks the host in the SAME task as the click (the user gesture does not survive an await)', async () => {
+    const { fake, host } = await setup('word');
+    fake.calls[0]?.succeed();
+    await act(() => Promise.resolve());
+    let calledDuringClick = false;
+    host.openSidePanel.mockImplementation(() => {
+      calledDuringClick = true;
+      return Promise.resolve(true);
+    });
+    (button() as HTMLElement).click();
+    expect(calledDuringClick).toBe(true);
+  });
+
+  it('says so when the panel could not be opened', async () => {
+    const { fake, host } = await setup('word');
+    host.openSidePanel.mockResolvedValue(false);
+    fake.calls[0]?.succeed();
+    await act(() => Promise.resolve());
+    await click(button());
+    await act(() => {
+      vi.advanceTimersByTime(100);
+    });
+    expect($('[data-clavis="card-live"]').textContent).toBe(
+      "Clavis couldn't open the side panel. Try again.",
+    );
+  });
+
+  it('ignores a synthetic click (a page cannot open the panel through the card)', async () => {
+    const { fake, host } = await setup('word');
+    fake.calls[0]?.succeed();
+    await act(() => Promise.resolve());
+    trusted = false;
+    await click(button());
+    expect(host.openSidePanel).not.toHaveBeenCalled();
+  });
+
+  it('points to the side panel only when the answer is long', async () => {
+    const { fake } = await setup('word');
+    fake.calls[0]?.succeed();
+    await act(() => Promise.resolve());
+    expect($('[data-clavis="card-long-hint"]')).toBeNull();
+    expect(button().className).not.toContain('suggest');
+    unmount?.();
+    root.replaceChildren();
+    const second = await setup('sentence', 'A long sentence.');
+    second.fake.calls[0]?.succeed({ summary: 'x'.repeat(600), definition: 'y'.repeat(500) });
+    await act(() => Promise.resolve());
+    expect($('[data-clavis="card-long-hint"]')?.textContent).toContain('side panel');
+    expect(button().className).toContain('suggest');
+  });
+});
+
+describe('provider status', () => {
+  it('words a connection failure as offline when the browser says it is offline', async () => {
+    browserOnline = false;
+    const { fake } = await setup('word');
+    fake.calls[0]?.reply({ kind: 'error', code: 'NETWORK_ERROR' });
+    await act(() => Promise.resolve());
+    const error = $('[data-clavis="card-error"]');
+    expect(error.getAttribute('data-offline')).toBe('true');
+    expect(error.textContent).toContain("You're offline");
+    expect(error.textContent).toContain('offline');
+    expect($('[data-clavis="card-retry"]')).not.toBeNull();
+  });
+
+  it('keeps the normal connection wording when the browser is online', async () => {
+    const { fake } = await setup('word');
+    fake.calls[0]?.reply({ kind: 'error', code: 'NETWORK_ERROR' });
+    await act(() => Promise.resolve());
+    expect($('[data-clavis="card-error"]').getAttribute('data-offline')).toBeNull();
+    expect($('[data-clavis="card-error"]').textContent).toContain("Can't connect");
+  });
+
+  it('follows the window going offline while an error is showing', async () => {
+    const { fake } = await setup('word');
+    fake.calls[0]?.reply({ kind: 'error', code: 'TIMEOUT' });
+    await act(() => Promise.resolve());
+    expect($('[data-clavis="card-error"]').getAttribute('data-offline')).toBeNull();
+    browserOnline = false;
+    await act(() => {
+      window.dispatchEvent(new Event('offline'));
+    });
+    expect($('[data-clavis="card-error"]').getAttribute('data-offline')).toBe('true');
+  });
+
+  it('a rate limit counts down on Retry, which stays reachable but inactive', async () => {
+    const { fake } = await setup('word');
+    fake.calls[0]?.reply({ kind: 'error', code: 'RATE_LIMITED', retryAfterMs: 3000 });
+    await act(() => Promise.resolve());
+    const retry = $('[data-clavis="card-retry"]');
+    expect($('[data-clavis="card-error"]').textContent).toContain('Rate limit reached');
+    expect(retry.getAttribute('aria-disabled')).toBe('true');
+    expect(retry.textContent).toBe('Try again in 3 s');
+    await act(() => {
+      vi.advanceTimersByTime(3100);
+    });
+    expect(retry.getAttribute('aria-disabled')).toBeNull();
+    expect(retry.textContent).toBe('Try again');
+  });
+
+  it.each([
+    ['SETUP_REQUIRED', 'Connect Groq', 'key'],
+    ['INVALID_API_KEY', 'Update key', 'key'],
+    ['MODEL_UNAVAILABLE', 'Choose another model', 'model'],
+  ] as const)(
+    '%s offers one button that opens Settings at the right section',
+    async (code, label, section) => {
+      const { fake } = await setup('word');
+      fake.calls[0]?.reply({ kind: 'error', code });
+      await act(() => Promise.resolve());
+      const action = $('[data-clavis="card-settings"]');
+      expect(action.textContent).toBe(label);
+      await click(action);
+      expect(fake.settings).toEqual([section]);
+    },
+  );
+});
+
+describe('text direction', () => {
+  it('lets every piece of model text and the selected text choose its own direction', async () => {
+    const { fake } = await setup('sentence', 'مرحبا بالعالم');
+    fake.calls[0]?.succeed({
+      title: 'مرحبا',
+      summary: 'تحية عربية',
+      contextualMeaning: 'Hello (مرحبا) to the world',
+      examples: [{ sentence: 'مرحبا يا صديقي' }, { sentence: 'Say مرحبا to her' }],
+    });
+    await act(() => Promise.resolve());
+    expect($('[data-clavis="card-text"]').getAttribute('dir')).toBe('auto');
+    const result = $('[data-clavis="card-result"]');
+    const texts = Array.from(result.querySelectorAll('p:not(.ec__label), li'));
+    expect(texts.length).toBeGreaterThan(4);
+    for (const element of texts)
+      expect(element.getAttribute('dir'), element.textContent ?? '').toBe('auto');
+    // Our own labels are not model text: they keep the interface's direction.
+    for (const label of Array.from(result.querySelectorAll('.ec__label'))) {
+      expect(label.getAttribute('dir')).toBeNull();
+    }
+    expect(result.querySelector('ol')?.getAttribute('dir')).toBe('auto');
+  });
+});
+
+describe('Grammar and Translate tabs with their flags forced on (FR-036, FR-037)', () => {
+  const ON = { grammarTab: true, translateTab: true };
+
+  async function flagged(kind: Parameters<typeof makeSnapshot>[0], text: string, language = 'fr') {
+    const fake = createFakeBackend();
+    let ids = 0;
+    const session = new ExplainSession({
+      snapshot: makeSnapshot(kind, text),
+      backend: fake.backend,
+      newId: () => `00000000-0000-4000-8000-${String((ids += 1)).padStart(12, '0')}`,
+      now: () => Date.now(),
+      features: ON,
+      targetLanguage: language,
+    });
+    const host = {
+      keyboard: false,
+      reposition: vi.fn(),
+      close: vi.fn(),
+      openSettings: () => Promise.resolve(true),
+      openSidePanel: () => Promise.resolve(true),
+      online: () => true,
+      copy: vi.fn().mockResolvedValue(true),
+      now: () => Date.now(),
+    } as unknown as CardHost;
+    await act(() => {
+      unmount = mountCard(root, { session, host });
+      session.attach();
+    });
+    fake.calls[0]?.succeed();
+    await act(() => Promise.resolve());
+    return { fake, session };
+  }
+
+  it('offers Grammar for a sentence and Translate for every kind', async () => {
+    await flagged('sentence', 'She broke the ice.');
+    expect($$('[role="tab"]').map((el) => el.textContent)).toEqual([
+      'Core',
+      'Simplify',
+      'Grammar',
+      'Translate',
+    ]);
+    unmount?.();
+    root.replaceChildren();
+    await flagged('word', 'bank');
+    expect($$('[role="tab"]').map((el) => el.textContent)).toEqual([
+      'Core',
+      'Roots',
+      'Related words',
+      'Translate',
+    ]);
+  });
+
+  it('requests Grammar and Translate lazily, Translate with the target language', async () => {
+    const { fake } = await flagged('sentence', 'She broke the ice.', 'fr');
+    expect(fake.calls).toHaveLength(1);
+    await click(tab('grammar'));
+    expect(fake.calls[1]?.request.mode).toBe('grammar');
+    fake.calls[1]?.succeed({ grammar: 'Subject: she\nVerb: broke\nObject: the ice' });
+    await act(() => Promise.resolve());
+    expect(panel('grammar').querySelector('.ec__field p:not(.ec__label)')?.textContent).toContain(
+      'Verb: broke',
+    );
+    await click(tab('translate'));
+    expect(fake.calls[2]?.request).toMatchObject({ mode: 'translate', targetLanguage: 'fr' });
+  });
+
+  it('labels the translation with its language and separates the literal rendering', async () => {
+    const { fake, session } = await flagged('sentence', 'She broke the ice.');
+    await click(tab('translate'));
+    fake.calls[1]?.succeed({
+      translation: {
+        language: 'French',
+        text: 'Elle a brisé la glace.',
+        literal: 'Elle a cassé la glace.',
+      },
+    });
+    await act(() => Promise.resolve());
+    const text = panel('translate').textContent ?? '';
+    expect(text).toContain('Translation into French');
+    expect(text).toContain('Elle a brisé la glace.');
+    expect(text).toContain('Word for word');
+    expect(session.activeText()).toContain('Translation into French: Elle a brisé la glace.');
+  });
+
+  it('shows a right-to-left translation in its own direction and a plain failure with Retry', async () => {
+    const { fake } = await flagged('phrase', 'break the ice', 'ar');
+    await click(tab('translate'));
+    fake.calls[1]?.succeed({ translation: { language: 'Arabic', text: 'كسر الجليد' } });
+    await act(() => Promise.resolve());
+    const field = panel('translate').querySelector('.ec__field p:not(.ec__label)');
+    expect(field?.getAttribute('dir')).toBe('auto');
+    expect(field?.textContent).toBe('كسر الجليد');
+    await click(tab('grammar'));
+    fake.calls[2]?.reply({ kind: 'error', code: 'INVALID_RESPONSE' });
+    await act(() => Promise.resolve());
+    expect(panel('grammar').textContent).toContain("Couldn't format explanation");
+    expect($('[data-clavis="card-retry"]')).not.toBeNull();
   });
 });

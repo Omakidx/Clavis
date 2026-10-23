@@ -1,0 +1,16 @@
+# Phase 8 security review — findings and dispositions
+
+**Date:** 2026-10-23 · **Scope:** the side panel (`entrypoints/sidepanel`, `components/sidepanel`, `lib/contracts/sidepanel.ts`, `lib/router/handlers/sidepanel.ts`, sender and route changes), explanation-card changes, Settings/popup help and navigation (`openSettingsAt`, `OPEN_SETTINGS` sections), the `CLAVIS_FORCE_FEATURES` test-build switch, and toolbar CSS/`dir` changes (`phase-8-ux`) · **Method:** independent read-only review with Playwright probes and a `tsx` probe of the router against scratch builds (fake `gsk_TEST` keys, Groq intercepted).
+
+No Critical, High or Medium findings, and no regression of earlier findings. The hand-off is keyed only by the browser-provided sender tab, readable only by that tab's panel, rendered as text only and never stored or logged; opening the panel needs a real user gesture; the panel cannot acknowledge the first-send disclosure.
+
+| ID | Severity | Finding | Disposition |
+| --- | --- | --- | --- |
+| L-1 | Low (confirmed) | A refused `OPEN_SIDE_PANEL` (no gesture) reset the 300 ms throttle, and LRU eviction ran before `open()` succeeded, so a compromised content script could churn the worker and evict another tab's hand-off (not leak it). | **Fixed:** refusals keep the throttle; eviction only after a successful open; the panel is disabled on rollback only if this call enabled it. Regression unit tests. |
+| L-2 | Low (confirmed) | `CLAVIS_FORCE_FEATURES=1` (test builds force Grammar/Translate on) was not guarded on the release path: a forced build passed `audit-zip --strict`. | **Fixed:** forced builds carry a marker that `audit-zip` rejects. Selftest case. |
+| L-3 | Low (defence in depth) | `GET_SIDE_PANEL_STATE` also answers `sidepanel.html?tab=N` opened as a normal tab. Not reachable by web pages (no `web_accessible_resources`); only the user typing the URL. | **Accepted** (architecture §4, Phase 8 additions); the E2E specs use this to inspect the panel. |
+| INFO-1 | Info | The panel has its own limiter key (`panel:<tabId>`), so card + panel get twice the per-tab budget and one request in flight each — only through user clicks. | **Accepted and documented** (architecture §4). |
+| INFO-2 | Info | Same-document (SPA) navigations may not report `status: 'loading'`, so a hand-off could outlive a route change. | **Fixed:** the hand-off is also dropped when `tabs.onUpdated` reports a URL change. |
+| INFO-3 | Info | The panel is tab-less, so its Stop stops speech in any tab (like the popup); a compromised content script with a gesture can put fake text in its own tab's panel (text only, as in the card). | Accepted. |
+
+Verified sound: sender checked before parsing and size checked on serialized bytes before Zod (128 KiB only for the side-panel messages, ≤ 24 tabs held); strict `^\d{1,10}$` tab id from the panel's own URL; no `innerHTML`, no content-derived `href`, Copy via `clipboard.writeText`, Listen sends only the selected text; hand-off dropped on tab close, navigation and Clear all data; `OPEN_SETTINGS` sections are a closed enum mapped to fixed anchors; popup PDF detection uses only `activeTab` data; toolbar keeps trusted events and the closed root; permissions match `expected-permissions.json` with `sidePanel` added, no `side_panel` key, CSP unchanged, no `web_accessible_resources` or `externally_connectable`.

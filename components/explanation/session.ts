@@ -1,5 +1,6 @@
 import { FEATURES } from '../../lib/config/constants';
 import type { ExplainMode, ExplainRequest, ExplainResult } from '../../lib/contracts/explain';
+import type { SidePanelHandoff } from '../../lib/contracts/sidepanel';
 import type { SelectionKind, SelectionSnapshot } from '../../lib/contracts/selection';
 import { t } from '../../lib/i18n';
 import { describeError, type ClientErrorCode } from '../../lib/ui-client/errors';
@@ -168,12 +169,13 @@ export class ExplainSession {
 
   /**
    * The card is on screen: show what is cached and request the core answer if the selection has
-   * none yet. Called again (after `detach`) when the user presses Explain once more.
+   * none yet. Called again (after `detach`) when the user presses Explain once more. The side
+   * panel passes `requestCore: false`: opening it must never send anything by itself.
    */
-  attach(): void {
+  attach(options: { requestCore?: boolean } = {}): void {
     if (this.destroyed || this.attached) return;
     this.attached = true;
-    if (this.entry('core') === undefined) {
+    if (this.entry('core') === undefined && options.requestCore !== false) {
       this.live = t('cardLoading');
       this.enqueue(this.create('core'));
     } else {
@@ -221,11 +223,22 @@ export class ExplainSession {
     this.emit();
   }
 
-  /** Retry a failed tab: a new request, only on the user's say-so and not before a rate-limit delay. */
+  /**
+   * Retry a failed tab: a new request, only on the user's say-so and not before a rate-limit delay.
+   * A tab that stopped at the first-send prompt can be asked again too (the side panel has no
+   * prompt of its own: the user confirms in the card, then loads the tab again here).
+   */
   retry(mode: ExplainMode): boolean {
     const entry = this.entry(mode);
-    if (!this.attached || entry?.status !== 'error' || entry.error?.action !== 'retry')
-      return false;
+    if (!this.attached) return false;
+    if (entry?.status === 'disclosure') {
+      entry.status = 'queued';
+      this.live = mode === 'core' ? t('cardLoading') : t('cardLoadingTab', tabLabel(mode));
+      this.enqueue(entry);
+      this.emit();
+      return true;
+    }
+    if (entry?.status !== 'error' || entry.error?.action !== 'retry') return false;
     if (entry.error.retryAt !== undefined && this.now() < entry.error.retryAt) return false;
     entry.error = null;
     entry.status = 'queued';
@@ -245,6 +258,51 @@ export class ExplainSession {
     this.enqueue(entry);
     this.emit();
     return true;
+  }
+
+  /**
+   * Adopt results another surface already loaded (the side panel starts from the card's). A mode
+   * that is loaded, loading or waiting is kept; a mode not offered for this selection is ignored.
+   * Sends nothing.
+   */
+  seed(results: readonly ExplainResult[], active?: ExplainMode): void {
+    if (this.destroyed) return;
+    for (const result of results) {
+      if (!this.tabs.includes(result.mode)) continue;
+      const existing = this.entry(result.mode);
+      if (existing !== undefined && existing.status !== 'error') continue;
+      const entry = existing ?? this.create(result.mode);
+      entry.status = 'ready';
+      entry.result = result;
+      entry.error = null;
+      entry.requestId = result.requestId;
+    }
+    if (active !== undefined && this.tabs.includes(active)) this.active = active;
+    this.emit();
+  }
+
+  /**
+   * What the side panel needs to continue from here (FR-042): the selection exactly as it was
+   * sent, and every loaded tab. Null while nothing has loaded. Plain objects; the background
+   * validates the hand-off, the panel renders it as text only.
+   */
+  handoff(): SidePanelHandoff | null {
+    const results: SidePanelHandoff['results'] = [];
+    for (const mode of this.tabs) {
+      const entry = this.entry(mode);
+      if (entry?.status !== 'ready' || entry.result === null) continue;
+      const { selectedText: _selected, ...result } = entry.result;
+      results.push(result);
+    }
+    if (results.length === 0) return null;
+    return {
+      snapshot: this.snapshot,
+      results,
+      active: this.active,
+      ...(this.language !== undefined && results.some((r) => r.mode === 'translate')
+        ? { targetLanguage: this.language }
+        : {}),
+    };
   }
 
   /** Text for the polite live region (copy feedback, retry becoming available). */

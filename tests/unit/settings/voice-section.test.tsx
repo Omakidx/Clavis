@@ -16,7 +16,7 @@ import {
   type FakeBackendOptions,
 } from '../ui-client/support';
 
-// Settings > Voice (FR-025, FR-006): per-engine counts, empty state, chooser, test voice.
+// Settings > Voice (FR-025, FR-006): voice counts, empty state, chooser, test voice.
 
 function Harness({ compact = false }: { compact?: boolean }) {
   const settings = useSettings();
@@ -78,8 +78,7 @@ describe('empty state (this Linux machine has no voices)', () => {
       ),
     ).toBeVisible();
     const counts = screen.getByTestId('voice-counts');
-    expect(within(counts).getByText('Chrome voices: 0')).toBeVisible();
-    expect(within(counts).getByText('Fallback voices: not in use')).toBeVisible();
+    expect(within(counts).getByText('On-device voices: 0. Online voices: 0.')).toBeVisible();
     expect(screen.getByRole('button', { name: 'Test voice' })).toBeDisabled();
     const chooser = screen.getByRole('combobox', { name: 'Voice' }) as HTMLSelectElement;
     expect(chooser).toBeDisabled();
@@ -98,21 +97,29 @@ describe('empty state (this Linux machine has no voices)', () => {
 });
 
 describe('voices present', () => {
-  it('shows the count per engine and groups the chooser by engine', async () => {
+  it('counts on-device and online voices and groups the chooser the same way', async () => {
     setup({ voices: WITH_VOICES });
     const counts = await screen.findByTestId('voice-counts');
-    expect(within(counts).getByText('Chrome voices: 3')).toBeVisible();
-    expect(within(counts).getByText('Fallback voices: 2')).toBeVisible();
-    expect(within(counts).getByText('Listen will use: Chrome voices')).toBeVisible();
+    // 2 on-device + 2 fallback-engine voices + 1 online; the unused engine slot is not mentioned.
+    expect(within(counts).getByText('On-device voices: 4. Online voices: 1.')).toBeVisible();
+    expect(screen.queryByText(/Fallback voices/)).toBeNull();
     const chooser = screen.getByRole('combobox', { name: 'Voice' }) as HTMLSelectElement;
     const groups = Array.from(chooser.querySelectorAll('optgroup')).map((g) => g.label);
-    expect(groups).toEqual(['Chrome voices', 'Fallback voices']);
+    expect(groups).toEqual(['On this device', 'Online (sends the text to a service)']);
     expect(chooser.options[0]?.textContent).toBe('Automatic (best match)');
     expect(screen.getByRole('option', { name: 'Google Deutsch (de-DE) (online)' })).toBeVisible();
     expect(screen.queryByText('No voices found on this device')).toBeNull();
   });
 
-  it('hides the Fallback group when that engine is not available', async () => {
+  it('states the limits truthfully: system-dependent voices, online voices only by choice', async () => {
+    setup({ voices: WITH_VOICES });
+    await screen.findByTestId('voice-counts');
+    expect(screen.getByText(/depends on your operating system/)).toBeVisible();
+    expect(screen.getByText(/uses a voice only for a language it speaks/)).toBeVisible();
+    expect(screen.getByText(/only if you choose it here/)).toBeVisible();
+  });
+
+  it('ignores voices of the fallback engine when that engine is not available', async () => {
     setup({
       voices: {
         ...WITH_VOICES,
@@ -122,11 +129,8 @@ describe('voices present', () => {
         },
       },
     });
-    await screen.findByTestId('voice-counts');
-    const chooser = screen.getByRole('combobox', { name: 'Voice' }) as HTMLSelectElement;
-    expect(Array.from(chooser.querySelectorAll('optgroup')).map((g) => g.label)).toEqual([
-      'Chrome voices',
-    ]);
+    const counts = await screen.findByTestId('voice-counts');
+    expect(within(counts).getByText('On-device voices: 2. Online voices: 1.')).toBeVisible();
     expect(screen.queryByRole('option', { name: /Ghost/ })).toBeNull();
   });
 
@@ -228,9 +232,8 @@ describe('chooser details', () => {
     const values = Array.from(chooser.options).map((o) => o.value);
     expect(values.filter((v) => v === 'Same Name')).toHaveLength(1);
     expect(
-      chooser.querySelector('optgroup[label="Chrome voices"] option[value="Same Name"]'),
+      chooser.querySelector('optgroup[label="On this device"] option[value="Same Name"]'),
     ).not.toBeNull();
-    expect(chooser.querySelector('optgroup[label="Fallback voices"]')).toBeNull();
   });
 
   it('the language filter follows a later change of the voice language', async () => {

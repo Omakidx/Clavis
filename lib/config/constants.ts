@@ -45,6 +45,12 @@ export const LIMITS = {
    * JSON overhead, so 32 KiB leaves headroom while stopping memory abuse.
    */
   maxMessageBytes: 32 * 1024,
+  /**
+   * Upper bound on the serialized size of the side-panel hand-off (FR-042): the selection snapshot
+   * plus every loaded explanation. The result schemas bound each field (the largest, Translate and
+   * Simplify, are 4,000 characters each); six results at 3 UTF-8 bytes a character stay below this.
+   */
+  maxHandoffBytes: 128 * 1024,
   /** Bounded length of a BCP-47-ish language tag. */
   maxLanguageTagChars: 35,
   /** Bounded length of a model identifier. */
@@ -78,6 +84,8 @@ export const EXTENSION_PAGES = {
   onboarding: '/onboarding.html',
   options: '/options.html',
   reader: '/reader.html',
+  /** The side panel (FR-042). One panel per tab: the tab id is a query parameter of its path. */
+  sidepanel: '/sidepanel.html',
 } as const;
 
 /** Network timeouts in milliseconds. Every external call must be bounded. */
@@ -132,4 +140,8 @@ export const SETTINGS_SECTION_ANCHORS = {
   model: 'section-model',
   privacy: 'section-privacy',
   voice: 'section-voice',
+  /** Website access (the popup and onboarding send people here to turn automatic mode on). */
+  site: 'section-site-access',
+  /** The PDF help inside Settings > Help (the popup and the reader's empty state link to it). */
+  pdfHelp: 'section-help-pdf',
 } as const;

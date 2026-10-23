@@ -18,10 +18,15 @@ export interface FeatureFlags {
   translateTab: boolean;
 }
 
-/** Tabs per selection kind (D-05, UJ-02, UJ-03): no word-only tabs for sentences, no rewrite for a word. */
+/**
+ * Tabs per selection kind (D-05, UJ-02, UJ-03, FR-033..035): Roots and Related words are for a
+ * word or a short phrase (an idiom has an origin and near-synonyms); Simplify is for anything that
+ * reads as text (a phrase, a sentence, a passage), never for a single word; a sentence or passage
+ * gets no word-only tab.
+ */
 const TABS_BY_KIND: Record<SelectionKind, readonly ExplainMode[]> = {
   word: ['core', 'etymology', 'related_words'],
-  phrase: ['core', 'related_words', 'simplify'],
+  phrase: ['core', 'etymology', 'related_words', 'simplify'],
   sentence: ['core', 'simplify'],
   passage: ['core', 'simplify'],
 };

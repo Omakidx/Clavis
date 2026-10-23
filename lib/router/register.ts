@@ -9,8 +9,9 @@ import { createAiHandlers } from './handlers/ai';
 import { createCardHandlers } from './handlers/card';
 import { createKeyService } from './handlers/key';
 import { createNavigationHandlers } from './handlers/navigation';
+import { createSidePanelHandlers } from './handlers/sidepanel';
 import { createSettingsHandlers } from './handlers/settings';
-import { createAiGuard, senderKey } from './limiter';
+import { createAiGuard, panelKey, senderKey } from './limiter';
 import { createMessageListener } from './router';
 import { buildRoutes } from './routes';
 
@@ -59,6 +60,12 @@ export function registerBackground(): void {
     },
   });
 
+  // The side panel hand-off (FR-042): held in this worker's memory by tab, never persisted.
+  const sidePanel = createSidePanelHandlers({
+    sidePanel: browser.sidePanel,
+    notify: (message) => browser.runtime.sendMessage(message) as Promise<unknown>,
+  });
+
   const routes = buildRoutes({
     ai: createAiHandlers({
       settings: settingsStore,
@@ -74,6 +81,7 @@ export function registerBackground(): void {
       tabs: browser.tabs,
       optionsUrl: browser.runtime.getURL('/options.html'),
     }),
+    sidePanel,
     keys: keyService,
     settings: createSettingsHandlers({
       settings: settingsStore,
@@ -82,6 +90,7 @@ export function registerBackground(): void {
       guard,
       areas: [browser.storage.local, browser.storage.session],
       onModelContextChanged: () => void capabilityCache.invalidate(),
+      onDataCleared: () => sidePanel.clear(),
     }),
     speech: createSpeech({ preferences: () => settingsStore.getPreferences() }),
     injection,
@@ -101,5 +110,17 @@ export function registerBackground(): void {
     const key = senderKey({ tabId });
     guard.inFlight.forget(key);
     guard.buckets.forget(key);
+    // Its side panel (if any) goes with it: the hand-off, and the panel's own request state.
+    sidePanel.forget(tabId);
+    guard.inFlight.forget(panelKey(tabId));
+    guard.buckets.forget(panelKey(tabId));
+  });
+
+  // A tab that starts loading another page, or changes its url without loading (a single-page
+  // app's navigation), no longer shows what the panel explains. `status` is reported without any
+  // host permission; `url` only where the extension may read the tab, which covers the sites Clavis
+  // runs on.
+  browser.tabs.onUpdated.addListener((tabId, changeInfo) => {
+    if (changeInfo.status === 'loading' || changeInfo.url !== undefined) sidePanel.reset(tabId);
   });
 }

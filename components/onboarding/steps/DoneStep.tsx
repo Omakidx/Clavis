@@ -5,6 +5,7 @@ import type { ClientError } from '../../../lib/ui-client/errors';
 import { openExtensionPage, openSettingsPage } from '../../../lib/ui-client/navigation';
 import { Button, ErrorNotice, LiveStatus, Notice } from '../../common/ui';
 import { ResourceGate } from '../../settings/ResourceGate';
+import { SiteAccessHelp } from '../../settings/SiteAccessHelp';
 import type { StepContext } from '../StepTypes';
 
 /** Summary and "Finish setup" (UPDATE_ONBOARDING completed:true). */
@@ -51,6 +52,7 @@ export function DoneStep({ settings, keys }: StepContext) {
               <p>{t('onbDoneNoKey')}</p>
             </Notice>
           )}
+          {snapshot.onboarding.siteAccessChoice === 'granted' ? null : <SiteAccessHelp />}
           {snapshot.onboarding.completed ? null : (
             <div className="clavis-actions">
               <Button variant="primary" disabled={busy} onClick={() => void finish()}>

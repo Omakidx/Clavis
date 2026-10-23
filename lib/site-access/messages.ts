@@ -25,6 +25,13 @@ export interface OpenSelectionMessage {
   type: 'CLAVIS_OPEN_SELECTION';
   /** Also move keyboard focus into the toolbar (the keyboard shortcut path). */
   focus?: boolean;
+  /**
+   * Also press Explain for that selection (FR-018): the context menu item and the popup's "Explain
+   * on this page" are an explicit request to explain, so the card opens and sends the core request
+   * (or asks the one-time first-send question, which only a click in the card can answer). Sent by
+   * the background only, and only the frame that holds the selection reacts.
+   */
+  explain?: boolean;
 }
 
 export type InjectReason = 'restricted' | 'no-access' | 'failed';
@@ -48,8 +55,15 @@ export function injectTabMessage(tabId: number, url?: string): InjectTabMessage 
   };
 }
 
-export function openSelectionMessage(focus = false): OpenSelectionMessage {
-  return { v: MESSAGE_VERSION, type: 'CLAVIS_OPEN_SELECTION', ...(focus ? { focus: true } : {}) };
+export function openSelectionMessage(
+  options: { focus?: boolean; explain?: boolean } = {},
+): OpenSelectionMessage {
+  return {
+    v: MESSAGE_VERSION,
+    type: 'CLAVIS_OPEN_SELECTION',
+    ...(options.focus === true ? { focus: true } : {}),
+    ...(options.explain === true ? { explain: true } : {}),
+  };
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -72,6 +86,7 @@ export function isOpenSelectionMessage(value: unknown): value is OpenSelectionMe
     isRecord(value) &&
     value['v'] === MESSAGE_VERSION &&
     value['type'] === 'CLAVIS_OPEN_SELECTION' &&
-    (value['focus'] === undefined || typeof value['focus'] === 'boolean')
+    (value['focus'] === undefined || typeof value['focus'] === 'boolean') &&
+    (value['explain'] === undefined || typeof value['explain'] === 'boolean')
   );
 }

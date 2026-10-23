@@ -102,6 +102,49 @@ describe('help section (FR-008)', () => {
       'href',
       '/reader.html',
     );
-    expect(screen.getByText(/Alt\+Shift\+E/)).toBeVisible();
+    expect(screen.getByText(/Keyboard: select text, then press Alt\+Shift\+E/)).toBeVisible();
+  });
+
+  it("explains why Chrome's PDF viewer cannot host the toolbar and how to use the reader (FR-056)", () => {
+    installCatalog();
+    render(<HelpSection />);
+    const help = screen.getByTestId('pdf-help');
+    expect(help).toHaveAttribute('id', 'section-help-pdf');
+    expect(within(help).getByRole('heading', { name: 'Reading PDFs with Clavis' })).toBeVisible();
+    expect(help).toHaveTextContent(/separate page that extensions can't add a toolbar to/);
+    expect(help).toHaveTextContent(/never takes over or changes how Chrome opens PDFs/);
+    const steps = within(help).getAllByRole('listitem');
+    expect(steps.slice(0, 3).map((li) => li.textContent)).toEqual([
+      "Click the Clavis icon and choose Open PDF reader, or use the link below. If you don't see the icon, open Chrome's Extensions menu (the puzzle-piece icon) and pin Clavis.",
+      'Choose the PDF from your computer, or drag the file onto the reader page.',
+      'Select a word or a sentence, then use Listen or Explain, just as on a web page.',
+    ]);
+    // Local files only (D-03).
+    expect(help).toHaveTextContent(/files from your computer only, not web addresses/);
+  });
+
+  it('is truthful about PDF limits and voices', () => {
+    installCatalog();
+    render(<HelpSection />);
+    const help = screen.getByTestId('pdf-help');
+    expect(help).toHaveTextContent(/never uploaded/);
+    expect(help).toHaveTextContent(/no text recognition \(OCR\)/);
+    expect(help).toHaveTextContent(/ask for their password/);
+    expect(help).toHaveTextContent(/XFA/);
+    expect(
+      screen.getByText(
+        /Some systems, including many Linux setups, have no voice until you install one/,
+      ),
+    ).toBeVisible();
+    expect(screen.getByText(/used only if you choose one in Voice settings/)).toBeVisible();
+  });
+
+  it('points to the website access help instead of repeating it', () => {
+    installCatalog();
+    render(<HelpSection />);
+    expect(
+      screen.getByRole('link', { name: 'Using Clavis without website access' }),
+    ).toHaveAttribute('href', '#section-site-access');
+    expect(screen.queryByTestId('site-access-help')).toBeNull();
   });
 });

@@ -1,9 +1,9 @@
 # Execution phases — Clavis
 
-**Document status:** v1 end-to-end implementation playbook (rev. 1.1 — decisions D-01 … D-23)  
+**Document status:** v1 end-to-end implementation playbook (rev. 1.1 — decisions D-01 … D-24)  
 **Baseline:** 2026-10-22 · **Goal:** deliver a privacy-conscious, production-ready Chrome MV3 extension with Groq BYOK, word/sentence pronunciation, contextual explanations, and a custom PDF reader.
 
-> Use this as the project's **build checklist and milestone tracker**. Feature IDs correspond to [requirements.md](requirements.md); implementation boundaries are in [architecture.md](architecture.md); approved tools are in [tech-stack.md](tech-stack.md). Product decisions D-01 … D-23 are in [requirements.md §11](requirements.md#11-product-decisions).
+> Use this as the project's **build checklist and milestone tracker**. Feature IDs correspond to [requirements.md](requirements.md); implementation boundaries are in [architecture.md](architecture.md); approved tools are in [tech-stack.md](tech-stack.md). Product decisions D-01 … D-24 are in [requirements.md §11](requirements.md#11-product-decisions).
 
 ## 0. Delivery philosophy and estimates
 
@@ -35,7 +35,7 @@ flowchart TD
 
 | Phase | Approx. effort | Exit gate |
 | --- | --- | --- |
-| 0 — Specification & risks | Done 2026-10-22 | Scope frozen, decisions D-01 … D-23 logged |
+| 0 — Specification & risks | Done 2026-10-22 | Scope frozen, decisions D-01 … D-24 logged |
 | 1 — Scaffold & CI | Done 2026-10-22 | Unpacked extension loads; lint/test/build pipeline works |
 | 2 — Feasibility spikes | Engineering done 2026-10-22; awaiting user runs | Groq call + model comparison, permission flow + toolbar latency, PDF viewer text layer and TTS capability proven |
 | 3 — Onboarding & BYOK | Done 2026-10-22 | Site access, valid/invalid keys, trusted storage and settings covered |
@@ -68,7 +68,7 @@ Effort counts are overlapping planning estimates, not additive deadlines; use th
 - [x] Select the target Chrome versions/OS testing matrix — Linux by hand, Windows/macOS automated, minimum Chrome tentatively 116, later set to 147 by D-18 ([platform matrix](requirements.md#platform-matrix-d-14), D-14).
 - [x] Record legal/privacy decisions and remaining open items — MIT license (D-13, `LICENSE` added), privacy policy on GitHub Pages with a [draft](privacy-policy.md) (D-15); publisher, support email and logo deferred to Phase 10 ([still open](requirements.md#still-open)).
 
-**Deliverables (done 2026-10-22):** approved scope and decisions D-01 … D-23 ([requirements.md §11](requirements.md#11-product-decisions)); ADRs A-001 … A-013 ([architecture.md §1](architecture.md#1-architectural-decisions-adrs)); requirement checklist, prioritized backlog and risk register ([backlog.md](backlog.md)); privacy policy draft ([privacy-policy.md](privacy-policy.md)).  
+**Deliverables (done 2026-10-22):** approved scope and decisions D-01 … D-24 ([requirements.md §11](requirements.md#11-product-decisions)); ADRs A-001 … A-013 ([architecture.md §1](architecture.md#1-architectural-decisions-adrs)); requirement checklist, prioritized backlog and risk register ([backlog.md](backlog.md)); privacy policy draft ([privacy-policy.md](privacy-policy.md)).  
 **Gate:** No launch-time features are ambiguous or promised beyond demonstrated browser capabilities. **Passed** — remaining unknowns are either Phase 2 spike outputs with defined decision criteria or Phase 10 publishing details.
 
 ## Phase 1 — Repository, WXT scaffold and developer tooling
@@ -234,7 +234,7 @@ Effort counts are overlapping planning estimates, not additive deadlines; use th
 - [x] Evaluation script with regression fixtures (`bank` senses, idiom, technical term, ambiguous sentence, invented word, injection variants, non-English, RTL) — `scripts/eval/explain-eval.ts`; **the live run needs the user's key** ([how to run](decisions/p5-prompt-eval.md)).
 - [x] No selected text, key or auth headers in logs or the page DOM (E2E console checks; card in the closed root).
 - [x] [Security review](decisions/phase-5-security-review.md): no Critical/High/Medium; Low findings fixed (WXT start-message fingerprinting and forged invalidation, in-page copy fallback removed, confirm arming delay, per-request delimiter nonces).
-- [ ] Side panel for long answers — Phase 8 (FR-042, Should).
+- [x] Side panel for long answers — Phase 8 (FR-042, D-24).
 
 **Phase 5 follow-ups:**
 
@@ -311,19 +311,21 @@ Remote PDF URLs and thumbnails are not part of v1 (D-03; thumbnails are a Could)
 
 **Tasks**
 
-- [ ] Make Explain/Listen actions look and behave the same in webpage and PDF reader.
-- [ ] Refine word/phrase/sentence-aware action sets; hide irrelevant modes.
-- [ ] Make long explanations navigable in side panel when selected scope supports it.
-- [ ] Add Copy answer, dismiss, retry, provider status, and clear no-key prompts.
-- [ ] Optimize spacing/position, scroll behavior, dark mode and small windows.
-- [ ] Test language direction, Unicode, accessible text labels and keyboard navigation.
-- [ ] If on schedule, enable the Grammar and Translate tabs (Should, FR-036/037) after their prompt regression fixtures pass; otherwise leave them flagged off.
-- [ ] Add help screen explaining why native Chrome PDF viewer can't host overlay, and how to open custom reader.
-- [ ] Add help text for users who declined site access, explaining the context-menu path and how to enable automatic mode.
-- [ ] Remove all placeholder controls that do nothing in final ZIP.
+- [x] Make Explain/Listen actions look and behave the same in webpage and PDF reader.
+- [x] Refine word/phrase/sentence-aware action sets; hide irrelevant modes (Roots and Related words for words and phrases; Simplify for phrases, sentences and passages).
+- [x] Make long explanations navigable in side panel when selected scope supports it — per-tab side panel, [spike findings](decisions/p8-sidepanel-spike.md).
+- [x] Add Copy answer, dismiss, retry, provider status, and clear no-key prompts (offline wording added; same card in webpage, practice page and reader).
+- [x] Optimize spacing/position, scroll behavior, dark mode and small windows (card and side panel).
+- [x] Test language direction, Unicode, accessible text labels and keyboard navigation (card and side panel; axe clean in light, dark).
+- [ ] If on schedule, enable the Grammar and Translate tabs (Should, FR-036/037) after their prompt regression fixtures pass; otherwise leave them flagged off. *UI, panel and tests are ready behind the flags (verified with a forced-on build); flipping `FEATURES.grammarTab` / `translateTab` in `lib/config/constants.ts` after the live eval is the only step left.*
+- [x] Add help screen explaining why native Chrome PDF viewer can't host overlay, and how to open custom reader.
+- [x] Add help text for users who declined site access, explaining the context-menu path and how to enable automatic mode.
+- [x] Remove all placeholder controls that do nothing in final ZIP.
 
 **Deliverables:** Cohesive, accessible product UI and truthful limitation copy.  
 **Gate:** End-to-end tasks completed without developer-only instructions; optional features are finished or removed.
+
+**Status (2026-10-23): complete except the Grammar/Translate flags**, which wait for the user's live eval (`npx tsx scripts/eval/explain-eval.ts --include-should --modes grammar,translate`). Gate met by the independent acceptance suite ([p8-acceptance.md](decisions/p8-acceptance.md)); security review findings fixed ([phase-8-security-review.md](decisions/phase-8-security-review.md)). Side panel shipped and FR-043 deferred (D-24). Open for release: the privacy-policy link is a placeholder until the policy is published (P3, D-15, Phase 10).
 
 ## Phase 9 — QA, performance, reliability, privacy and security
 

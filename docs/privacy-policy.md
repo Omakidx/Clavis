@@ -32,6 +32,10 @@ Clavis does **not** collect browsing history, page addresses, analytics, adverti
 
 During setup, Clavis asks for optional permission to run on websites so it can show its toolbar when you select text. With this permission, a small script on each page watches for text selections **on your device only**; it does not read or send page content in the background. You can decline and still use Clavis by right-clicking selected text and choosing **Explain with Clavis**. You can grant or remove website access at any time in Clavis settings or on Chrome's extension page.
 
+## Side panel
+
+When you choose **Open in side panel** in the explanation card, Clavis shows that explanation in Chrome's side panel. The selected text and the explanation are handed to the panel inside the extension and kept in the extension's memory only, for that tab: they are not written to storage, are not sent anywhere, and are dropped when you close the tab, move it to another page or clear Clavis data. Opening the panel sends nothing to Groq; loading another part of the explanation in the panel is a new Explain request like any other.
+
 ## Groq
 
 When you click Explain, Groq receives the text described above and processes it to return an explanation. Groq is an independent company; its handling of that data is governed by its own terms and privacy policy: <https://groq.com/privacy-policy/>. You create and control your Groq account and API key, and Groq's usage limits apply to your account.

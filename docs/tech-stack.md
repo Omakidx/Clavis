@@ -132,7 +132,7 @@ export default defineConfig({
 });
 ```
 
-This is **illustrative**. Validate module availability and WXT config shape for the actual installed version; the normative permission list and site-access flow are in [architecture.md §3](architecture.md#3-extension-entry-points-and-message-routes). `sidePanel` is included only if the side panel ships.
+This is **illustrative**. Validate module availability and WXT config shape for the actual installed version; the normative permission list and site-access flow are in [architecture.md §3](architecture.md#3-extension-entry-points-and-message-routes). `sidePanel` shipped in Phase 8 (D-24).
 
 ## 6. Frontend design and component boundaries
 
@@ -141,7 +141,7 @@ This is **illustrative**. Validate module availability and WXT config shape for 
 | `SelectionObserver` | Plain TS content script, always loaded on granted sites | Selection detection, snapshot, context extraction; loads the UI on first qualifying selection |
 | `SelectionToolbar` | Lazily loaded UI under Shadow DOM (WXT shadow-root UI helper) | Anchored Explain/Listen, dismissal, a11y |
 | `ExplanationCard` | Shared React component | Core answer, lazy tabs with per-selection cache, loading/error, copying |
-| `ExplanationSidePanel` | Chrome Side Panel API page | Detailed responses, keyboard navigation |
+| `ExplanationSidePanel` | React page at `/sidepanel.html?tab=<id>` (`components/sidepanel`), opened per tab by the background | Sections with headings for every loaded tab, Load on demand, Copy, Listen, retry and provider states, text only (D-10); shares the card's session logic |
 | `OnboardingWizard` | Extension-owned onboarding page | Consent, site-access request, BYOK test, model choice, voice preferences |
 | `OptionsPage` | Extension-owned options page | Key management, local/session setting, site access grant/revoke, per-site disable |
 | `PDFReader` | Extension-owned tab | Local file opening; React shell around PDF.js `PDFViewer` |

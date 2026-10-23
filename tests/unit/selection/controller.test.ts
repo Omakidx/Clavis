@@ -21,6 +21,7 @@ function fakeToolbar(): ToolbarHandle & {
     hide: vi.fn(),
     isInteracting: () => state.interacting,
     focus: vi.fn(),
+    explain: vi.fn(),
     destroy: vi.fn(),
   };
   return state;
@@ -283,6 +284,24 @@ describe('selection controller', () => {
     selectText('river');
     expect(await controller.openForCurrentSelection({ focus: true })).toBe(true);
     expect(toolbar.focus).toHaveBeenCalledTimes(1);
+  });
+
+  it('openForCurrentSelection starts Explain only when asked (context menu, popup button)', async () => {
+    const toolbar = fakeToolbar();
+    controller = createSelectionController({ loadToolbar: () => Promise.resolve(toolbar) });
+    selectText('river');
+    expect(await controller.openForCurrentSelection()).toBe(true);
+    expect(toolbar.explain).not.toHaveBeenCalled();
+    expect(await controller.openForCurrentSelection({ explain: true })).toBe(true);
+    expect(toolbar.explain).toHaveBeenCalledTimes(1);
+    expect(toolbar.focus).not.toHaveBeenCalled();
+  });
+
+  it('nothing is explained when there is no selection', async () => {
+    const toolbar = fakeToolbar();
+    controller = createSelectionController({ loadToolbar: () => Promise.resolve(toolbar) });
+    expect(await controller.openForCurrentSelection({ explain: true })).toBe(false);
+    expect(toolbar.explain).not.toHaveBeenCalled();
   });
 });
 

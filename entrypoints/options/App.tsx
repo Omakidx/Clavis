@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useEffect } from 'react';
 import { Page } from '../../components/common/Page';
 import { ApiKeySection } from '../../components/settings/ApiKeySection';
 import { HelpSection } from '../../components/settings/HelpSection';
@@ -21,12 +21,43 @@ const SECTIONS = [
   { id: 'section-help', label: 'helpTitle' },
 ] as const;
 
+/**
+ * Settings sections are rendered after the page loads, so the browser's own jump to `#section-…`
+ * finds nothing. Scroll to the section once it exists, and keep it in view while the sections
+ * above it settle (voices and the key status load asynchronously), until the person scrolls.
+ */
+function useScrollToSectionInUrl(): void {
+  useEffect(() => {
+    let id = '';
+    try {
+      id = decodeURIComponent(window.location.hash.slice(1));
+    } catch {
+      return;
+    }
+    if (id === '') return;
+    const go = () => document.getElementById(id)?.scrollIntoView({ block: 'start' });
+    go();
+    const observer = new ResizeObserver(go);
+    observer.observe(document.body);
+    const stop = () => observer.disconnect();
+    const timer = window.setTimeout(stop, 2000);
+    const events = ['wheel', 'keydown', 'pointerdown', 'touchstart'] as const;
+    for (const type of events) window.addEventListener(type, stop, { once: true });
+    return () => {
+      window.clearTimeout(timer);
+      stop();
+      for (const type of events) window.removeEventListener(type, stop);
+    };
+  }, []);
+}
+
 /** Settings (opens in a tab). One page, one section per concern, jump links at the top. */
 export function App() {
   const keys = useKeyStatus();
   const settings = useSettings();
   const reloadKeys = keys.resource.reload;
   const reloadSettings = settings.resource.reload;
+  useScrollToSectionInUrl();
 
   const afterClear = useCallback(() => {
     reloadKeys();

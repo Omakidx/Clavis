@@ -189,6 +189,8 @@ export interface ToolbarHandle {
   isInteracting(): boolean;
   /** Move keyboard focus into the toolbar (the Alt+Shift+E path); Escape or Tab gives it back. */
   focus(): void;
+  /** Start Explain for the selection shown, as if its button was pressed (context menu, popup button). */
+  explain?(): void;
   destroy(): void;
 }
 

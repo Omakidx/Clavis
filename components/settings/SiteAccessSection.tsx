@@ -10,6 +10,7 @@ import type { SiteAccessStatus } from '../../lib/contracts/setup';
 import { Button, LiveStatus } from '../common/ui';
 import { DisabledSites } from './DisabledSites';
 import { ResourceGate } from './ResourceGate';
+import { SiteAccessHelp } from './SiteAccessHelp';
 
 interface SiteAccessSectionProps {
   settings: SettingsHook;
@@ -88,15 +89,18 @@ export function SiteAccessSection({ settings, access: injected }: SiteAccessSect
                 </div>
               </>
             ) : (
-              <div className="clavis-actions">
-                <Button
-                  variant="primary"
-                  disabled={access.requestState === 'pending'}
-                  onClick={enable}
-                >
-                  {t('siteAccessGrant')}
-                </Button>
-              </div>
+              <>
+                <div className="clavis-actions">
+                  <Button
+                    variant="primary"
+                    disabled={access.requestState === 'pending'}
+                    onClick={enable}
+                  >
+                    {t('siteAccessGrant')}
+                  </Button>
+                </div>
+                <SiteAccessHelp />
+              </>
             )}
           </>
         )}

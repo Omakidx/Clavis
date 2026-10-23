@@ -119,7 +119,9 @@ export function DisabledSites({ sites, save }: DisabledSitesProps) {
         <ul aria-label={t('siteDisabledListLabel')} data-testid="disabled-sites">
           {sites.map((host) => (
             <li key={host} className="clavis-site-row">
-              <span className="clavis-site-row__host">{host}</span>
+              <span className="clavis-site-row__host" dir="auto">
+                {host}
+              </span>
               <Button
                 disabled={busy}
                 aria-label={t('siteDisabledRemove', host)}

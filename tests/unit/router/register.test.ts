@@ -21,6 +21,7 @@ function installBrowser() {
     onClicked: event(),
     onCommand: event(),
     onTabRemoved: event(),
+    onTabUpdated: event(),
   };
   const scripting = {
     getRegisteredContentScripts: vi.fn(() => Promise.resolve([])),
@@ -40,7 +41,9 @@ function installBrowser() {
       sendMessage: vi.fn(),
       query: vi.fn(() => Promise.resolve([])),
       onRemoved: events.onTabRemoved,
+      onUpdated: events.onTabUpdated,
     },
+    sidePanel: { setOptions: vi.fn(() => Promise.resolve()), open: vi.fn(() => Promise.resolve()) },
     contextMenus: { create: vi.fn(), removeAll: vi.fn(), onClicked: events.onClicked },
     commands: { onCommand: events.onCommand },
   });
@@ -71,6 +74,7 @@ describe('registerBackground', () => {
       'onClicked',
       'onCommand',
       'onTabRemoved',
+      'onTabUpdated',
     ] as const) {
       expect(events[name].addListener, name).toHaveBeenCalledTimes(1);
     }
@@ -115,5 +119,71 @@ describe('registerBackground', () => {
     const events = installBrowser();
     registerBackground();
     expect(() => events.onTabRemoved.listeners[0]!(5)).not.toThrow();
+  });
+
+  it("drops a tab's side panel hand-off only when the tab starts loading another page", () => {
+    const events = installBrowser();
+    registerBackground();
+    const updated = events.onTabUpdated.listeners[0]!;
+    // Title, favicon, audible and the like change all the time and say nothing about navigation.
+    expect(() => updated(5, { title: 'x' })).not.toThrow();
+    expect(() => updated(5, { status: 'loading' })).not.toThrow();
+    expect(() => updated(5, { status: 'complete' })).not.toThrow();
+  });
+
+  it('also drops the hand-off when the url changes without a load (single-page navigation)', async () => {
+    const events = installBrowser();
+    registerBackground();
+    const listener = events.onMessage.listeners[0]!;
+    const send = (message: unknown, tabId: number) =>
+      new Promise<unknown>((resolve) =>
+        listener(
+          message,
+          {
+            id: ID,
+            url: 'https://example.com/a',
+            frameId: 0,
+            tab: { id: tabId, url: 'https://example.com/a' },
+          },
+          resolve,
+        ),
+      );
+    const handoff = {
+      snapshot: {
+        selectionId: '3f2504e0-4f89-41d3-9a0c-0305e82c3301',
+        source: 'webpage',
+        kind: 'word',
+        text: 'bank',
+      },
+      results: [
+        {
+          requestId: '9b2f5c1e-7d1a-4c8e-8b57-2f6a1e4d9c10',
+          mode: 'core',
+          title: 'bank',
+          summary: 'x',
+          provider: 'groq',
+          model: 'm',
+        },
+      ],
+    };
+    const panel = (tab: number) => ({
+      id: ID,
+      url: `chrome-extension://${ID}/sidepanel.html?tab=${tab}`,
+    });
+    const ask = (tab: number) =>
+      new Promise<{ data: { handoff: unknown } }>((resolve) =>
+        listener({ v: 1, type: 'GET_SIDE_PANEL_STATE', tabId: tab }, panel(tab), resolve as never),
+      );
+    const updated = events.onTabUpdated.listeners[0]!;
+    for (const change of [{ url: 'https://example.com/b' }, { status: 'loading' }]) {
+      await send({ v: 1, type: 'OPEN_SIDE_PANEL', handoff }, 9);
+      expect((await ask(9)).data.handoff).not.toBeNull();
+      updated(9, { title: 'unrelated' });
+      expect((await ask(9)).data.handoff).not.toBeNull();
+      updated(9, change);
+      expect((await ask(9)).data.handoff).toBeNull();
+      // Reopening needs the throttle interval to pass.
+      await new Promise((r) => setTimeout(r, 320));
+    }
   });
 });

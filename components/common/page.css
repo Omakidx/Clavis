@@ -68,6 +68,12 @@ body {
   line-height: 1.4;
 }
 
+.clavis-page h4 {
+  margin: var(--space-4) 0 var(--space-2);
+  font-size: 1rem;
+  line-height: 1.4;
+}
+
 .clavis-page h2:focus,
 .clavis-page h3:focus {
   /* Programmatic focus on step headings: the ring is for keyboard users, not a stray box. */
@@ -205,6 +211,14 @@ body {
   border-color: var(--danger);
   background: var(--danger);
   color: var(--danger-fg);
+}
+
+.clavis-notice .clavis-button--link {
+  padding-inline: 0;
+}
+
+.clavis-page--narrow .clavis-actions > .clavis-button--link {
+  align-self: flex-start;
 }
 
 .clavis-button--link {
@@ -356,6 +370,52 @@ body {
 .clavis-notice--danger {
   border-color: var(--danger);
   background: var(--danger-bg);
+}
+
+.clavis-page .clavis-notice__title {
+  margin: 0 0 var(--space-1);
+  font-size: 1rem;
+  line-height: 1.4;
+}
+
+/* Help blocks (PDFs, working without website access): a titled group inside a section. */
+.clavis-help {
+  margin: var(--space-4) 0;
+}
+
+.clavis-page .clavis-help__sub {
+  margin: var(--space-4) 0 var(--space-2);
+  font-size: 1rem;
+  line-height: 1.4;
+}
+
+.clavis-help > h3:first-child {
+  margin-top: 0;
+}
+
+.clavis-help > :last-child {
+  margin-bottom: 0;
+}
+
+/* A native <details> that looks like the rest of the page (the popup's site-access help). */
+.clavis-disclosure {
+  margin: 0 0 var(--space-3);
+  padding: 0 var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.clavis-disclosure > summary {
+  display: list-item;
+  list-style-position: inside;
+  padding: var(--space-2) 0;
+  min-height: var(--target);
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.clavis-disclosure[open] > summary {
+  margin-bottom: var(--space-2);
 }
 
 /* A live region exists in the DOM before it speaks; while empty it takes no space. */
@@ -545,4 +605,22 @@ body {
 .clavis-stack > .clavis-field,
 .clavis-stack > .clavis-fieldset {
   margin-bottom: 0;
+}
+
+/* ---- Forced colors (Windows high contrast) --------------------------------------------- */
+
+@media (forced-colors: active) {
+  /* Background tints disappear; keep "selected", "current" and the status kinds visible. */
+  .clavis-choice:has(input:checked),
+  .clavis-progress__item--current {
+    outline: 2px solid Highlight;
+  }
+
+  .clavis-notice {
+    border-color: CanvasText;
+  }
+
+  .clavis-button--primary {
+    border-color: ButtonText;
+  }
 }

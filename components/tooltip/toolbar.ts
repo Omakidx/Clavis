@@ -324,6 +324,8 @@ export function createToolbar(
     const { snapshot, overLimit } = current;
     // Pressing Explain again supersedes the previous explain run; Listen keeps playing.
     cancelRun('explain');
+    // A Listen problem note gives way to the card (it would push the card's footer off screen).
+    listenView = { ...listenView, message: '', hint: '' };
     const id = runs.explain.id;
     const control = new AbortController();
     runs.explain.abort = control;
@@ -679,6 +681,10 @@ export function createToolbar(
     showNotice,
     hide,
     isInteracting: () => visible && (pointerInside || (shadow?.activeElement ?? null) !== null),
+    explain() {
+      // Not for a selection that is over the limit: that one offers "use the first 2,000" first.
+      if (selection !== null && mode === 'actions') perform('explain', selection);
+    },
     focus() {
       const active = deepActiveElement(doc);
       if (active !== null && active !== doc.body && !isOwnUiNode(active)) previousFocus = active;

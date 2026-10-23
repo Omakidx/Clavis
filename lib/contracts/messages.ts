@@ -39,7 +39,7 @@ export const loadExplainCardMessageSchema = z.strictObject({
 export const openSettingsMessageSchema = z.strictObject({
   v,
   type: z.literal('OPEN_SETTINGS'),
-  section: z.enum(['key', 'model', 'privacy', 'voice']).optional(),
+  section: z.enum(['key', 'model', 'privacy', 'voice', 'site', 'pdfHelp']).optional(),
 });
 
 export const aiCancelMessageSchema = z.strictObject({

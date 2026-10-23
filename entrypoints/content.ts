@@ -74,13 +74,18 @@ export default defineContentScript({
       if (sender?.id === browser.runtime.id && speech.handleEvent(message)) return undefined;
       if (isOpenSelectionMessage(message)) {
         const focus = message.focus === true;
+        // Explain from the context menu or the popup: only our own background asks for it.
+        const explain = message.explain === true && sender?.id === browser.runtime.id;
         // The shortcut reaches every frame: only the frame the user is in reacts.
         if (focus && !ownsFocus(document, window === window.top)) {
           sendResponse({ ok: true, shown: false });
           return undefined;
         }
         void controller
-          .openForCurrentSelection(focus ? { focus: true } : {})
+          .openForCurrentSelection({
+            ...(focus ? { focus: true } : {}),
+            ...(explain ? { explain: true } : {}),
+          })
           .then((shown) => sendResponse({ ok: true, shown }));
         return true;
       }

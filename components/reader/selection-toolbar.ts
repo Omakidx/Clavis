@@ -64,7 +64,11 @@ export function mountReaderSelection(
     // The keyboard path (FR-016): show the toolbar for the current selection and move focus in.
     if (isOpenSelectionMessage(message) && mounted.controller !== undefined) {
       void mounted.controller
-        .openForCurrentSelection(message.focus === true ? { focus: true } : {})
+        .openForCurrentSelection({
+          ...(message.focus === true ? { focus: true } : {}),
+          // The reader only listens to the background (isFromBackground above).
+          ...(message.explain === true ? { explain: true } : {}),
+        })
         .then((shown) => sendResponse({ ok: true, shown }));
       return true;
     }

@@ -201,6 +201,7 @@ export function toolbarView<N>(props: ToolbarViewProps, h: CreateElement<N>): N 
             {
               className: 'card__text card__text--scroll',
               tabIndex: 0,
+              dir: 'auto',
               role: 'group',
               'aria-label': t('toolbarTrimmedPreview'),
               'data-clavis': 'trimmed-text',
@@ -218,7 +219,7 @@ export function toolbarView<N>(props: ToolbarViewProps, h: CreateElement<N>): N 
             'div',
             { className: 'card', 'data-clavis': 'card', 'data-action': card.action },
             h('p', { className: 'card__note', 'data-clavis': 'card-note' }, card.note),
-            h('p', { className: 'card__text', 'data-clavis': 'card-text' }, card.text),
+            h('p', { className: 'card__text', dir: 'auto', 'data-clavis': 'card-text' }, card.text),
           ),
     h('div', { className: 'sr-only', role: 'status', 'data-clavis': 'live' }, props.live),
   );

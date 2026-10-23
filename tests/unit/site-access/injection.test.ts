@@ -10,7 +10,11 @@ import {
   injectTabForPopup,
   type InjectionDeps,
 } from '../../../lib/site-access/injection';
-import { injectTabMessage } from '../../../lib/site-access/messages';
+import {
+  injectTabMessage,
+  isOpenSelectionMessage,
+  openSelectionMessage,
+} from '../../../lib/site-access/messages';
 
 const READER = 'chrome-extension://abcdefghijklmnopabcdefghijklmnop/reader.html';
 
@@ -78,6 +82,34 @@ describe('explainInTab (declined-access path, activeTab)', () => {
       { frameId: 3 },
     );
     expect(result).toEqual({ ok: true, shown: true });
+  });
+
+  it('the context menu and the popup button also start Explain, the shortcut only focuses (FR-018)', async () => {
+    const menu = deps();
+    await handleContextMenuClick(
+      menu.value,
+      { menuItemId: CONTEXT_MENU_ID, frameId: 3 },
+      { id: 7, url: 'https://example.com/' },
+    );
+    expect(menu.sendMessage).toHaveBeenCalledWith(
+      7,
+      { v: 1, type: 'CLAVIS_OPEN_SELECTION', explain: true },
+      { frameId: 3 },
+    );
+    const popup = deps();
+    await injectTabForPopup(popup.value, injectTabMessage(7, 'https://example.com/'));
+    expect(popup.sendMessage).toHaveBeenCalledWith(
+      7,
+      { v: 1, type: 'CLAVIS_OPEN_SELECTION', explain: true },
+      { frameId: 0 },
+    );
+    const key = deps();
+    await handleCommand(key.value, 'explain-selection', { id: 7, url: 'https://example.com/' });
+    expect(key.sendMessage).toHaveBeenCalledWith(
+      7,
+      { v: 1, type: 'CLAVIS_OPEN_SELECTION', focus: true },
+      { frameId: 0 },
+    );
   });
 
   it('does not even try on restricted pages', async () => {
@@ -362,7 +394,7 @@ describe('the reader page (an extension page that hosts the toolbar itself)', ()
     });
   });
 
-  it('the popup path and the context menu use the same route (no focus for the popup)', async () => {
+  it('the popup path and the context menu use the same route: explain, no focus', async () => {
     const popup = deps();
     expect(await injectTabForPopup(popup.value, injectTabMessage(4, readerTab.url))).toEqual({
       ok: true,
@@ -370,7 +402,7 @@ describe('the reader page (an extension page that hosts the toolbar itself)', ()
     });
     expect(popup.sendMessage).toHaveBeenCalledWith(
       4,
-      { v: 1, type: 'CLAVIS_OPEN_SELECTION' },
+      { v: 1, type: 'CLAVIS_OPEN_SELECTION', explain: true },
       { frameId: 0 },
     );
     expect(popup.executeScript).not.toHaveBeenCalled();
@@ -383,7 +415,7 @@ describe('the reader page (an extension page that hosts the toolbar itself)', ()
     );
     expect(menu.sendMessage).toHaveBeenCalledWith(
       4,
-      { v: 1, type: 'CLAVIS_OPEN_SELECTION' },
+      { v: 1, type: 'CLAVIS_OPEN_SELECTION', explain: true },
       { frameId: 0 },
     );
     expect(menu.executeScript).not.toHaveBeenCalled();
@@ -404,6 +436,36 @@ describe('the reader page (an extension page that hosts the toolbar itself)', ()
       });
       expect(executeScript).not.toHaveBeenCalled();
       expect(sendMessage).not.toHaveBeenCalled();
+    }
+  });
+});
+
+describe('CLAVIS_OPEN_SELECTION', () => {
+  it('builds and checks the explain flag (the toolbar-only shortcut message stays unchanged)', () => {
+    expect(openSelectionMessage()).toEqual({ v: 1, type: 'CLAVIS_OPEN_SELECTION' });
+    expect(openSelectionMessage({ focus: true })).toEqual({
+      v: 1,
+      type: 'CLAVIS_OPEN_SELECTION',
+      focus: true,
+    });
+    expect(openSelectionMessage({ explain: true })).toEqual({
+      v: 1,
+      type: 'CLAVIS_OPEN_SELECTION',
+      explain: true,
+    });
+    for (const good of [
+      openSelectionMessage(),
+      openSelectionMessage({ focus: true, explain: true }),
+    ]) {
+      expect(isOpenSelectionMessage(good)).toBe(true);
+    }
+    for (const bad of [
+      { v: 1, type: 'CLAVIS_OPEN_SELECTION', explain: 'yes' },
+      { v: 2, type: 'CLAVIS_OPEN_SELECTION', explain: true },
+      { v: 1, type: 'CLAVIS_OPEN_SELECTION', focus: 1 },
+      null,
+    ]) {
+      expect(isOpenSelectionMessage(bad)).toBe(false);
     }
   });
 });

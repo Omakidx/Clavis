@@ -7,3 +7,4 @@ export * from './selection';
 export * from './key-storage';
 export * from './setup';
 export * from './speech';
+export * from './sidepanel';

@@ -17,6 +17,9 @@ describe('config constants', () => {
     expect(LIMITS.maxMessageBytes).toBeGreaterThan(
       (LIMITS.maxSelectionChars + LIMITS.maxContextChars) * 4,
     );
+    // The side panel hand-off is the one larger message: still a hard bound.
+    expect(LIMITS.maxHandoffBytes).toBeGreaterThan(LIMITS.maxMessageBytes);
+    expect(LIMITS.maxHandoffBytes).toBeLessThanOrEqual(256 * 1024);
   });
 
   it('keeps Groq endpoints https-only and consistent with the API base', () => {
@@ -48,6 +51,7 @@ describe('config constants', () => {
       onboarding: '/onboarding.html',
       options: '/options.html',
       reader: '/reader.html',
+      sidepanel: '/sidepanel.html',
     });
     for (const route of Object.values(EXTENSION_PAGES)) {
       expect(route).toMatch(/^\/[a-z]+\.html$/);

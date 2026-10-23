@@ -183,7 +183,7 @@ jobs:
       - name: Run real-UI tests
         env:
           CLAVIS_E2E_REAL_UI: '1'
-        run: xvfb-run -a -s "-screen 0 1920x1080x24" npx playwright test --workers=1 tests/e2e/spike-b-real-ui.spec.ts tests/e2e/p4-matrix-realui.spec.ts
+        run: xvfb-run -a -s "-screen 0 1920x1080x24" npx playwright test --workers=1 tests/e2e/spike-b-real-ui.spec.ts tests/e2e/p4-matrix-realui.spec.ts tests/e2e/p8-sidepanel-realui.spec.ts tests/e2e/p8-accept-realui.spec.ts
 
       - name: Upload Playwright report
         if: failure()

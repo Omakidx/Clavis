@@ -59,6 +59,26 @@ describe('site access (FR-009)', () => {
     );
   });
 
+  it('off: explains the three ways to use Clavis and how to turn on automatic mode', async () => {
+    setup();
+    const help = await screen.findByTestId('site-access-help');
+    expect(within(help).getByText(/right-click it and choose Explain with Clavis/)).toBeVisible();
+    expect(
+      within(help).getByText(/click the Clavis icon and choose Explain on this page/),
+    ).toBeVisible();
+    expect(within(help).getByText(/press Alt\+Shift\+E/)).toBeVisible();
+    // Both ways to turn it on, and the preference that can still hide the toolbar.
+    expect(within(help).getByText(/Choose Enable on websites under Website access/)).toBeVisible();
+    expect(within(help).getByText(/set Site access to On all sites/)).toBeVisible();
+    expect(within(help).getByText(/Only when I ask/)).toBeVisible();
+  });
+
+  it('on: the help for working without access is not shown', async () => {
+    setup({ onboarding: { siteAccessChoice: 'granted' } }, true);
+    await screen.findByRole('button', { name: 'Remove website access' });
+    expect(screen.queryByTestId('site-access-help')).toBeNull();
+  });
+
   it('records a refused prompt as declined', async () => {
     const { user } = setup({}, false, false);
     await user.click(await screen.findByRole('button', { name: 'Enable on websites' }));

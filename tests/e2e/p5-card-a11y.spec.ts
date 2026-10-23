@@ -59,6 +59,11 @@ const SCENARIOS: Scenario[] = [
   { name: "error: Can't connect", scenario: 'error:NETWORK_ERROR' },
   { name: "error: Couldn't format explanation", scenario: 'error:INVALID_RESPONSE' },
   { name: 'quiet: not loaded', scenario: 'error:REQUEST_CANCELLED' },
+  // Phase 8
+  { name: 'long answer (side panel suggested)', scenario: 'coreLong' },
+  { name: 'right-to-left answer', scenario: 'coreRtl', kind: 'phrase' },
+  { name: 'error: offline', scenario: 'error:NETWORK_ERROR:offline' },
+  { name: 'Grammar and Translate tabs (flags forced on)', scenario: 'flags', kind: 'sentence' },
 ];
 
 async function openPage(

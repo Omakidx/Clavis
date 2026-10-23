@@ -10,6 +10,7 @@ import {
 import { createCardHandlers } from '../../../lib/router/handlers/card';
 import { createKeyService } from '../../../lib/router/handlers/key';
 import { createNavigationHandlers } from '../../../lib/router/handlers/navigation';
+import { createSidePanelHandlers } from '../../../lib/router/handlers/sidepanel';
 import { createSettingsHandlers } from '../../../lib/router/handlers/settings';
 import { createAiGuard } from '../../../lib/router/limiter';
 import { createMessageListener, type Route } from '../../../lib/router/router';
@@ -47,6 +48,15 @@ export const pageSender = (path: string, tabId: number | null = 9): SenderLike =
 /** The real toolbar popup has no tab, and Chrome reports no frameId for tab-less senders. */
 export const popupSender = (): SenderLike => ({ id: RUNTIME_ID, url: `${ORIGIN}/popup.html` });
 
+/**
+ * The side panel (FR-042): tab-less like the popup (verified in Chromium, docs/decisions/
+ * p8-sidepanel-spike.md), and its path carries the tab it belongs to.
+ */
+export const panelSender = (tabId = 5): SenderLike => ({
+  id: RUNTIME_ID,
+  url: `${ORIGIN}/sidepanel.html?tab=${tabId}`,
+});
+
 /** The url the removed offscreen document used to have: now just an unknown extension page. */
 export const offscreenSender = (): SenderLike => ({
   id: RUNTIME_ID,
@@ -77,6 +87,32 @@ export const CARD_MESSAGES: Record<string, unknown> = {
   LOAD_EXPLAIN_CARD: { v: 1, type: 'LOAD_EXPLAIN_CARD' },
   OPEN_SETTINGS: { v: 1, type: 'OPEN_SETTINGS' },
 };
+
+/** The side panel routes (FR-042): their own, narrower sender rules and a larger size bound. */
+export const HANDOFF = {
+  snapshot: { ...snapshot, text: 'break the ice', kind: 'phrase' },
+  results: [
+    {
+      requestId: REQ_A,
+      mode: 'core',
+      title: 'break the ice',
+      summary: 'Start a conversation.',
+      provider: 'groq',
+      model: 'openai/gpt-oss-20b',
+    },
+  ],
+  active: 'core',
+};
+export const openSidePanelMessage = (handoff: object = structuredClone(HANDOFF)) => ({
+  v: 1,
+  type: 'OPEN_SIDE_PANEL',
+  handoff,
+});
+export const sidePanelStateMessage = (tabId = 5) => ({
+  v: 1,
+  type: 'GET_SIDE_PANEL_STATE',
+  tabId,
+});
 
 export const KEY_MESSAGES: Record<string, unknown> = {
   SET_API_KEY: { v: 1, type: 'SET_API_KEY', apiKey: FAKE_KEY, storage: 'local' },
@@ -159,7 +195,17 @@ export function createHarness(options: HarnessOptions = {}) {
     lockedDown,
     ...(options.features === undefined ? {} : { features: options.features }),
   });
+  const sidePanelApi = {
+    setOptions: vi.fn((_options: { tabId: number; path: string; enabled: boolean }) =>
+      Promise.resolve(),
+    ),
+    open: vi.fn((_options: { tabId: number }) => Promise.resolve()),
+  };
+  const notify = vi.fn((_message: unknown) => Promise.resolve());
+  const sidePanel = createSidePanelHandlers({ sidePanel: sidePanelApi, notify, now });
+
   const settings = createSettingsHandlers({
+    onDataCleared: () => sidePanel.clear(),
     settings: settingsStore,
     keys: keyStore,
     siteAccess,
@@ -199,6 +245,7 @@ export function createHarness(options: HarnessOptions = {}) {
     ai,
     card,
     navigation,
+    sidePanel,
     keys: keyService,
     settings,
     speech,
@@ -242,6 +289,9 @@ export function createHarness(options: HarnessOptions = {}) {
     siteAccess,
     injection,
     browserNav,
+    sidePanel,
+    sidePanelApi,
+    notify,
     chromeTts,
     speechService,
     routes,

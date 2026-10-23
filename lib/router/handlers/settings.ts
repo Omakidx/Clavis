@@ -30,6 +30,8 @@ export interface SettingsHandlerDeps {
    * the model's capabilities (lib/ai/capability-cache.ts) must be re-learned.
    */
   onModelContextChanged?: () => void;
+  /** CLEAR_ALL_DATA finished: memory that holds the user's selections (side panel hand-offs) goes too. */
+  onDataCleared?: () => void;
 }
 
 /** Preference fields that change what the observer registration should look like. */
@@ -108,6 +110,7 @@ export function createSettingsHandlers(deps: SettingsHandlerDeps) {
       deps.guard.inFlight.abortAll();
       deps.guard.buckets.clear();
       deps.onModelContextChanged?.();
+      deps.onDataCleared?.();
       await applySitePolicy();
       return success({ cleared: true });
     },

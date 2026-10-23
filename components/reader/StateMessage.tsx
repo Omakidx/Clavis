@@ -1,3 +1,4 @@
+import { SETTINGS_SECTION_ANCHORS } from '../../lib/config/constants';
 import { t } from '../../lib/i18n';
 import { MAX_PDF_BYTES, MAX_PDF_PAGES } from '../../lib/pdf/limits';
 import type { ReaderErrorCode, ReaderState } from '../../lib/pdf/state';
@@ -53,6 +54,17 @@ export function StateMessage({ state, dragging, onOpen }: StateMessageProps) {
             {dragging ? t('readerDropActive') : t('readerEmptyHint')}
           </p>
           <p className="clavis-muted">{t('readerEmptyChrome')}</p>
+          <p>
+            {/* A plain link: the reader's first-load chunks must not pull in the shared UI module. */}
+            <a
+              href={`/options.html#${SETTINGS_SECTION_ANCHORS.pdfHelp}`}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              {t('readerEmptyHelp')}
+              <span className="clavis-sr-only"> {t('uiOpensInNewTab')}</span>
+            </a>
+          </p>
           <p className="clavis-muted">{t('readerShortcutsHint')}</p>
         </section>
       );

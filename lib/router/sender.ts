@@ -21,9 +21,23 @@ export const EXTENSION_PAGE_PATHS = [
   EXTENSION_PAGES.onboarding,
   EXTENSION_PAGES.popup,
   EXTENSION_PAGES.reader,
+  EXTENSION_PAGES.sidepanel,
   PRACTICE_PAGE_PATH,
 ] as const;
 export type ExtensionPagePath = (typeof EXTENSION_PAGE_PATHS)[number];
+
+/** The tab a panel belongs to, from its own url (`/sidepanel.html?tab=7`). */
+export function panelTabOf(url: string | undefined): number | undefined {
+  if (url === undefined) return undefined;
+  try {
+    const raw = new URL(url).searchParams.get('tab');
+    if (raw === null || !/^\d{1,10}$/.test(raw)) return undefined;
+    const id = Number(raw);
+    return Number.isSafeInteger(id) && id <= 2_147_483_647 ? id : undefined;
+  } catch {
+    return undefined;
+  }
+}
 
 export interface ClassifiedSender {
   kind: SenderKind;
@@ -112,11 +126,12 @@ export function classifySender(sender: SenderLike, identity: SenderIdentity): Cl
     // /options.html) is not trusted as that page. Chrome only reports `frameId` for senders in a
     // tab: a page opened in a tab must be frame 0, while the real toolbar popup has no tab and
     // no frameId (none of our pages embeds another extension page, so a tab-less frame can't occur).
-    // Only the popup is ever tab-less (options opens in a tab; there are no web-accessible
-    // resources), so a tab-less sender must be the popup.
+    // Only the popup and the side panel are ever tab-less (options opens in a tab; there are no
+    // web-accessible resources), so a tab-less sender must be one of those two. The side panel is
+    // verified to report no tab and no frame id (docs/decisions/p8-sidepanel-spike.md).
     const topFrame =
       sender.tab === undefined
-        ? url.pathname === EXTENSION_PAGES.popup &&
+        ? (url.pathname === EXTENSION_PAGES.popup || url.pathname === EXTENSION_PAGES.sidepanel) &&
           (sender.frameId === undefined || sender.frameId === 0)
         : sender.frameId === 0;
     if (!topFrame) return unknown;

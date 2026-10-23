@@ -28,12 +28,17 @@ interface NoticeProps {
   tone?: NoticeTone;
   children: ReactNode;
   id?: string;
+  testId?: string;
 }
 
 /** A visible message with no live-region semantics. Use `LiveStatus` for announced updates. */
-export function Notice({ tone = 'info', children, id }: NoticeProps) {
+export function Notice({ tone = 'info', children, id, testId }: NoticeProps) {
   return (
-    <div id={id} className={`clavis-notice${tone === 'info' ? '' : ` clavis-notice--${tone}`}`}>
+    <div
+      id={id}
+      data-testid={testId}
+      className={`clavis-notice${tone === 'info' ? '' : ` clavis-notice--${tone}`}`}
+    >
       {children}
     </div>
   );

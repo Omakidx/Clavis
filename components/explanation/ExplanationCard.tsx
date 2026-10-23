@@ -2,6 +2,7 @@
 import { render } from 'preact';
 import { useEffect, useId, useLayoutEffect, useRef, useState } from 'preact/hooks';
 import type { ExplainMode } from '../../lib/contracts/explain';
+import type { SidePanelHandoff } from '../../lib/contracts/sidepanel';
 import { t } from '../../lib/i18n';
 import { isTrustedEvent } from '../../lib/selection/trust';
 import type { SettingsSection } from './backend';
@@ -30,6 +31,13 @@ export interface CardHost {
   /** Close the card (and abort its run); the toolbar stays. */
   close(): void;
   openSettings(section?: SettingsSection): Promise<boolean>;
+  /**
+   * Hand the explanation to the side panel and open it (FR-042). Called synchronously from the
+   * click: the user gesture that lets the background open the panel does not survive an `await`.
+   */
+  openSidePanel(handoff: SidePanelHandoff): Promise<boolean>;
+  /** Whether the browser says it is online (only used to word a connection error). */
+  online(): boolean;
   /** Copy plain text with the async Clipboard API; false when the page does not allow it. */
   copy(text: string): Promise<boolean>;
   now(): number;
@@ -46,6 +54,9 @@ export const CONFIRM_DELAY_MS = 500;
 /** How much of the selected text the header keeps in the DOM. */
 const HEADER_TEXT_CHARS = 200;
 
+/** An answer longer than this is a long one: the card says the side panel has more room (FR-042). */
+export const LONG_ANSWER_CHARS = 700;
+
 interface Props {
   session: ExplainSession;
   host: CardHost;
@@ -55,6 +66,23 @@ interface Props {
 export function mountCard(slot: HTMLElement, props: Props): () => void {
   render(<ExplanationCard {...props} />, slot);
   return () => render(null, slot);
+}
+
+/** Whether the browser says it is online, following the card's own window's online/offline events. */
+function useOnline(host: CardHost, rootRef: { current: HTMLElement | null }): boolean {
+  const [online, setOnline] = useState(() => host.online());
+  useEffect(() => {
+    const win = rootRef.current?.ownerDocument.defaultView;
+    if (win === null || win === undefined) return;
+    const update = (): void => setOnline(host.online());
+    win.addEventListener('online', update);
+    win.addEventListener('offline', update);
+    return () => {
+      win.removeEventListener('online', update);
+      win.removeEventListener('offline', update);
+    };
+  }, [host, rootRef]);
+  return online;
 }
 
 function useSessionState(session: ExplainSession): SessionState {
@@ -82,6 +110,7 @@ function ExplanationCard({ session, host }: Props) {
   const [focusTab, setFocusTab] = useState<ExplainMode>(state.active);
   const [armed, setArmed] = useState(false);
   const [copied, setCopied] = useState(false);
+  const online = useOnline(host, rootRef);
 
   const entries = state.entries;
   const core = entries.core;
@@ -175,7 +204,17 @@ function ExplanationCard({ session, host }: Props) {
     });
   };
 
+  // The click that asks for the panel must reach the background in the same task (see CardHost).
+  const openPanel = (): void => {
+    const handoff = session.handoff();
+    if (handoff === null) return;
+    void host.openSidePanel(handoff).then((opened) => {
+      session.announce(opened ? t('cardPanelOpened') : t('cardPanelFailed'));
+    });
+  };
+
   const model = active?.status === 'ready' ? active.result?.model : undefined;
+  const longAnswer = (session.activeText()?.length ?? 0) > LONG_ANSWER_CHARS;
 
   return (
     <section
@@ -258,23 +297,43 @@ function ExplanationCard({ session, host }: Props) {
             session={session}
             host={host}
             confirmRef={confirmRef}
+            online={online}
             onSettings={openSettings}
           />
         </div>
       ))}
 
+      {longAnswer ? (
+        <p class="ec__hint" data-clavis="card-long-hint">
+          {t('cardLongHint')}
+        </p>
+      ) : null}
+
       <footer class="ec__foot">
-        <button
-          type="button"
-          class="ec__btn"
-          data-clavis="card-copy"
-          aria-disabled={active?.status === 'ready' ? undefined : 'true'}
-          onClick={onTrusted(() => {
-            if (active?.status === 'ready') copyActive();
-          })}
-        >
-          {copied ? t('cardCopied') : t('cardCopy')}
-        </button>
+        <div class="ec__actions">
+          <button
+            type="button"
+            class="ec__btn"
+            data-clavis="card-copy"
+            aria-disabled={active?.status === 'ready' ? undefined : 'true'}
+            onClick={onTrusted(() => {
+              if (active?.status === 'ready') copyActive();
+            })}
+          >
+            {copied ? t('cardCopied') : t('cardCopy')}
+          </button>
+          <button
+            type="button"
+            class={longAnswer ? 'ec__btn ec__btn--suggest' : 'ec__btn'}
+            data-clavis="card-side-panel"
+            aria-disabled={core?.status === 'ready' ? undefined : 'true'}
+            onClick={onTrusted(() => {
+              if (core?.status === 'ready') openPanel();
+            })}
+          >
+            {t('cardOpenPanel')}
+          </button>
+        </div>
         {model === undefined ? null : (
           <p class="ec__model" dir="auto" data-clavis="card-model">
             {t('cardModel', model)}
@@ -297,6 +356,7 @@ interface PanelProps {
   session: ExplainSession;
   host: CardHost;
   confirmRef: { current: HTMLButtonElement | null };
+  online: boolean;
   onSettings(section: SettingsSection | undefined): void;
 }
 
@@ -307,6 +367,7 @@ function PanelContent({
   session,
   host,
   confirmRef,
+  online,
   onSettings,
 }: PanelProps) {
   if (entry === undefined && !isActive) return null;
@@ -328,6 +389,7 @@ function PanelContent({
         mode={mode}
         session={session}
         host={host}
+        online={online}
         onSettings={onSettings}
       />
     );
@@ -378,17 +440,23 @@ function DisclosurePrompt({
 
 function ResultView({ blocks }: { blocks: Block[] }) {
   return (
-    <div class="ec__result" data-clavis="card-result" dir="auto">
+    <div class="ec__result" data-clavis="card-result">
+      {/* Each piece of model text decides its own direction (dir="auto"), so an Arabic answer next to
+          an English label, or an English example inside a Hebrew answer, each read the right way. */}
       {blocks.map((block, index) => {
         switch (block.kind) {
           case 'title':
             return (
-              <p key={index} class="ec__title">
+              <p key={index} class="ec__title" dir="auto">
                 {block.text}
               </p>
             );
           case 'paragraph':
-            return <p key={index}>{block.text}</p>;
+            return (
+              <p key={index} dir="auto">
+                {block.text}
+              </p>
+            );
           case 'field':
           case 'note':
             return (
@@ -397,7 +465,7 @@ function ResultView({ blocks }: { blocks: Block[] }) {
                 class={block.kind === 'note' ? 'ec__field ec__field--note' : 'ec__field'}
               >
                 <p class="ec__label">{block.label}</p>
-                <p>{block.text}</p>
+                <p dir="auto">{block.text}</p>
               </div>
             );
           case 'list': {
@@ -405,9 +473,11 @@ function ResultView({ blocks }: { blocks: Block[] }) {
             return (
               <div key={index} class="ec__field">
                 <p class="ec__label">{block.label}</p>
-                <List class="ec__list">
+                <List class="ec__list" dir="auto">
                   {block.items.map((item, itemIndex) => (
-                    <li key={itemIndex}>{item}</li>
+                    <li key={itemIndex} dir="auto">
+                      {item}
+                    </li>
                   ))}
                 </List>
               </div>
@@ -424,18 +494,28 @@ interface ErrorProps {
   mode: ExplainMode;
   session: ExplainSession;
   host: CardHost;
+  online: boolean;
   onSettings(section: SettingsSection | undefined): void;
 }
 
-function ErrorView({ error, mode, session, host, onSettings }: ErrorProps) {
+/** Errors that mean "could not reach Groq": worded differently when the browser knows it is offline. */
+const CONNECTION_CODES: readonly string[] = ['NETWORK_ERROR', 'TIMEOUT', 'NO_RESPONSE'];
+
+function ErrorView({ error, mode, session, host, online, onSettings }: ErrorProps) {
+  const offline = !online && CONNECTION_CODES.includes(error.code);
   return (
     <div
       class={error.quiet === true ? 'ec__error ec__error--quiet' : 'ec__error'}
       data-clavis="card-error"
       data-code={error.code}
+      data-offline={offline ? 'true' : undefined}
     >
-      {error.title === null ? null : <p class="ec__error-title">{error.title}</p>}
-      <p>{error.message}</p>
+      {offline ? (
+        <p class="ec__error-title">{t('cardErrOfflineTitle')}</p>
+      ) : error.title === null ? null : (
+        <p class="ec__error-title">{error.title}</p>
+      )}
+      <p>{offline ? t('errOffline') : error.message}</p>
       <div class="ec__actions">
         {error.action === 'retry' ? (
           <RetryButton error={error} mode={mode} session={session} host={host} />

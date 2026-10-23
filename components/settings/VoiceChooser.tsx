@@ -38,7 +38,7 @@ function optionLabel(voice: VoiceInfo): string {
 
 /**
  * Voice chooser (FR-025): "Automatic (best match)" plus the voices that really exist, grouped by
- * engine and filtered by language, with a Test voice button. With no voices the drop-down and the
+ * on-device and online (D-22) and filtered by language, with a Test voice button. With no voices the drop-down and the
  * button are disabled, so nothing offers a choice that cannot play.
  */
 export function VoiceChooser({
@@ -62,8 +62,8 @@ export function VoiceChooser({
   const chosen = saved === undefined ? undefined : voices.find((voice) => voice.name === saved);
   const savedMissing = saved !== undefined && chosen === undefined;
   const shown = filterVoices(voices, compact ? ALL_LANGUAGES : filter, saved);
-  const chrome = shown.filter((voice) => voice.engine === 'chrome-tts');
-  const fallback = shown.filter((voice) => voice.engine !== 'chrome-tts');
+  const onDevice = shown.filter((voice) => !voice.remote);
+  const online = shown.filter((voice) => voice.remote);
   const languages = voiceLanguages(voices);
 
   const options = (list: VoiceInfo[]) =>
@@ -95,11 +95,11 @@ export function VoiceChooser({
       >
         <option value={AUTOMATIC}>{t('voiceAutomatic')}</option>
         {savedMissing ? <option value={saved}>{t('voiceSavedMissing', saved)}</option> : null}
-        {chrome.length > 0 ? (
-          <optgroup label={t('voiceEngineChrome')}>{options(chrome)}</optgroup>
+        {onDevice.length > 0 ? (
+          <optgroup label={t('voiceGroupDevice')}>{options(onDevice)}</optgroup>
         ) : null}
-        {report.engines.offscreen.available && fallback.length > 0 ? (
-          <optgroup label={t('voiceEngineFallback')}>{options(fallback)}</optgroup>
+        {online.length > 0 ? (
+          <optgroup label={t('voiceGroupOnline')}>{options(online)}</optgroup>
         ) : null}
       </SelectField>
 

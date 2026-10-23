@@ -678,6 +678,27 @@ describe('notice', () => {
   });
 });
 
+describe('explain() (context menu and popup button, FR-018)', () => {
+  it('runs the Explain action for the shown selection without any click, and keeps focus where it was', () => {
+    calls.length = 0;
+    const handle = create();
+    handle.show(capture('bank'));
+    handle.explain?.();
+    expect(calls.map((c) => c.action)).toEqual(['explain']);
+    expect((calls[0]?.context as ActionContext).snapshot.text).toBe('bank');
+    expect(shadow().activeElement).toBeNull();
+  });
+
+  it('does nothing without a selection or for a selection over the limit', () => {
+    calls.length = 0;
+    const handle = create();
+    handle.explain?.();
+    handle.show({ ...capture('bank'), overLimit: true });
+    handle.explain?.();
+    expect(calls).toHaveLength(0);
+  });
+});
+
 describe('keyboard and focus (FR-016)', () => {
   it('focus() moves into the toolbar and Escape gives focus back to the element that had it', () => {
     setBody('<p>The old bank by the river.</p><a id="link" href="#x">link</a>');

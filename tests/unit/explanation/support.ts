@@ -5,6 +5,7 @@ import type {
 } from '../../../components/explanation/backend';
 import type { ExplainRequest, ExplainResult } from '../../../lib/contracts/explain';
 import type { SelectionKind, SelectionSnapshot } from '../../../lib/contracts/selection';
+import type { SidePanelHandoff } from '../../../lib/contracts/sidepanel';
 
 export { installCatalog } from '../ui-client/support';
 
@@ -110,7 +111,8 @@ export function createFakeBackend() {
   const calls: PendingCall[] = [];
   const cancelled: string[] = [];
   const settings: Array<SettingsSection | undefined> = [];
-  const state = { settingsOpens: true, language: 'en' as string | undefined };
+  const handoffs: SidePanelHandoff[] = [];
+  const state = { settingsOpens: true, panelOpens: true, language: 'en' as string | undefined };
   const backend: ExplainBackend = {
     explain(request, acknowledge) {
       return new Promise<BackendReply>((resolve) => {
@@ -128,9 +130,13 @@ export function createFakeBackend() {
       settings.push(section);
       return Promise.resolve(state.settingsOpens);
     },
+    openSidePanel: (handoff) => {
+      handoffs.push(handoff);
+      return Promise.resolve(state.panelOpens);
+    },
     explanationLanguage: () => Promise.resolve(state.language),
   };
-  return { backend, calls, cancelled, settings, state };
+  return { backend, calls, cancelled, settings, handoffs, state };
 }
 
 export const flush = async (): Promise<void> => {

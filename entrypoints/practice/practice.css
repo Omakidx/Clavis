@@ -1,7 +1,8 @@
 .clavis-practice__frame {
   display: block;
   width: 100%;
-  min-height: 18rem;
+  /* Tall enough for the explanation card (about 26rem with its toolbar) not to be clipped. */
+  min-height: 26rem;
   margin: 0 0 var(--space-4);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);

@@ -1,4 +1,5 @@
-import { AI_RATE_LIMIT } from '../config/constants';
+import { AI_RATE_LIMIT, EXTENSION_PAGES } from '../config/constants';
+import { panelTabOf } from './sender';
 
 /**
  * Per-sender AI request limits (Phase 2 security review, HIGH-1 follow-up): a token
@@ -140,7 +141,19 @@ export function createAiGuard(now: () => number = Date.now): AiGuard {
   return { buckets: new TokenBuckets(AI_RATE_LIMIT, now), inFlight: new InFlightRequests() };
 }
 
-/** The limiter key for a sender: its tab, or its page for tab-less extension pages. */
-export function senderKey(sender: { tabId?: number; path?: string }): string {
-  return sender.tabId === undefined ? `page:${sender.path ?? 'unknown'}` : `tab:${sender.tabId}`;
+/**
+ * The limiter key for a sender: its tab, or its page for tab-less extension pages. A side panel
+ * is tab-less but belongs to one tab (the query of its own url), so its key is per tab too: panels
+ * in two windows never cancel each other's request.
+ */
+export function senderKey(sender: { tabId?: number; path?: string; url?: string }): string {
+  if (sender.tabId !== undefined) return `tab:${sender.tabId}`;
+  if (sender.path === EXTENSION_PAGES.sidepanel) {
+    const tab = panelTabOf(sender.url);
+    if (tab !== undefined) return panelKey(tab);
+  }
+  return `page:${sender.path ?? 'unknown'}`;
 }
+
+/** The limiter key of the side panel that belongs to `tabId` (forgotten when the tab closes). */
+export const panelKey = (tabId: number): string => `panel:${tabId}`;

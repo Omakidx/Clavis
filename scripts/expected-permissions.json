@@ -19,7 +19,7 @@
     "options_ui"
   ],
   "minimum_chrome_version": "147",
-  "permissions": ["storage", "tts", "scripting", "activeTab", "contextMenus"],
+  "permissions": ["storage", "tts", "scripting", "activeTab", "contextMenus", "sidePanel"],
   "optional_permissions": [],
   "host_permissions": ["https://api.groq.com/*"],
   "optional_host_permissions": ["http://*/*", "https://*/*"],

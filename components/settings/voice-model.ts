@@ -6,11 +6,13 @@ export const ALL_LANGUAGES = '';
 
 /**
  * Every voice on the device, Chrome's first, once per name: the same name in both engines is one
- * choice (the preference stores only a name), and Chrome's copy wins.
+ * choice (the preference stores only a name), and Chrome's copy wins. Voices of the optional
+ * fallback engine count only while that engine is available (it is not adopted, D-07).
  */
 export function allVoices(report: VoicesReport): VoiceInfo[] {
   const seen = new Set<string>();
-  return [...report.engines.chromeTts.voices, ...report.engines.offscreen.voices].filter(
+  const { chromeTts, offscreen } = report.engines;
+  return [...chromeTts.voices, ...(offscreen.available ? offscreen.voices : [])].filter(
     (voice) => !seen.has(voice.name) && seen.add(voice.name) !== undefined,
   );
 }

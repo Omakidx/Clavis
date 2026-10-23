@@ -1,14 +1,19 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { browser } from 'wxt/browser';
-import { Button, ErrorNotice } from '../../components/common/ui';
+import { Button, ErrorNotice, Notice } from '../../components/common/ui';
 import { Page } from '../../components/common/Page';
+import { SiteAccessHelp } from '../../components/settings/SiteAccessHelp';
 import { t } from '../../lib/i18n';
 import { injectTabMessage, type InjectResult } from '../../lib/site-access/messages';
 import { useSiteAccess } from '../../lib/site-access/use-site-access';
 import { api } from '../../lib/ui-client/api';
-import { openExtensionPage, openSettingsPage } from '../../lib/ui-client/navigation';
+import {
+  openExtensionPage,
+  openSettingsAt,
+  openSettingsPage,
+} from '../../lib/ui-client/navigation';
 import { useResource } from '../../lib/ui-client/use-resource';
-import { GROQ_STATUS } from './status';
+import { GROQ_STATUS, isPdfTabUrl } from './status';
 
 function openReader() {
   openExtensionPage('/reader.html');
@@ -17,6 +22,12 @@ function openReader() {
 
 function openSettings() {
   openSettingsPage();
+  window.close();
+}
+
+/** Settings at one section; the popup closes because the page it opens takes over. */
+function openSection(section: Parameters<typeof openSettingsAt>[0]) {
+  openSettingsAt(section);
   window.close();
 }
 
@@ -49,11 +60,35 @@ const INJECT_MESSAGE = {
   failed: 'popupInjectFailed',
 } as const;
 
-/** Compact status: is Groq ready, is website access on, and the buttons people need most. */
+/** Address of the tab the popup was opened on (readable under `activeTab`), when it can be read. */
+function useActiveTabUrl(): string | undefined {
+  const [url, setUrl] = useState<string | undefined>();
+  useEffect(() => {
+    let alive = true;
+    browser.tabs.query({ active: true, currentWindow: true }).then(
+      ([tab]) => {
+        if (alive) setUrl(tab?.url);
+      },
+      () => undefined,
+    );
+    return () => {
+      alive = false;
+    };
+  }, []);
+  return url;
+}
+
+/**
+ * Compact status: is Groq ready, is website access on, and the buttons people need most. What
+ * is not working says so here and has one button that fixes it (no key, key rejected), a tab
+ * that is a PDF in Chrome's own viewer points to the Clavis reader, and without website access
+ * the other ways to use Clavis are one click away.
+ */
 export function App() {
   const { status } = useSiteAccess();
   const ai = useResource(api.getAiStatus);
   const [inject, setInject] = useState<InjectState>('idle');
+  const onPdfTab = isPdfTabUrl(useActiveTabUrl());
 
   function onExplainHere() {
     setInject('busy');
@@ -68,6 +103,24 @@ export function App() {
 
   const aiState = ai.state;
   const groq = aiState.status === 'ready' ? GROQ_STATUS[aiState.data.state] : null;
+  const fixAction =
+    groq?.action === 'connect' ? (
+      <Button variant="primary" onClick={() => openSection('key')}>
+        {t('uiConnectGroq')}
+      </Button>
+    ) : groq?.action === 'update-key' ? (
+      <Button variant="primary" onClick={() => openSection('key')}>
+        {t('uiUpdateKey')}
+      </Button>
+    ) : groq?.action === 'review' ? (
+      <Button variant="primary" onClick={openSetup}>
+        {t('popupReviewSetup')}
+      </Button>
+    ) : null;
+  // Exactly one primary button: the fix for what is broken, else the way to explain on this page,
+  // else the reader.
+  const injectPrimary = fixAction === null && !onPdfTab && status === 'not-granted';
+  const readerPrimary = fixAction === null && !injectPrimary;
 
   return (
     <Page title={t('extName')} size="narrow">
@@ -96,26 +149,32 @@ export function App() {
         <ErrorNotice error={aiState.error} onRetry={ai.reload} onOpenSettings={openSettings} />
       ) : null}
 
+      {groq !== null && groq.notice.length > 0 ? (
+        <Notice tone={groq.tone === 'danger' ? 'danger' : 'warning'}>
+          {groq.notice.map((key) => (
+            <p key={key}>{t(key)}</p>
+          ))}
+          {fixAction === null ? null : <div className="clavis-actions">{fixAction}</div>}
+        </Notice>
+      ) : null}
+
+      {onPdfTab ? (
+        <Notice testId="popup-pdf-help">
+          <h2 className="clavis-notice__title">{t('popupPdfTitle')}</h2>
+          <p>{t('popupPdfBody')}</p>
+          <div className="clavis-actions">
+            <Button variant="link" onClick={() => openSection('pdfHelp')}>
+              {t('popupPdfHelp')}
+            </Button>
+          </div>
+        </Notice>
+      ) : null}
+
       <div className="clavis-actions">
-        {groq?.action === 'connect' ? (
-          <Button variant="primary" onClick={openSettings}>
-            {t('uiConnectGroq')}
-          </Button>
-        ) : null}
-        {groq?.action === 'update-key' ? (
-          <Button variant="primary" onClick={openSettings}>
-            {t('uiUpdateKey')}
-          </Button>
-        ) : null}
-        {groq?.action === 'review' ? (
-          <Button variant="primary" onClick={openSetup}>
-            {t('popupReviewSetup')}
-          </Button>
-        ) : null}
-        {status === 'not-granted' ? (
+        {status === 'not-granted' && !onPdfTab ? (
           <>
             <Button
-              variant={groq === null || groq.action === 'none' ? 'primary' : 'default'}
+              variant={injectPrimary ? 'primary' : 'default'}
               disabled={inject === 'busy'}
               onClick={onExplainHere}
             >
@@ -127,14 +186,21 @@ export function App() {
             </div>
           </>
         ) : null}
-        <Button
-          variant={groq?.action === 'none' || groq === null ? 'primary' : 'default'}
-          onClick={openReader}
-        >
+        <Button variant={readerPrimary ? 'primary' : 'default'} onClick={openReader}>
           {t('popupOpenReader')}
         </Button>
         <Button onClick={openSettings}>{t('popupSettings')}</Button>
       </div>
+
+      {status === 'not-granted' ? (
+        <details className="clavis-disclosure" data-testid="popup-site-help">
+          <summary>{t('siteHelpTitle')}</summary>
+          <SiteAccessHelp bare />
+          <div className="clavis-actions">
+            <Button onClick={() => openSection('site')}>{t('siteHelpOpenSettings')}</Button>
+          </div>
+        </details>
+      ) : null}
     </Page>
   );
 }

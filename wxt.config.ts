@@ -1,5 +1,8 @@
 import { defineConfig } from 'wxt';
 
+/** Left in every chunk of a CLAVIS_FORCE_FEATURES build; audit-zip.mjs fails the release ZIP if it finds it. */
+const FORCED_FEATURES_MARKER = 'CLAVIS_FORCED_FEATURES_BUILD_NEVER_SHIP';
+
 // Manifest permissions are normative in docs/architecture.md §3.
 // Change them there first, then here, and update the privacy policy.
 export default defineConfig({
@@ -17,8 +20,10 @@ export default defineConfig({
     minimum_chrome_version: '147',
     // D-07: Listen uses chrome.tts only (the offscreen Web Speech fallback found the same voices
     // and was not adopted), so there is no 'offscreen' permission.
-    permissions: ['storage', 'tts', 'scripting', 'activeTab', 'contextMenus'],
-    // 'sidePanel' is added when the side panel ships (FR-042, Phase 8).
+    // 'sidePanel' (FR-042, Phase 8): the side panel for long explanations. It is opened per tab by
+    // `chrome.sidePanel.setOptions({ tabId, path }) + open()` after a click on "Open in side
+    // panel"; the manifest has no `side_panel.default_path` (see the build:manifestGenerated hook).
+    permissions: ['storage', 'tts', 'scripting', 'activeTab', 'contextMenus', 'sidePanel'],
     host_permissions: ['https://api.groq.com/*'],
     // Requested at onboarding from a user gesture (D-02); never at install.
     optional_host_permissions: ['http://*/*', 'https://*/*'],
@@ -41,7 +46,40 @@ export default defineConfig({
         "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'; media-src 'none'; frame-src 'none'; form-action 'none'; base-uri 'none'",
     },
   },
+  // Test builds only: CLAVIS_FORCE_FEATURES=1 builds with FEATURES.grammarTab and FEATURES.translateTab
+  // on, so the Grammar and Translate tabs can be exercised end to end WITHOUT editing
+  // lib/config/constants.ts. The shipped flags stay the literals in that file (flip them there).
+  vite: () => ({
+    plugins:
+      process.env.CLAVIS_FORCE_FEATURES === '1'
+        ? [
+            {
+              name: 'clavis-force-features',
+              enforce: 'pre' as const,
+              transform(code: string, id: string) {
+                if (!id.replaceAll('\\', '/').endsWith('lib/config/constants.ts')) return null;
+                // The flag's initializer also sets a global named FORCED_FEATURES_MARKER, a side
+                // effect the minifier keeps, so every bundle that reads FEATURES carries the name
+                // and scripts/audit-zip.mjs refuses the ZIP of such a build.
+                return code
+                  .replace(
+                    'grammarTab: false',
+                    `grammarTab: ((globalThis as Record<string, unknown>)['${FORCED_FEATURES_MARKER}'] = true)`,
+                  )
+                  .replace('translateTab: false', 'translateTab: true');
+              },
+            },
+          ]
+        : [],
+  }),
   hooks: {
+    // WXT turns entrypoints/sidepanel into `side_panel.default_path`, which would offer ONE shared
+    // panel on every tab (it would keep showing one tab's explanation after a tab switch). The
+    // panel is per tab instead: lib/router/handlers/sidepanel.ts enables it for one tab with
+    // `setOptions({ tabId, path: 'sidepanel.html?tab=<id>' })`, so there is no default.
+    'build:manifestGenerated': (_wxt, manifest) => {
+      delete (manifest as { side_panel?: unknown }).side_panel;
+    },
     // Spike C (D-06): PDF.js reads CMaps, standard fonts, ICC profiles and image-decoder wasm at
     // runtime from URLs. Copy them from pdfjs-dist into the build under pdfjs/ so nothing is
     // fetched remotely. The scripting sandbox (quickjs-eval) is deliberately left out. Only the

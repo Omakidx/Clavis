@@ -2,9 +2,11 @@ import { EXTENSION_PAGES } from '../config/constants';
 import {
   parsePrivilegedMessage,
   parsePublicMessage,
+  parseSidePanelMessage,
   type MessageParseResult,
   type PrivilegedMessage,
   type PublicMessage,
+  type SidePanelMessage,
 } from '../contracts';
 import { injectTabForPopup, type InjectionDeps } from '../site-access/injection';
 import { isInjectTabMessage, type InjectTabMessage } from '../site-access/messages';
@@ -12,6 +14,7 @@ import { rejectedSpeakReply, type SpeechHandlers } from '../speech/background';
 import type { createAiHandlers } from './handlers/ai';
 import type { CardHandlers } from './handlers/card';
 import type { NavigationHandlers } from './handlers/navigation';
+import type { SidePanelHandlers } from './handlers/sidepanel';
 import type { KeyService } from './handlers/key';
 import type { SettingsHandlers } from './handlers/settings';
 import {
@@ -23,13 +26,13 @@ import {
   type SenderRule,
 } from './router';
 import { invalidRequest } from './replies';
-import { PRACTICE_PAGE_PATH } from './sender';
+import { panelTabOf, PRACTICE_PAGE_PATH } from './sender';
 
 // ---------------------------------------------------------------------------
 // Allowed senders
 // ---------------------------------------------------------------------------
 
-const { options, onboarding, popup, reader } = EXTENSION_PAGES;
+const { options, onboarding, popup, reader, sidepanel } = EXTENSION_PAGES;
 
 /**
  * Public routes: content scripts, the reader, the practice page and the other extension
@@ -40,6 +43,29 @@ export const PUBLIC_SENDERS: SenderRule = {
   content: true,
   pages: [options, onboarding, popup, reader, PRACTICE_PAGE_PATH],
 };
+
+/**
+ * The routes the side panel (FR-042) shares with the card: AI_EXPLAIN (further modes on demand),
+ * AI_CANCEL, TTS_SPEAK / TTS_STOP (Listen for the selected text) and GET_PUBLIC_SETTINGS (rate,
+ * language). Not GET_AI_STATUS. The panel never carries `acknowledgeDisclosure`: that stays with
+ * the card (`mayAcknowledgeDisclosure`), so the panel adds no new disclosure path.
+ */
+export const PANEL_SENDERS: SenderRule = {
+  content: true,
+  pages: [options, onboarding, popup, reader, PRACTICE_PAGE_PATH, sidepanel],
+};
+
+/**
+ * OPEN_SIDE_PANEL: the contexts that host the explanation card (web page content scripts, the
+ * reader and the practice page). Not the popup, Settings or the panel itself.
+ */
+export const OPEN_SIDE_PANEL_SENDERS: SenderRule = {
+  content: true,
+  pages: [reader, PRACTICE_PAGE_PATH],
+};
+
+/** GET_SIDE_PANEL_STATE: the side panel only, and only for its own tab (checked in the route). */
+export const GET_SIDE_PANEL_STATE_SENDERS: SenderRule = { pages: [sidepanel] };
 
 /**
  * Key routes (KEY_ROUTES in lib/contracts) and CLEAR_ALL_DATA: ONLY the options and
@@ -58,7 +84,7 @@ export const CARD_LOAD_SENDERS: SenderRule = { content: true };
 /** OPEN_SETTINGS: where "Open settings" buttons live (the card, the practice page, the reader, the popup). */
 export const OPEN_SETTINGS_SENDERS: SenderRule = {
   content: true,
-  pages: [popup, reader, PRACTICE_PAGE_PATH],
+  pages: [popup, reader, PRACTICE_PAGE_PATH, sidepanel],
 };
 
 /** Other privileged routes: settings and status. Adds the popup. */
@@ -118,6 +144,28 @@ function privilegedRoute<K extends PrivilegedMessage['type']>(
   });
 }
 
+/**
+ * A route of the side panel (FR-042): validated by `parseSidePanelMessage`, the only parser with
+ * the larger size bound (`LIMITS.maxHandoffBytes`).
+ */
+function sidePanelRoute<K extends SidePanelMessage['type']>(
+  type: K,
+  allow: SenderRule,
+  handle: (message: Extract<SidePanelMessage, { type: K }>, context: RouteContext) => unknown,
+): Route {
+  return defineRoute<Extract<SidePanelMessage, { type: K }>>({
+    type,
+    allow,
+    parse: (raw) => {
+      const parsed = parseSidePanelMessage(raw);
+      return parsed.ok && parsed.message.type === type
+        ? { ok: true, message: parsed.message as Extract<SidePanelMessage, { type: K }> }
+        : { ok: false };
+    },
+    handle,
+  });
+}
+
 /** The Spike B replies are `{ ok: false, reason }`, not envelopes; keep that shape. */
 const injectRejected = (): unknown => ({ ok: false, reason: 'failed' });
 
@@ -125,6 +173,7 @@ export interface RouteServices {
   ai: ReturnType<typeof createAiHandlers>;
   card: CardHandlers;
   navigation: NavigationHandlers;
+  sidePanel: SidePanelHandlers;
   keys: KeyService;
   settings: SettingsHandlers;
   speech: SpeechHandlers;
@@ -136,16 +185,21 @@ export interface RouteServices {
  * Anything not listed is not answered.
  */
 export function buildRoutes(services: RouteServices): Route[] {
-  const { ai, card, navigation, keys, settings, speech, injection } = services;
+  const { ai, card, navigation, sidePanel, keys, settings, speech, injection } = services;
 
   return [
     // ---- public ---------------------------------------------------------
-    publicRoute('AI_EXPLAIN', (message, context) =>
-      ai.explain(message.payload, context, {
-        acknowledgeDisclosure: message.acknowledgeDisclosure === true,
-      }),
+    publicRoute(
+      'AI_EXPLAIN',
+      (message, context) =>
+        ai.explain(message.payload, context, {
+          acknowledgeDisclosure: message.acknowledgeDisclosure === true,
+        }),
+      { allow: PANEL_SENDERS },
     ),
-    publicRoute('AI_CANCEL', (message, context) => ai.cancel(message.requestId, context)),
+    publicRoute('AI_CANCEL', (message, context) => ai.cancel(message.requestId, context), {
+      allow: PANEL_SENDERS,
+    }),
     publicRoute(
       'TTS_SPEAK',
       (message, { sender }) =>
@@ -154,12 +208,18 @@ export function buildRoutes(services: RouteServices): Route[] {
           frameId: sender.frameId,
           documentId: sender.documentId,
         }),
-      { reject: (raw, why) => (why === 'shape' ? rejectedSpeakReply(raw) : invalidRequest(raw)) },
+      {
+        allow: PANEL_SENDERS,
+        reject: (raw, why) => (why === 'shape' ? rejectedSpeakReply(raw) : invalidRequest(raw)),
+      },
     ),
-    publicRoute('TTS_STOP', (message, { sender }) =>
-      speech.stop(message, { tabId: sender.tabId, frameId: sender.frameId }),
+    publicRoute(
+      'TTS_STOP',
+      (message, { sender }) =>
+        speech.stop(message, { tabId: sender.tabId, frameId: sender.frameId }),
+      { allow: PANEL_SENDERS },
     ),
-    publicRoute('GET_PUBLIC_SETTINGS', () => ai.getPublicSettings()),
+    publicRoute('GET_PUBLIC_SETTINGS', () => ai.getPublicSettings(), { allow: PANEL_SENDERS }),
     publicRoute('GET_AI_STATUS', () => ai.getAiStatus()),
     publicRoute('LOAD_EXPLAIN_CARD', (_message, context) => card.loadExplainCard(context), {
       allow: CARD_LOAD_SENDERS,
@@ -168,6 +228,18 @@ export function buildRoutes(services: RouteServices): Route[] {
       'OPEN_SETTINGS',
       (message, context) => navigation.openSettings(message.section, context),
       { allow: OPEN_SETTINGS_SENDERS },
+    ),
+
+    // ---- the side panel (FR-042) ------------------------------------------------
+    // The hand-off is the one message above the normal size bound; it is held in memory by tab.
+    sidePanelRoute('OPEN_SIDE_PANEL', OPEN_SIDE_PANEL_SENDERS, (message, context) =>
+      sidePanel.open(message.handoff, context),
+    ),
+    sidePanelRoute('GET_SIDE_PANEL_STATE', GET_SIDE_PANEL_STATE_SENDERS, (message, context) =>
+      // A panel reads only its own tab's hand-off (the tab id in its own url, set by us).
+      panelTabOf(context.sender.url) === message.tabId
+        ? sidePanel.getState(message.tabId)
+        : invalidRequest(message),
     ),
 
     // ---- privileged: the key --------------------------------------------

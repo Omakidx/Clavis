@@ -16,29 +16,14 @@ interface VoiceSectionProps {
   settings: SettingsHook;
 }
 
-/** What each engine found, plainly (this is where the D-07 check is read off). */
+/** What the device reports, plainly: how many voices speak on this computer and how many are online. */
 function VoiceCounts({ report }: { report: VoicesReport }) {
-  const { chromeTts, offscreen } = report.engines;
-  const engine =
-    report.defaultEngine === 'chrome-tts'
-      ? t('voiceEngineChrome')
-      : report.defaultEngine === 'offscreen-web-speech'
-        ? t('voiceEngineFallback')
-        : null;
+  const voices = allVoices(report);
+  const online = voices.filter((voice) => voice.remote).length;
   return (
     <div data-testid="voice-counts">
       <h3>{t('voiceDevice')}</h3>
-      <ul>
-        <li data-engine="chrome-tts">
-          {t('voiceCount', [t('voiceEngineChrome'), String(chromeTts.voices.length)])}
-        </li>
-        <li data-engine="offscreen-web-speech">
-          {offscreen.available
-            ? t('voiceCount', [t('voiceEngineFallback'), String(offscreen.voices.length)])
-            : t('voiceFallbackOff')}
-        </li>
-      </ul>
-      {engine === null ? null : <p className="clavis-hint">{t('voiceDefaultEngine', engine)}</p>}
+      <p>{t('voiceSummary', [String(voices.length - online), String(online)])}</p>
     </div>
   );
 }
@@ -100,7 +85,7 @@ function Fields({
 }
 
 /**
- * Settings > Voice (FR-025, FR-006): which voices this device really has, per engine; the voice
+ * Settings > Voice (FR-025, FR-006): which voices this device really has, on-device and online; the voice
  * Listen should use; the voice language and default speed; and a Test voice button. Works without
  * a Groq key and sends nothing to Groq.
  */
@@ -112,6 +97,7 @@ export function VoiceSection({ settings }: VoiceSectionProps) {
     <section className="clavis-section" aria-labelledby={headingId} id="section-voice">
       <h2 id={headingId}>{t('voiceTitle')}</h2>
       <p>{t('voiceIntro')}</p>
+      <p>{t('voiceLimits')}</p>
       <ResourceGate resource={voices}>
         {(report) => (
           <>

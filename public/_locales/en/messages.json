@@ -144,8 +144,8 @@
     "description": "Toolbar button that explains the selected text. Explain is also the name used in the privacy disclosure."
   },
   "toolbarCardPlaceholder": {
-    "message": "The explanation will appear here.",
-    "description": "Temporary placeholder inside the toolbar card, shown after Listen or Explain is chosen. Replaced by real content in a later phase."
+    "message": "Clavis couldn't show the explanation. Press Explain to try again.",
+    "description": "State line in the toolbar card when the Explain action finished without drawing its explanation card."
   },
   "toolbarWorking": {
     "message": "Working on it…",
@@ -227,10 +227,6 @@
     "message": "Clavis settings",
     "description": "Main heading and tab title of the settings page."
   },
-  "optionsPlaceholder": {
-    "message": "Settings will be available in a later phase.",
-    "description": "Placeholder text on the settings page while the real settings are not built yet."
-  },
   "readerTitle": {
     "message": "Clavis PDF reader",
     "description": "Main heading and tab title of the PDF reader page."
@@ -267,10 +263,6 @@
     "message": "$FILE$ — Clavis PDF reader",
     "description": "Browser tab title while a PDF is open. $FILE$ is the file name.",
     "placeholders": { "FILE": { "content": "$1" } }
-  },
-  "readerToolsLabel": {
-    "message": "PDF reader tools",
-    "description": "Accessible name of the reader toolbar that holds open, page, zoom and find controls."
   },
   "readerGroupPages": {
     "message": "Pages",
@@ -661,25 +653,13 @@
     "message": "Thanks. Your confirmation was saved.",
     "description": "Status announced after the user clicked I understand."
   },
-  "onbDisclosureNeeded": {
-    "message": "Please read this and choose I understand to continue.",
-    "description": "Hint shown on the data disclosure step before the user confirmed it."
-  },
   "onbAccessAlternative": {
-    "message": "Without website access you can still use Clavis: select text, right-click it and choose Explain with Clavis. You can also press Alt+Shift+E after selecting text, or click the Clavis icon in Chrome and choose Explain on this page.",
+    "message": "Without website access you can still use Clavis: select text, right-click it and choose Explain with Clavis. You can also press Alt+Shift+E after selecting text, or click the Clavis icon in Chrome and choose Explain on this page. If you don't see the icon, open Chrome's Extensions menu (the puzzle-piece icon) and pin Clavis.",
     "description": "Explains the right-click, keyboard shortcut and toolbar icon alternatives to website access. Alt+Shift+E is the default shortcut."
   },
   "onbAccessLater": {
     "message": "You can change this at any time in Settings.",
     "description": "Reminder under the website access choice."
-  },
-  "onbAccessSaveFailed": {
-    "message": "Clavis couldn't save your choice. Try again.",
-    "description": "Error shown when saving the website access choice failed."
-  },
-  "onbAccessChoose": {
-    "message": "Choose one of the two options to continue.",
-    "description": "Hint shown on the website access step before the user chose."
   },
   "onbGetKeyTitle": {
     "message": "Get your Groq key",
@@ -725,14 +705,6 @@
     "message": "Continue",
     "description": "Button that continues after a key was connected."
   },
-  "onbConnectContinueAnyway": {
-    "message": "Continue anyway",
-    "description": "Button that continues even though the key was not verified or not accepted."
-  },
-  "onbConnectNeeded": {
-    "message": "Connect your key, or choose Set up later.",
-    "description": "Hint shown on the connect step before a key was saved."
-  },
   "onbPrefsTitle": {
     "message": "Choose your preferences",
     "description": "Heading of the setup step for language, reading level, speed and toolbar behavior."
@@ -762,7 +734,7 @@
     "description": "Heading of the last setup step."
   },
   "onbDoneBody": {
-    "message": "Select text on any page and use the Clavis toolbar. Settings and the PDF reader are always one click away from the Clavis icon.",
+    "message": "Select text on any page and use the Clavis toolbar. Settings and the PDF reader are always one click away from the Clavis icon. If you don't see the icon, open Chrome's Extensions menu (the puzzle-piece icon) and pin Clavis.",
     "description": "Body of the last setup step."
   },
   "onbDoneNoKey": {
@@ -776,10 +748,6 @@
   "onbDoneSaved": {
     "message": "Setup is complete. You can close this tab.",
     "description": "Status shown after setup was completed."
-  },
-  "onbDoneSaveFailed": {
-    "message": "Clavis couldn't save that setup is complete. Try again.",
-    "description": "Error shown when marking setup as completed failed."
   },
   "onbSummaryHeading": {
     "message": "Your setup",
@@ -1045,10 +1013,6 @@
     "message": "Resets language, reading level, speed, toolbar behavior and model choice.",
     "description": "Hint next to the reset button."
   },
-  "prefLoadFailed": {
-    "message": "Clavis couldn't load your settings.",
-    "description": "Error shown when loading settings failed."
-  },
   "modelTitle": {
     "message": "Model",
     "description": "Heading of the model section in Settings."
@@ -1068,11 +1032,6 @@
   "modelMissing": {
     "message": "The model you chose, $MODEL$, isn't available to your key right now. Choose another model below. Clavis won't switch models for you.",
     "description": "Warning when the saved model is missing from the list Groq returned. $MODEL$ is a model id.",
-    "placeholders": { "MODEL": { "content": "$1" } }
-  },
-  "modelUnavailableOption": {
-    "message": "$MODEL$ (not available now)",
-    "description": "Drop-down option for a saved model that is no longer in the list. $MODEL$ is a model id.",
     "placeholders": { "MODEL": { "content": "$1" } }
   },
   "modelListNoKey": {
@@ -1095,10 +1054,6 @@
     "message": "Website access",
     "description": "Heading of the website access section in Settings."
   },
-  "siteStatusLabel": {
-    "message": "Website access status",
-    "description": "Accessible label of the website access status line."
-  },
   "siteStatusOn": {
     "message": "Website access is on. Clavis shows its toolbar when you select text on websites.",
     "description": "Settings status when site access is granted and active."
@@ -1110,10 +1065,6 @@
   "siteStatusOff": {
     "message": "Website access is off. Select text, right-click and choose Explain with Clavis, or click the Clavis icon and choose Explain on this page.",
     "description": "Settings status when site access is not granted."
-  },
-  "siteStatusLoading": {
-    "message": "Checking website access…",
-    "description": "Settings status while the website access state is loading."
   },
   "siteRevokeHelp": {
     "message": "To turn it off in Chrome, open Clavis on the chrome://extensions page, choose Details, and change Site access. You can also use the button below.",
@@ -1255,6 +1206,131 @@
     "message": "Keyboard: select text, then press Alt+Shift+E to open the Clavis toolbar. You can change the shortcut on the chrome://extensions/shortcuts page.",
     "description": "Explains the keyboard shortcut. Alt+Shift+E is the default."
   },
+  "pdfHelpTitle": {
+    "message": "Reading PDFs with Clavis",
+    "description": "Heading of the PDF help in Settings > Help."
+  },
+  "pdfHelpWhy": {
+    "message": "Chrome shows PDFs in its own built-in viewer. That viewer is a separate page that extensions can't add a toolbar to, so Listen and Explain can't appear there. Clavis never takes over or changes how Chrome opens PDFs.",
+    "description": "PDF help: why the toolbar does not appear in Chrome's own PDF viewer (FR-056)."
+  },
+  "pdfHelpIntro": {
+    "message": "To use Clavis on a PDF, open it in the Clavis PDF reader:",
+    "description": "PDF help: introduces the numbered steps."
+  },
+  "pdfHelpStep1": {
+    "message": "Click the Clavis icon and choose Open PDF reader, or use the link below. If you don't see the icon, open Chrome's Extensions menu (the puzzle-piece icon) and pin Clavis.",
+    "description": "PDF help step 1. Open PDF reader is the popup button's name."
+  },
+  "pdfHelpStep2": {
+    "message": "Choose the PDF from your computer, or drag the file onto the reader page.",
+    "description": "PDF help step 2."
+  },
+  "pdfHelpStep3": {
+    "message": "Select a word or a sentence, then use Listen or Explain, just as on a web page.",
+    "description": "PDF help step 3. Listen and Explain are toolbar button names."
+  },
+  "pdfHelpWebPdf": {
+    "message": "If the PDF is on a website, save it to your computer first (use the download button in Chrome's viewer), then open the saved file. The reader opens files from your computer only, not web addresses.",
+    "description": "PDF help: remote PDFs are not supported in this version (D-03)."
+  },
+  "pdfHelpLimitsTitle": {
+    "message": "Good to know about PDFs",
+    "description": "Heading of the list of PDF limitations in Settings > Help."
+  },
+  "pdfHelpLimitScan": {
+    "message": "Scanned PDFs made of page pictures have no text to select. Clavis has no text recognition (OCR), so it can't read them.",
+    "description": "PDF limitation: image-only PDFs."
+  },
+  "pdfHelpLimitPassword": {
+    "message": "Password-protected PDFs ask for their password when you open them.",
+    "description": "PDF limitation: encrypted PDFs are supported through a password prompt."
+  },
+  "pdfHelpLimitXfa": {
+    "message": "Forms that use only XFA, an older PDF form format, aren't supported.",
+    "description": "PDF limitation: XFA-only forms."
+  },
+  "siteHelpTitle": {
+    "message": "Using Clavis without website access",
+    "description": "Heading of the help for people who did not allow website access (FR-018). Also the label of the popup's expandable help."
+  },
+  "siteHelpIntro": {
+    "message": "With website access off, the toolbar doesn't appear by itself when you select text. You can still use Clavis on the page you're reading, one page at a time:",
+    "description": "Site access help: introduces the three ways to use Clavis without website access."
+  },
+  "siteHelpContextMenu": {
+    "message": "Select text, right-click it and choose Explain with Clavis.",
+    "description": "Site access help: the context menu path. Explain with Clavis is the context menu item's name."
+  },
+  "siteHelpIcon": {
+    "message": "Select text, click the Clavis icon and choose Explain on this page. If you don't see the icon, open Chrome's Extensions menu (the puzzle-piece icon) and pin Clavis.",
+    "description": "Site access help: the toolbar icon path. Explain on this page is the popup button's name."
+  },
+  "siteHelpShortcut": {
+    "message": "Select text and press Alt+Shift+E. You can change the shortcut on the chrome://extensions/shortcuts page.",
+    "description": "Site access help: the keyboard shortcut path. Alt+Shift+E is the default."
+  },
+  "siteHelpTurnOnTitle": {
+    "message": "To show the toolbar automatically",
+    "description": "Heading above the steps that turn on automatic mode."
+  },
+  "siteHelpTurnOn": {
+    "message": "Choose Enable on websites under Website access in Settings. Or open the chrome://extensions page, choose Details for Clavis and set Site access to On all sites.",
+    "description": "Site access help: two ways to turn on website access. Enable on websites is a button name; Details and Site access are Chrome's own labels."
+  },
+  "siteHelpToolbarSetting": {
+    "message": "Also check that When to show the toolbar, under Preferences, is set to Automatically. If it is set to Only when I ask, the toolbar stays hidden even with website access on.",
+    "description": "Site access help: the preference that also controls whether the toolbar appears by itself."
+  },
+  "siteHelpOpenSettings": {
+    "message": "Turn on website access",
+    "description": "Popup button that opens Settings at the Website access section."
+  },
+  "helpVoicesTitle": {
+    "message": "Listening and voices",
+    "description": "Heading of the voice limitations in Settings > Help."
+  },
+  "helpVoicesBody": {
+    "message": "Listen uses the voices installed on your computer, so the languages and accents you get depend on your system. Some systems, including many Linux setups, have no voice until you install one. Online voices send the selected text to their provider and are used only if you choose one in Voice settings.",
+    "description": "Help: truthful voice limitations (D-22). Voice settings is the name of a Settings section."
+  },
+  "popupPdfTitle": {
+    "message": "This tab looks like a PDF",
+    "description": "Popup notice heading shown when the current tab's address ends in .pdf."
+  },
+  "popupPdfBody": {
+    "message": "Clavis can't add its toolbar to Chrome's built-in PDF viewer. Save the PDF to your computer, then open it in the Clavis PDF reader.",
+    "description": "Popup notice body for a PDF tab. Explains the supported path (D-03, FR-056)."
+  },
+  "popupPdfHelp": {
+    "message": "How to read PDFs with Clavis",
+    "description": "Popup link that opens the PDF help in Settings."
+  },
+  "popupDisclosureBody": {
+    "message": "Before Explain can send text to Groq, Clavis needs you to read what it sends.",
+    "description": "Popup notice shown when a key exists but the data notice was never accepted. The button opens the setup tutorial."
+  },
+  "readerEmptyHelp": {
+    "message": "Why doesn't Clavis work in Chrome's PDF viewer?",
+    "description": "Link in the reader's empty state that opens the PDF help in Settings."
+  },
+  "voiceLimits": {
+    "message": "Which voices and languages you can use depends on your operating system. Clavis lists only the voices your device reports and uses a voice only for a language it speaks. A voice marked online sends the selected text to that voice's provider, and Clavis uses one only if you choose it here.",
+    "description": "Voice section: truthful limits (D-22, FR-024, FR-025)."
+  },
+  "voiceSummary": {
+    "message": "On-device voices: $LOCAL$. Online voices: $ONLINE$.",
+    "description": "Voice section: how many voices the device reports. $LOCAL$ and $ONLINE$ are numbers.",
+    "placeholders": { "LOCAL": { "content": "$1" }, "ONLINE": { "content": "$2" } }
+  },
+  "voiceGroupDevice": {
+    "message": "On this device",
+    "description": "Group label in the voice drop-down for voices that speak on this computer."
+  },
+  "voiceGroupOnline": {
+    "message": "Online (sends the text to a service)",
+    "description": "Group label in the voice drop-down for online voices (D-22)."
+  },
   "optionsNavLabel": {
     "message": "Settings sections",
     "description": "Accessible name of the navigation list that jumps between settings sections."
@@ -1379,43 +1455,13 @@
     "message": "Result",
     "description": "Heading of the panel that shows what Listen or Explain did."
   },
-  "practiceResultEmpty": {
-    "message": "Choose Listen or Explain in the toolbar to see the result here.",
-    "description": "Placeholder in the result panel before anything was chosen."
-  },
   "practiceListening": {
     "message": "Reading aloud…",
     "description": "Status while Listen is speaking."
   },
-  "practiceExplaining": {
-    "message": "Asking Groq…",
-    "description": "Status while Explain waits for Groq."
-  },
-  "practiceMeaning": {
-    "message": "Meaning here",
-    "description": "Label of the in-context meaning in the Explain result."
-  },
-  "practiceDefinition": {
-    "message": "Definition",
-    "description": "Label of the definition in the Explain result."
-  },
-  "practiceExamples": {
-    "message": "Examples",
-    "description": "Label of the examples in the Explain result."
-  },
-  "practiceCaveat": {
-    "message": "Note",
-    "description": "Label of the caveat in the Explain result."
-  },
-  "practiceModel": {
-    "message": "Model: $MODEL$",
-    "description": "Shows which model produced the Explain result. $MODEL$ is a model id.",
-    "placeholders": { "MODEL": { "content": "$1" } }
-  },
   "practiceSelected": {
-    "message": "Selected: $TEXT$",
-    "description": "Shows the text that was selected for Listen or Explain. $TEXT$ is the selection.",
-    "placeholders": { "TEXT": { "content": "$1" } }
+    "message": "Selected:",
+    "description": "Label before the text that was selected for Listen or Explain. The selected text follows it in its own element, so right-to-left text keeps its direction."
   },
   "settingsReloadNote": {
     "message": "Changes to when the toolbar appears and to this list apply to pages you load afterwards. Reload pages that are already open.",
@@ -1677,24 +1723,7 @@
   },
   "voiceDevice": {
     "message": "Voices found on this device",
-    "description": "Heading above the per-engine voice counts in Settings."
-  },
-  "voiceEngineChrome": {
-    "message": "Chrome voices",
-    "description": "Name of the voice group provided by the browser's own text-to-speech."
-  },
-  "voiceEngineFallback": {
-    "message": "Fallback voices",
-    "description": "Name of the voice group provided by the secondary speech engine, used only when Chrome has no voice."
-  },
-  "voiceCount": {
-    "message": "$ENGINE$: $COUNT$",
-    "description": "One line of the voice counts in Settings. $ENGINE$ is a group name such as Chrome voices, $COUNT$ is a number.",
-    "placeholders": { "ENGINE": { "content": "$1" }, "COUNT": { "content": "$2" } }
-  },
-  "voiceFallbackOff": {
-    "message": "Fallback voices: not in use",
-    "description": "Voice count line when the fallback speech engine is not available on this device."
+    "description": "Heading above the voice counts in Settings."
   },
   "voiceEmpty": {
     "message": "No voices found on this device",
@@ -1755,11 +1784,6 @@
     "message": "Test finished.",
     "description": "Status after the voice test finished."
   },
-  "voiceDefaultEngine": {
-    "message": "Listen will use: $ENGINE$",
-    "description": "Status line in Settings. $ENGINE$ is a group name such as Chrome voices.",
-    "placeholders": { "ENGINE": { "content": "$1" } }
-  },
   "listenDone": {
     "message": "Finished reading aloud.",
     "description": "Status in the practice page's result area after Listen finished the selected text."
@@ -1779,5 +1803,93 @@
   "speechOnlineOnly": {
     "message": "Only online voices are available for this language. To use one, choose it in Voice settings.",
     "description": "Message when Listen found voices for the language but all are online services, which Clavis only uses when the user chooses one explicitly (privacy). Followed by a Voice settings button."
+  },
+  "cardOpenPanel": {
+    "message": "Open in side panel",
+    "description": "Button in the explanation card: shows the whole explanation in Chrome's side panel, which has more room for long answers."
+  },
+  "cardPanelOpened": {
+    "message": "Opened in the side panel.",
+    "description": "Screen-reader announcement after the explanation was opened in Chrome's side panel."
+  },
+  "cardPanelFailed": {
+    "message": "Clavis couldn't open the side panel. Try again.",
+    "description": "Announcement when the explanation card could not open Chrome's side panel."
+  },
+  "cardLongHint": {
+    "message": "Long answer. The side panel has more room to read it.",
+    "description": "Hint in the explanation card when the answer is long; points to the Open in side panel button."
+  },
+  "cardErrOfflineTitle": {
+    "message": "You're offline",
+    "description": "Heading of the explanation card error when the computer has no internet connection."
+  },
+  "errOffline": {
+    "message": "Clavis can't reach Groq because this computer is offline. Reconnect, then try again.",
+    "description": "Message when an explain request failed and the browser reports that the computer is offline."
+  },
+  "panelTitle": {
+    "message": "Clavis explanation",
+    "description": "Title of the side panel page and its main heading."
+  },
+  "panelSelectedLabel": {
+    "message": "Selected text",
+    "description": "Label above the selected text in the side panel."
+  },
+  "panelSectionsLabel": {
+    "message": "Parts of this explanation",
+    "description": "Accessible name of the list of links to the sections (Core, Roots, ...) of the explanation in the side panel."
+  },
+  "panelLoadMode": {
+    "message": "Load $TAB$",
+    "description": "Button in the side panel that requests one more part of the explanation. $TAB$ is the name of the part, for example Roots.",
+    "placeholders": { "TAB": { "content": "$1" } }
+  },
+  "panelNotLoaded": {
+    "message": "Not loaded yet. Loading it sends the selected text to Groq as one request.",
+    "description": "Text under a part of the explanation in the side panel that has not been requested yet. Groq is the AI provider."
+  },
+  "panelNotLoadedShort": {
+    "message": "not loaded",
+    "description": "Added to a link name in the side panel's list of sections when that part has not been loaded yet."
+  },
+  "panelCopySection": {
+    "message": "Copy $TAB$",
+    "description": "Accessible name of the Copy button of one section in the side panel. $TAB$ is the section name.",
+    "placeholders": { "TAB": { "content": "$1" } }
+  },
+  "panelCopyAll": {
+    "message": "Copy all",
+    "description": "Button in the side panel that copies the selected text and every loaded part of the explanation as plain text."
+  },
+  "panelUpdated": {
+    "message": "Now showing the explanation of $TEXT$.",
+    "description": "Screen-reader announcement when the side panel received a new explanation. $TEXT$ is the selected text, shortened.",
+    "placeholders": { "TEXT": { "content": "$1" } }
+  },
+  "panelEmptyTitle": {
+    "message": "No explanation to show",
+    "description": "Heading of the side panel when it has nothing to show."
+  },
+  "panelEmptyBody": {
+    "message": "Select text on a page and choose Explain, then choose Open in side panel in the card. The explanation will appear here. If you saw one here before, Clavis was restarted or you moved to another page. Clavis doesn't keep your text, so select it again.",
+    "description": "Text of the empty side panel: how to fill it, and why a previous explanation may be gone."
+  },
+  "panelDisclosure": {
+    "message": "Groq needs your confirmation before the first request. Confirm it in the explanation card on the page, then load this part again.",
+    "description": "Message in the side panel when a request needs the one-time data disclosure confirmation, which only the card on the page can collect."
+  },
+  "panelPdfPage": {
+    "message": "PDF page $PAGE$",
+    "description": "Line in the side panel header: the selection comes from this page of a PDF.",
+    "placeholders": { "PAGE": { "content": "$1" } }
+  },
+  "panelListenGroup": {
+    "message": "Listen to the selected text",
+    "description": "Accessible name of the group of Listen controls in the side panel."
+  },
+  "panelAiNote": {
+    "message": "Written by AI, so it can be wrong. Check anything important.",
+    "description": "Short note in the side panel: the explanation is generated by an AI model."
   }
 }

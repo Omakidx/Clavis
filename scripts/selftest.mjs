@@ -111,6 +111,15 @@ const WAR_NO_DYNAMIC = { resources: ['pdfjs/viewer.js'], matches: ['https://exam
 
 const zipCases = [
   ['clean package passes', baseFiles(), 0, 'AUDIT PASSED'],
+  [
+    'forced-features test build (CLAVIS_FORCE_FEATURES marker)',
+    {
+      ...baseFiles(),
+      'background.js': 'var a=1;\n;void "CLAVIS_FORCED_FEATURES_BUILD_NEVER_SHIP";\n',
+    },
+    1,
+    'CLAVIS_FORCE_FEATURES test build',
+  ],
   ['.env file', { ...baseFiles(), '.env': 'X=1' }, 1, 'environment file'],
   ['nested .env.local', { ...baseFiles(), 'config/.env.local': 'X=1' }, 1, 'environment file'],
   ['source map', { ...baseFiles(), 'background.js.map': '{}' }, 1, 'source map'],

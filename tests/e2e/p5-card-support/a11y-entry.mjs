@@ -36,6 +36,54 @@ const RESULTS = {
   }),
 };
 
+// Phase 8 scenarios: a long answer, right-to-left text, and the Should tabs with their flags forced on.
+const LONG = 'Long text that keeps going. '.repeat(40);
+RESULTS.coreLong = (request) => ({
+  ...RESULTS.core(request),
+  summary: LONG.slice(0, 600),
+  contextualMeaning: LONG.slice(0, 800),
+  definition: LONG.slice(0, 600),
+});
+RESULTS.coreRtl = (request) => ({
+  ...RESULTS.core(request),
+  title: 'ضفة',
+  summary: 'الأرض بجانب النهر.',
+  contextualMeaning: 'هنا تعني حافة النهر وليس مصرف الأموال (bank).',
+  definition: 'أرض منحدرة على جانب النهر.',
+  examples: [{ sentence: 'صدنا السمك من الضفة.' }, { sentence: 'Say ضفة to her.' }],
+});
+RESULTS.simplify = (request) => ({
+  requestId: request.requestId,
+  selectedText: request.snapshot.text,
+  mode: 'simplify',
+  title: 'bank',
+  summary: 'x',
+  simplifiedText: 'A simpler way to say it.',
+  provider: 'groq',
+  model: 'openai/gpt-oss-20b',
+});
+RESULTS.grammar = (request) => ({
+  requestId: request.requestId,
+  selectedText: request.snapshot.text,
+  mode: 'grammar',
+  title: 'bank',
+  summary: 'x',
+  grammar: 'Subject: she\nVerb: broke (past simple)\nObject: the ice (idiom)',
+  caveat: 'An idiom: the parts do not add up.',
+  provider: 'groq',
+  model: 'openai/gpt-oss-20b',
+});
+RESULTS.translate = (request) => ({
+  requestId: request.requestId,
+  selectedText: request.snapshot.text,
+  mode: 'translate',
+  title: 'bank',
+  summary: 'x',
+  translation: { language: 'Arabic', text: 'كسرت الجليد أخيراً.', literal: 'كسرت الثلج.' },
+  provider: 'groq',
+  model: 'openai/gpt-oss-20b',
+});
+
 let counter = 0;
 
 /**
@@ -64,7 +112,7 @@ export async function show(root, options) {
   const pending = [];
   /** @type {(r: any, c: number) => any} */
   let answer = () => ({ kind: 'result' });
-  const [scenario, detail] = options.scenario.split(':');
+  const [scenario, detail, extra] = options.scenario.split(':');
   const error = (code, retryAfterMs) => ({ kind: 'error', code, retryAfterMs });
   const backend = {
     explain: (request, acknowledge) =>
@@ -75,11 +123,12 @@ export async function show(root, options) {
       }),
     cancel: () => undefined,
     openSettings: () => Promise.resolve(true),
+    openSidePanel: () => Promise.resolve(true),
     explanationLanguage: () => Promise.resolve('en'),
   };
   const result = (request) => ({ kind: 'result', result: RESULTS[request.mode](request) });
   if (scenario === 'loading') answer = () => 'never';
-  else if (scenario === 'core' || scenario === 'roots') answer = result;
+  else if (['core', 'roots', 'coreLong', 'coreRtl', 'flags'].includes(scenario)) answer = result;
   else if (scenario === 'disclosure') answer = () => ({ kind: 'disclosure' });
   else if (scenario === 'error')
     answer = () => error(detail, detail === 'RATE_LIMITED' ? 3_600_000 : undefined);
@@ -92,8 +141,12 @@ export async function show(root, options) {
       text: 'bank',
     },
     backend,
-    newId: () => `id-${(counter += 1)}`,
-    features: { grammarTab: false, translateTab: false },
+    newId: () => `00000000-0000-4000-8000-${String((counter += 1)).padStart(12, '0')}`,
+    features:
+      scenario === 'flags'
+        ? { grammarTab: true, translateTab: true }
+        : { grammarTab: false, translateTab: false },
+    targetLanguage: 'ar',
   });
   mountCard(slot, {
     session,
@@ -102,11 +155,19 @@ export async function show(root, options) {
       reposition: () => undefined,
       close: () => undefined,
       openSettings: () => Promise.resolve(true),
+      openSidePanel: () => Promise.resolve(true),
+      online: () => extra !== 'offline',
       copy: () => Promise.resolve(true),
       now: Date.now,
     },
   });
   session.attach();
+  if (scenario === 'flags') {
+    for (const mode of ['simplify', 'grammar', 'translate']) {
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      session.selectTab(mode);
+    }
+  }
   if (scenario === 'roots') {
     await new Promise((resolve) => setTimeout(resolve, 20));
     session.selectTab('etymology');

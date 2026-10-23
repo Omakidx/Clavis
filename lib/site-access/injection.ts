@@ -77,10 +77,10 @@ async function openSelection(
   tabs: Tabs,
   tabId: number,
   frameId: number,
-  focus: boolean,
+  options: { focus?: boolean; explain?: boolean },
 ): Promise<boolean> {
   try {
-    const reply = (await tabs.sendMessage(tabId, openSelectionMessage(focus), { frameId })) as
+    const reply = (await tabs.sendMessage(tabId, openSelectionMessage(options), { frameId })) as
       { ok?: boolean; shown?: boolean } | undefined;
     return reply?.shown === true;
   } catch {
@@ -111,19 +111,19 @@ export function isReaderUrl(readerUrl: string, url: string | undefined): boolean
  * Declined-access path (D-02 step 5, FR-018): with only the `activeTab` grant,
  * inject the observer into ONE frame (context menu) or all reachable frames
  * (popup button, shortcut) of ONE tab, then open the toolbar for the selection
- * that is already there. Never throws.
+ * that is already there. `explain` (context menu, popup button) also starts Explain for it. Never throws.
  */
 export async function explainInTab(
   deps: InjectionDeps,
   target: { tabId: number; frameId: number | undefined; url: string | undefined },
-  options: { focus?: boolean } = {},
+  options: { focus?: boolean; explain?: boolean } = {},
 ): Promise<InjectResult> {
   // The reader is an extension page: it mounts the selection toolbar itself, so it is asked to
   // open it. Extension pages are never injected into, and any other one stays restricted.
   if (isReaderUrl(deps.readerUrl, target.url)) {
     return {
       ok: true,
-      shown: await openSelection(deps.tabs, target.tabId, 0, options.focus === true),
+      shown: await openSelection(deps.tabs, target.tabId, 0, options),
     };
   }
   if (!isInjectableUrl(target.url)) return { ok: false, reason: 'restricted' };
@@ -131,9 +131,7 @@ export async function explainInTab(
   if (!injected.ok) return injected;
   // Only the frame that holds the selection answers `shown: true`; ask every injected frame.
   const answers = await Promise.all(
-    injected.frames.map((frame) =>
-      openSelection(deps.tabs, target.tabId, frame, options.focus === true),
-    ),
+    injected.frames.map((frame) => openSelection(deps.tabs, target.tabId, frame, options)),
   );
   return { ok: true, shown: answers.some(Boolean) };
 }
@@ -185,11 +183,11 @@ async function explainInFrame(
   deps: InjectionDeps,
   target: { tabId: number; frameId: number; topUrl: string | undefined; url: string | undefined },
 ): Promise<InjectResult> {
-  const result = await explainInTab(deps, {
-    tabId: target.tabId,
-    frameId: target.frameId,
-    url: target.url,
-  });
+  const result = await explainInTab(
+    deps,
+    { tabId: target.tabId, frameId: target.frameId, url: target.url },
+    { explain: true },
+  );
   if (result.ok || result.reason !== 'no-access' || target.frameId === 0) return result;
   if (!isInjectableUrl(target.topUrl)) return result;
   const top = await injectFiles(deps.scripting, target.tabId, 0, OBSERVER_FILES);
@@ -209,5 +207,10 @@ export function injectTabForPopup(
   deps: InjectionDeps,
   message: InjectTabMessage,
 ): Promise<InjectResult> {
-  return explainInTab(deps, { tabId: message.tabId, frameId: undefined, url: message.url });
+  // The popup's "Explain on this page" asks to explain: the card opens for the selection.
+  return explainInTab(
+    deps,
+    { tabId: message.tabId, frameId: undefined, url: message.url },
+    { explain: true },
+  );
 }

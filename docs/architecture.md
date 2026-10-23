@@ -61,7 +61,7 @@ flowchart TD
 | **Onboarding/options** | Consent explanation, site-access request (`chrome.permissions.request`), API-key entry, model lookup, preferences, revoke key | Full page or PDF contents |
 | **Background worker** | Request verification, key retrieval, Groq provider adapter, rate limits, TTS calls, content-script (un)registration on permission changes, context-menu handling | DOM manipulations, PDF page canvas rendering, permanent in-memory state |
 | **Offscreen document** (only if D-07 fallback adopted) | `speechSynthesis` playback on behalf of the background | Groq access, key, page content beyond the text to speak |
-| **Side panel** | Long explanations and details after user action | Raw key or unauthorized page history |
+| **Side panel** | Long explanations after the user pressed **Open in side panel**: the selection, every tab the card had loaded, further tabs on demand, Copy, Listen for the selected text | Raw key, any Groq request on open, the first-send disclosure (only the card collects it), other tabs' explanations, page history |
 | **PDF reader** | Local/user-requested PDF loading, page lifecycle, search/zoom, text-layer selection, local reader UI | Uploading PDFs or invoking Groq without user action |
 | **Shared libraries** | Schemas, AI mode definitions, feature flags, selection normalization, error mapping | Page-specific secrets or direct DOM globals in pure data layers |
 
@@ -73,7 +73,7 @@ entrypoints/content.ts           # selection observer; registered at runtime, no
 entrypoints/popup/index.html     # action launcher, provider status
 entrypoints/onboarding/index.html
 entrypoints/options/index.html   # user key settings, tests, preferences
-entrypoints/sidepanel/index.html # extended explanation when invoked
+entrypoints/sidepanel/index.html # long explanation for one tab (FR-042); React, path /sidepanel.html?tab=<tabId>
 entrypoints/reader/index.html    # full-screen extension-owned PDF reader
 ```
 
@@ -90,7 +90,7 @@ This table is the single source of truth for permissions; the privacy policy, st
 | `scripting` | `permissions` | Must | Runtime registration of the content script (D-02) and on-demand injection into the current tab |
 | `activeTab` | `permissions` | Must | Current-tab injection from the context menu or toolbar icon when site access is declined |
 | `contextMenus` | `permissions` | Must | **Explain with Clavis** entry; the fallback path for users without site access (FR-018) |
-| `sidePanel` | `permissions` | Should | Large accessible explanations; include only if the side panel ships |
+| `sidePanel` | `permissions` | Should → **shipped** (D-24, Phase 8) | The side panel for long explanations (FR-042): `sidePanel.setOptions({ tabId, path })` + `open()`, one panel per tab. Shows no install warning. The manifest has **no** `side_panel.default_path` (a shared default panel would keep one tab's explanation across tab switches); a build hook removes the key WXT derives from the entrypoint |
 | `content_security_policy.extension_pages` | manifest | Must | Exactly `script-src 'self' 'wasm-unsafe-eval'; object-src 'self'; media-src 'none'; frame-src 'none'; form-action 'none'; base-uri 'none'` (D-17; the `none` directives added in Phase 7) |
 | `commands.explain-selection` (Alt+Shift+E) | manifest | Must | Keyboard path to the toolbar (FR-016); not a permission |
 | `minimum_chrome_version` 147 | manifest | Must | D-18 (set by PDF.js 6's use of `Math.sumPrecise`) |
@@ -183,6 +183,33 @@ All result strings are **plain text** (D-10). The UI renders them as text nodes;
 **Response normalization:** ask Groq for a **mode-specific minimal JSON schema** — `core` returns `title`, `summary`, `contextualMeaning`, `definition`, `examples` (2), optional `caveat`; each lazy mode returns only its own field(s). The adapter converts valid output into the unified response. Check which structured-output modes the chosen model supports; do not assume strict JSON Schema support on every Groq model. If schema mode fails due to unsupported capability, fall back to supported JSON mode with strong validation, or show an actionable error.
 
 **Phase 5 additions.** `AI_EXPLAIN` may carry `acknowledgeDisclosure: true` (only from content scripts, `/reader.html`, `/practice.html`, after a trusted click on the one-time first-send prompt); when the disclosure was never acknowledged the reply is `SETUP_REQUIRED` with `reason: 'disclosure'`. `LOAD_EXPLAIN_CARD` (website content scripts only) injects `content-scripts/explain-card.js` into exactly the sender's frame, once per document. `OPEN_SETTINGS` opens Settings at an optional section. The card renders into a slot inside the toolbar's closed shadow root via an isolated-world registry; it never reaches the page.
+
+**Phase 8 additions (side panel, FR-042).** Two routes with their own contract file (`lib/contracts/sidepanel.ts`) and the only message size bound above 32 KiB (`LIMITS.maxHandoffBytes`, 128 KiB: a snapshot plus up to six loaded results at full field size):
+
+```ts
+// Card / reader / practice page -> background, on a trusted click ("Open in side panel").
+{ v: 1; type: 'OPEN_SIDE_PANEL'; handoff: SidePanelHandoff }
+// Side panel -> background: what is waiting for MY tab (the tab id is in the panel's own path).
+{ v: 1; type: 'GET_SIDE_PANEL_STATE'; tabId: number }   // reply data: { revision, handoff | null }
+// Background -> panel (runtime broadcast, never any text): the hand-off of a tab changed.
+{ v: 1; type: 'SIDE_PANEL_UPDATED'; tabId: number; revision: number }
+
+interface SidePanelHandoff {
+  snapshot: SelectionSnapshot;            // exactly what the card sent to Groq (text + bounded context)
+  results: Omit<ExplainResult, 'selectedText'>[]; // every loaded tab, one per mode
+  active?: ExplainMode;
+  targetLanguage?: string;                // only when a Translate result is included
+}
+```
+
+How the hand-off works (spike: [p8-sidepanel-spike.md](decisions/p8-sidepanel-spike.md)):
+
+1. `chrome.sidePanel.open()` needs a user gesture. A trusted click in the card (a content script's closed shadow root, the reader or the practice page) sends `OPEN_SIDE_PANEL` synchronously from the click handler; Chrome carries the gesture through the message event's own task, so the router's handler calls `setOptions({ tabId, path: 'sidepanel.html?tab=<tabId>', enabled: true })` and `open({ tabId })` in that same synchronous turn. **Nothing may be awaited before `open()`** (an awaited `setOptions` first made it fail with "may only be called in response to a user gesture"). A message sent with no gesture (a compromised content script, more than about five seconds after any input) is refused by Chrome; the worker then rolls back (no hand-off kept, panel not left enabled).
+2. The service worker holds the hand-off in **memory** keyed by the **sender's tab** (taken from the browser-provided sender, never from the message): at most 24 tabs, oldest dropped first, one open per tab per 300 ms. It is never written to `chrome.storage` and never logged. It is dropped when the tab closes, when the tab starts loading another page (`tabs.onUpdated` `status: 'loading'`, no host permission needed) and on `CLEAR_ALL_DATA`. After a worker restart it is gone: the panel then says to select the text again.
+3. The panel (`/sidepanel.html?tab=<id>`, tab-less like the popup) asks `GET_SIDE_PANEL_STATE` for its own tab only (the route compares the id with the one in the sender's own url) and renders the results as text (D-10). A newer hand-off or a drop is announced by the `SIDE_PANEL_UPDATED` broadcast; the panel then asks again.
+4. The panel starts an `ExplainSession` from the loaded results (`seed`, `attach({ requestCore: false })`): **opening it sends nothing**. Other tabs load only when the user presses **Load** (D-05, one request each, cached per selection in memory). It may call `AI_EXPLAIN`, `AI_CANCEL`, `TTS_SPEAK`, `TTS_STOP`, `GET_PUBLIC_SETTINGS` and `OPEN_SETTINGS`; it can never carry `acknowledgeDisclosure` (a first-send prompt in the panel says to confirm in the card), and its AI limiter key is per tab (`panel:<tabId>`).
+
+`GET_SIDE_PANEL_STATE` also answers `/sidepanel.html` opened as an ordinary tab (the sender is then tab-bearing). That is reachable only by the user typing the extension URL (there are no `web_accessible_resources`), and it is accepted as a design choice (Phase 8 security review L-3); the handler still serves only the tab named in that page's own url. The panel has its own AI limiter key (`panel:<tabId>`), so a card and its panel together get twice the per-tab budget and may each have one request in flight; every such request still comes from a user click. The hand-off is also dropped when `tabs.onUpdated` reports a `url` change (single-page navigations), besides `status: 'loading'`.
 
 ### Message contract
 
@@ -442,6 +469,7 @@ For v1, rely on `window.getSelection()` in the PDF text layer while preserving p
 | Model ID / UI settings / per-site disable list | `chrome.storage.local` (never `sync` in v1) | Local, non-secret |
 | Temporary selection snapshot | UI/background memory scoped to tab/request | Discard on dismissal/navigation/expiration |
 | Per-selection tab results | Content UI / reader memory | Dropped on dismissal or navigation (§4) |
+| Side panel hand-off (selection + loaded results) | **Service-worker memory only**, keyed by tab (≤ 24 tabs) | Dropped on tab close, navigation of the tab and clear-all-data; lost on a worker restart (the panel says to select again); never stored or logged |
 | PDF bytes | ArrayBuffer in reader tab memory | Do not store automatically; release on close |
 | AI response cache across selections (FR-043, optional) | Bounded local store | Opt-in; disabled on private/sensitive pages; TTL and clearing UI |
 | Error logs | In-memory redacted diagnostics by default | Never raw content, credential, URL with tokens or PDF bytes |
@@ -455,7 +483,7 @@ These rules are the single source of truth for key handling; other documents lin
 1. At startup in the background, call `chrome.storage.local.setAccessLevel({ accessLevel: 'TRUSTED_CONTEXTS' })` **before** registering any message route that reads storage. Explicitly verify in tests that `chrome.storage.session` is also unreadable from content scripts.
 2. Persistent keys live in `chrome.storage.local`; session-only keys live in `chrome.storage.session`. Never use `chrome.storage.sync` for secrets. Neither area is an encrypted vault or OS keychain; the settings UI must say so and must not claim encryption.
 3. Only the background reads the key. Content scripts send `AI_EXPLAIN`; there is no message that returns the key, and `GET_PUBLIC_SETTINGS` returns `hasKey: boolean` and non-secret preferences only (`publicSettingsSchema`).
-4. One background router (`lib/router`) owns the single `runtime.onMessage` listener and checks every route's sender: `sender.id === chrome.runtime.id`, extension pages matched by **exact path**, no website `sender.tab`. Key routes (`SET_API_KEY`, `TEST_API_KEY`, `REMOVE_API_KEY`, `GET_KEY_STATUS`, `CLEAR_ALL_DATA`) only from `/options.html` and `/onboarding.html`; settings and status routes also from `/popup.html`; never from the reader or the practice page. Unknown types get no reply; a known type from a disallowed sender or with a bad shape gets `INVALID_REQUEST`.
+4. One background router (`lib/router`) owns the single `runtime.onMessage` listener and checks every route's sender: `sender.id === chrome.runtime.id`, extension pages matched by **exact path**, no website `sender.tab`. Key routes (`SET_API_KEY`, `TEST_API_KEY`, `REMOVE_API_KEY`, `GET_KEY_STATUS`, `CLEAR_ALL_DATA`) only from `/options.html` and `/onboarding.html`; settings and status routes also from `/popup.html`; never from the reader or the practice page. The side panel (`/sidepanel.html`, tab-less) may only call the explain, speech and settings-read routes it needs, `OPEN_SETTINGS` and `GET_SIDE_PANEL_STATE`; `OPEN_SIDE_PANEL` comes only from content scripts, the reader and the practice page. Unknown types get no reply; a known type from a disallowed sender or with a bad shape gets `INVALID_REQUEST`.
 5. Key inputs are masked by default; the UI may show the last 4 characters only.
 6. Removing the key clears the chosen storage area, in-memory references, connection status and any cache tied to it, and aborts in-flight requests. Key metadata (storage area, last4, verification, models) lives in the **same area as the key**, so a session-only key leaves nothing in `chrome.storage.local`. Key reads and writes `await whenStorageLockedDown()` and fail with `STORAGE_UNAVAILABLE` if it resolved `false`; deletion is allowed regardless.
 7. One user-supplied key per provider; no developer key is ever shipped. Groq is reached only over `https:` within the narrow host permission.

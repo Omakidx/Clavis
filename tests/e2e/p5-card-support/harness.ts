@@ -34,11 +34,16 @@ export interface HarnessOptions {
   key?: boolean;
   /** Acknowledge the data disclosure, as onboarding does. Default true. */
   acknowledged?: boolean;
+  /** Real, visible Chromium (needs a display: xvfb-run), for real-mouse and native-UI specs. */
+  headed?: boolean;
 }
 
 export async function startCardHarness(options: HarnessOptions = {}): Promise<CardHarness> {
   const server = await startFixtureServer();
-  const ext = await launchExtension({ grantedSiteAccess: true });
+  const ext = await launchExtension({
+    grantedSiteAccess: true,
+    ...(options.headed === true ? { headed: true } : {}),
+  });
   const groqUrls = trackGroqRequests(ext.context);
   const groq = await fakeGroq(ext.context);
   await waitForRegistration(ext.serviceWorker);
@@ -105,6 +110,8 @@ export const CARD = {
   text: '[data-clavis="card-text"]',
   close: '[data-clavis="card-close"]',
   copy: '[data-clavis="card-copy"]',
+  sidePanel: '[data-clavis="card-side-panel"]',
+  longHint: '[data-clavis="card-long-hint"]',
   model: '[data-clavis="card-model"]',
   live: '[data-clavis="card-live"]',
   confirm: '[data-clavis="card-confirm"]',
