@@ -199,6 +199,17 @@ const zipCases = [
     'content_security_policy',
   ],
   [
+    'CSP without the reader hardening directives (media/frame/form/base)',
+    withManifest(
+      (m) =>
+        (m.content_security_policy = {
+          extension_pages: "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'",
+        }),
+    ),
+    1,
+    'content_security_policy',
+  ],
+  [
     'unsafe-eval CSP',
     withManifest(
       (m) => (m.content_security_policy = { extension_pages: "script-src 'self' 'unsafe-eval'" }),
@@ -399,6 +410,29 @@ const zipCases = [
     'AUDIT PASSED',
   ]),
 
+  // Store ZIP size cap (maxZipBytes in the budgets file).
+  [
+    'ZIP under the size cap passes and reports its size',
+    baseFiles(),
+    0,
+    'ZIP size',
+    { budgets: { maxZipBytes: 1_000_000 } },
+  ],
+  [
+    'ZIP over the size cap fails with the measured size',
+    baseFiles(),
+    1,
+    'ZIP is ',
+    { budgets: { maxZipBytes: 100 } },
+  ],
+  [
+    'budgets file without maxZipBytes skips the cap',
+    baseFiles(),
+    0,
+    'AUDIT PASSED',
+    { budgets: {} },
+  ],
+
   // Unknown file types warn normally and fail under --strict.
   [
     'unknown file type only warns by default',
@@ -435,6 +469,11 @@ zipCases.forEach(([name, files, wantCode, wantText, options = {}], index) => {
     const allowlistFile = path.join(scratch, `allowlist-${index}.json`);
     writeFileSync(allowlistFile, JSON.stringify(options.allowlist));
     args.push('--allowlist', allowlistFile);
+  }
+  if (options.budgets) {
+    const budgetsFile = path.join(scratch, `budgets-${index}.json`);
+    writeFileSync(budgetsFile, JSON.stringify(options.budgets));
+    args.push('--budgets', budgetsFile);
   }
   const run = runNode('audit-zip.mjs', args);
   const output = `${run.stdout}${run.stderr}`;
@@ -497,6 +536,37 @@ sizeCase(
   1,
   'OVER BUDGET',
 );
+
+// Aggregate rows with many matches are truncated unless --verbose.
+for (const [verbose, want, notWant] of [
+  [false, 'chunks/a-0.js (+4 more)', 'chunks/a-1.js'],
+  [true, 'chunks/a-0.js + chunks/a-1.js', '(+4 more)'],
+]) {
+  const dir = mkdtempSync(path.join(scratch, 'build-'));
+  mkdirSync(path.join(dir, 'chunks'));
+  for (let i = 0; i < 5; i++) writeFileSync(path.join(dir, `chunks/a-${i}.js`), `var a${i}=1;`);
+  const budgets = path.join(scratch, 'budgets-label.json');
+  writeFileSync(
+    budgets,
+    JSON.stringify({
+      buildDir: dir,
+      budgets: [{ id: 'many', files: ['chunks/a-*.js'], maxGzipBytes: 10000, aggregate: true }],
+    }),
+  );
+  const run = runNode('check-bundle-size.mjs', [
+    '--dir',
+    dir,
+    '--budgets',
+    budgets,
+    ...(verbose ? ['--verbose'] : []),
+  ]);
+  const output = run.stdout;
+  record(
+    `check-bundle-size: aggregate label ${verbose ? 'is full with --verbose' : 'is truncated'}`,
+    run.status === 0 && output.includes(want) && !output.includes(notWant),
+    `exit ${run.status}\n${output}`,
+  );
+}
 sizeCase('required content script missing fails', { 'background.js': 'x' }, 1, 'MISSING');
 sizeCase(
   'larger observer within the 15 KB gzip budget passes',

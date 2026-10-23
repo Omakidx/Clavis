@@ -197,13 +197,6 @@ describe('ChromeTtsEngine: remembered empty answer, peek and invalidate', () => 
     return { tts, setVoices: (next: typeof voices) => (voices = next) };
   }
 
-  it('peekVoices answers at once and never waits for voices to load', async () => {
-    const { tts } = emptyTts();
-    const engine = new ChromeTtsEngine(tts, 1_000);
-    await expect(engine.peekVoices()).resolves.toEqual([]);
-    expect(tts.onVoicesChanged).toBeDefined();
-  });
-
   it('invalidate() makes the next empty answer wait and look again (voices installed later)', async () => {
     const { tts, setVoices } = emptyTts();
     const engine = new ChromeTtsEngine(tts, 1_000);

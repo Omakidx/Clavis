@@ -8,8 +8,8 @@ import {
 import { startFixtureServer, type FixtureServer } from './spike-b-support/server';
 import { contentWorld, type ContentWorld } from './p3-support/content-world';
 import {
-  closeOffscreen,
-  offscreenDocuments,
+  contextTypes,
+  newId,
   openExtensionPage,
   sendFromPage,
   type VoicesReply,
@@ -42,9 +42,8 @@ test.afterAll(async () => {
 
 const GET_VOICES = { v: 1, type: 'GET_VOICES' };
 
-test('GET_VOICES from options reports the platform, both engines and the offscreen availability', async () => {
+test('GET_VOICES from options reports the platform and the chrome.tts voices; the offscreen slot is unavailable', async () => {
   const options = await openExtensionPage(ext.context, ext.extensionId, 'options');
-  expect(await offscreenDocuments(ext.serviceWorker)).toHaveLength(0);
 
   const started = Date.now();
   const reply = (await sendFromPage(options, GET_VOICES)) as VoicesReply;
@@ -58,17 +57,13 @@ test('GET_VOICES from options reports the platform, both engines and the offscre
   expect(reply.ok).toBe(true);
   const report = reply.data;
   expect(report?.platform).toBe(process.platform === 'linux' ? 'linux' : report?.platform);
-  expect(report?.engines.offscreen.available).toBe(true);
-  // Both engines are always listed so the D-07 comparison can be made from Settings.
   expect(Array.isArray(report?.engines.chromeTts.voices)).toBe(true);
-  expect(Array.isArray(report?.engines.offscreen.voices)).toBe(true);
-  const total =
-    (report?.engines.chromeTts.voices.length ?? 0) + (report?.engines.offscreen.voices.length ?? 0);
-  if (total === 0) expect(report?.defaultEngine).toBe('none');
-  // The probe is bounded (one voice wait plus document start, hard limit 4 s) ...
-  expect(tookMs).toBeLessThan(5_500);
-  // ... and the document it needed is closed again.
-  await expect.poll(async () => (await offscreenDocuments(ext.serviceWorker)).length).toBe(0);
+  // D-07: no fallback engine; the slot stays in the contract, empty and unavailable.
+  expect(report?.engines.offscreen).toEqual({ available: false, voices: [] });
+  const chromeVoices = report?.engines.chromeTts.voices.length ?? 0;
+  expect(report?.defaultEngine).toBe(chromeVoices === 0 ? 'none' : 'chrome-tts');
+  // One voice wait at most (chrome.tts loads voices late on Linux).
+  expect(tookMs).toBeLessThan(3_000);
 });
 
 test('GET_VOICES from the popup and onboarding pages works too', async () => {
@@ -88,7 +83,7 @@ test('concurrent GET_VOICES calls all get a full answer', async () => {
   ])) as VoicesReply[];
   for (const reply of replies) {
     expect(reply.ok).toBe(true);
-    expect(reply.data?.engines.offscreen.available).toBe(true);
+    expect(reply.data?.engines.offscreen.available).toBe(false);
   }
 });
 
@@ -118,65 +113,26 @@ test('SPEECH_DIAGNOSE is gone: nobody answers it', async () => {
   ).toBeNull();
 });
 
-test.describe('offscreen document hardening (Phase 3 review INFO-9)', () => {
-  const COMMANDS = [
+test('the offscreen fallback is gone (D-07): its messages are unanswered and no document opens', async () => {
+  const options = await openExtensionPage(ext.context, ext.extensionId, 'options');
+  const messages = [
     { v: 1, target: 'offscreen', type: 'SPEECH_OFFSCREEN_GET_VOICES' },
-    {
-      v: 1,
-      target: 'offscreen',
-      type: 'SPEECH_OFFSCREEN_SPEAK',
-      requestId: '11111111-1111-4111-8111-111111111111',
-      text: 'bank',
-      rate: 1,
-    },
-    { v: 1, target: 'offscreen', type: 'SPEECH_OFFSCREEN_STOP' },
+    { v: 1, type: 'SPEECH_OFFSCREEN_EVENT', requestId: newId(), state: 'ended' },
+    { v: 1, type: 'SPEECH_OFFSCREEN_IDLE' },
   ];
-
-  test('obeys the service worker only: not a content script, not any extension page', async () => {
-    // A document for the commands to be sent to (any earlier probe has closed its own).
-    await expect.poll(async () => (await offscreenDocuments(ext.serviceWorker)).length).toBe(0);
-    await ext.serviceWorker.evaluate(
-      `chrome.offscreen.createDocument({ url: 'offscreen.html', reasons: ['AUDIO_PLAYBACK'], justification: 'test' })`,
-    );
-    try {
-      // The worker (sender.url is the worker script) gets an answer.
-      const fromWorker = await sendWhenReady(
-        `chrome.runtime.sendMessage(${JSON.stringify(COMMANDS[0])})`,
-      );
-      expect(fromWorker).toMatchObject({ ok: true, supported: true });
-
-      const pages: Page[] = [];
-      for (const name of ['options', 'popup', 'onboarding', 'reader', 'practice']) {
-        pages.push(await openExtensionPage(ext.context, ext.extensionId, name));
-      }
-      for (const extensionPage of pages) {
-        for (const command of COMMANDS) {
-          // No reply from the offscreen page (undefined), and no router route answers it either.
-          expect((await sendFromPage(extensionPage, command)) ?? null).toBeNull();
-        }
-      }
-      for (const command of COMMANDS) {
-        expect(
-          (await world.evaluate(
-            `chrome.runtime.sendMessage(${JSON.stringify(command)}).catch(() => null)`,
-          )) ?? null,
-        ).toBeNull();
-      }
-    } finally {
-      await closeOffscreen(ext.serviceWorker).catch(() => undefined);
-    }
-  });
-
-  /** The page may still be loading right after creation; retry until its listener is there. */
-  async function sendWhenReady(expression: string): Promise<unknown> {
-    const deadline = Date.now() + 5_000;
-    for (;;) {
-      try {
-        return await ext.serviceWorker.evaluate(expression);
-      } catch (error) {
-        if (Date.now() > deadline) throw error;
-        await new Promise((resolve) => setTimeout(resolve, 100));
-      }
-    }
+  for (const message of messages) {
+    expect((await sendFromPage(options, message)) ?? null).toBeNull();
+    expect(
+      (await world.evaluate(
+        `chrome.runtime.sendMessage(${JSON.stringify(message)}).catch(() => null)`,
+      )) ?? null,
+    ).toBeNull();
   }
+  // The page itself is not part of the build.
+  const missing = await ext.context.newPage();
+  const response = await missing
+    .goto(`chrome-extension://${ext.extensionId}/offscreen.html`)
+    .catch(() => null);
+  expect(response === null || !response.ok()).toBe(true);
+  expect(await contextTypes(ext.serviceWorker)).not.toContain('OFFSCREEN_DOCUMENT');
 });

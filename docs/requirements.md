@@ -3,7 +3,7 @@
 **Status:** Implementation-ready specification (v1 baseline)  
 **Version:** 1.1-draft · **Last reviewed:** 2026-10-22  
 **Platform:** Google Chrome, Manifest V3, desktop first  
-**Product owner decisions:** Groq only for v1; user provides key; no mandatory accounts or first-party backend; custom PDF.js reader; native pronunciation for words **and** sentences. Further resolved decisions D-01 … D-22 are in [§11](#11-product-decisions).
+**Product owner decisions:** Groq only for v1; user provides key; no mandatory accounts or first-party backend; custom PDF.js reader; native pronunciation for words **and** sentences. Further resolved decisions D-01 … D-23 are in [§11](#11-product-decisions).
 
 ## 1. Problem, audience and success criteria
 
@@ -163,7 +163,7 @@ This is the approved user-facing wording. Implementation may adjust layout and f
 | FR-025 | Should | Voice chooser lists actually available voices | Empty/missing voice gracefully disables unavailable choices |
 | FR-026 | Could | Show IPA / authentic dictionary audio for supported words | Source/locale clearly labeled; never invent audio or phonetics |
 
-**TTS routing (D-07):** prefer `chrome.tts` where a suitable voice exists. If it has no suitable voice, fall back to Web Speech `speechSynthesis` running in an extension **offscreen document** (or directly in the reader page), but only once Spike D shows it produces audio on that OS. Neither mechanism guarantees voices on every operating system; Linux commonly has none for `chrome.tts`. Playback never depends on Groq.
+**TTS routing (D-07, settled):** `chrome.tts` only. The Web Speech fallback in an offscreen document was evaluated and **not adopted**: on the user's Chrome it reported exactly the same voices as `chrome.tts`. Voices vary by operating system; Linux without a speech engine has only online voices (used only when chosen, D-22) or none. Playback never depends on Groq.
 
 ### 4.4 AI explanation and provider behavior
 
@@ -289,7 +289,7 @@ The exact permission list, and why each permission is needed, is maintained in [
 1. **Malicious webpage tries to capture key:** impossible through intended boundaries because key lives only in trusted extension contexts; validate all inbound messages and never return the key.
 2. **Prompt injection in selected text:** pass it as untrusted quoted context; fixed system instruction prohibits obeying instructions embedded in source material; never request powerful browser actions from model output.
 3. **Selected private data:** default to no collection from editable fields; show explicit external-send disclosure; avoid raw-content persistence/logging.
-4. **PDF with malicious links or scripts:** disable PDF scripting (`isEvalSupported: false`, no JavaScript actions) and confirm before opening external links; keep PDF.js patched.
+4. **PDF with malicious links or scripts:** disable PDF scripting (`isEvalSupported: false`, no JavaScript actions), render only an allowlist of annotation types (no media, file attachments or 3D) with a per-page cap, and confirm before opening external http/https/mailto links; keep PDF.js patched. Known limitation: invisible (render mode 3), tiny or image-covered text is still in the text layer, so it can be selected and can reach Explain as context; delimiters and the plain-text card limit the impact to a misleading explanation.
 5. **Service worker restarted mid-request:** result discarded with clear retry; no duplicate unexpected AI requests.
 6. **Model output appears to be HTML/script/Markdown injection:** render as plain text only; never `dangerouslySetInnerHTML` with untrusted output.
 7. **Excessive token use:** selected/context character and token ceilings, sensible `max_completion_tokens`, one request per Explain plus at most one per opened tab, no automatic tab prefetching.
@@ -303,7 +303,7 @@ The exact permission list, and why each permission is needed, is maintained in [
 | Selection | Word, phrase, sentence, paragraph, keyboard, double-click, triple-click, nested inline elements, punctuation, collapsed selection |
 | Semantic | Polysemous words (`bank`), idioms (`break the ice`), technical term, no etymology known, uncommon name, ambiguous sentence |
 | Site access | Granted at onboarding, declined (context menu + toolbar icon), granted later from Settings, revoked |
-| Speech | Word, long sentence, Stop/Replay, rapid repeat, `en-US`, `en-GB`, no `chrome.tts` voice (Linux), offscreen fallback, no unsupported accent promise |
+| Speech | Word, long sentence, Stop/Replay, rapid repeat, `en-US`, `en-GB`, no `chrome.tts` voice (Linux), online-only voices (D-22), no unsupported accent promise |
 | PDF | Local text, multi-page, multi-column, rotated page, zoom, password protected, corrupted, scan-only, large file (100+ pages) |
 | API | Good key, bad key, missing model, 400, 401, 403, 404, 429, 500, offline, malformed output, timeout, service worker stop |
 | Security | Key storage boundary, HTML injection, prompt injection, oversized messages, corrupt PDF, unexpected runtime sender |
@@ -316,7 +316,7 @@ The team can test **Linux only** by hand. Other platforms get automated coverage
 | Platform | Coverage | What it proves |
 | --- | --- | --- |
 | Linux, latest Chrome Stable, with `speech-dispatcher` + a voice engine (e.g. `espeak-ng`) installed | Manual + automated E2E (primary dev machine) | Full feature set; `chrome.tts` playback path |
-| Linux, latest Chrome Stable, **without** `speech-dispatcher` | Manual | No-voice message and the offscreen `speechSynthesis` fallback (D-07) |
+| Linux, latest Chrome Stable, **without** `speech-dispatcher` | Manual | No on-device voice: online-only or no-voice message (D-22) |
 | Windows, latest Chrome Stable | Automated E2E on CI runners (non-voice flows) | Install, site access, selection, Explain with mocked Groq, PDF reader |
 | macOS, latest Chrome Stable | Automated E2E on CI runners (non-voice flows) | Same as Windows |
 | Minimum supported Chrome (147, D-18) | Automated smoke test with a pinned [Chrome for Testing](https://googlechromelabs.github.io/chrome-for-testing/) build | APIs used exist at the declared `minimum_chrome_version` |
@@ -356,7 +356,7 @@ The team can test **Linux only** by hand. Other platforms get automated coverage
 | D-04 | **Saved vocabulary/history deferred** to post-v1 | Not needed to prove the core value; avoids storage, export and deletion UI in v1 | FR-019, FR-079 |
 | D-05 | **Core + lazy tabs:** Explain makes one request returning contextual meaning, definition and 2 examples. Roots, Related words and Simplify (Must) and Grammar, Translate (Should) each make one request only when their tab is opened, cached in memory for that selection | Fewer requests on free-tier rate limits, faster first answer, fewer prompts to regression-test at launch | FR-030 … FR-038; architecture §4, §6 |
 | D-06 | **PDF reader uses PDF.js viewer components** (`pdfjs-dist/web/pdf_viewer`: `PDFViewer`, `EventBus`, `PDFLinkService`, `PDFFindController`) inside a React shell | Provides virtualization, aligned text layer, zoom and find out of the box; cuts Phase 7 effort substantially | FR-051 … FR-059; architecture §8 |
-| D-07 | **Voice:** `chrome.tts` first; Web Speech fallback in an **offscreen document** (and directly in the reader page), adopted only if Spike D proves it works per OS | Offscreen documents are the MV3 way to use DOM audio APIs from the background; Linux often lacks `chrome.tts` voices | FR-020 … FR-025; architecture §7 |
+| D-07 | **Voice: `chrome.tts` only; the offscreen Web Speech fallback is not adopted** (settled 2026-10-23) | User's check on branded Chrome 154 / Linux: Settings → Voice showed 19 Chrome voices and the same 19 fallback voices (all online), so the fallback adds nothing; dropping it removes the `offscreen` permission and code | FR-020 … FR-025; architecture §7 |
 | D-08 | **Content-script budget:** a framework-free selection observer is the only always-loaded code. **Outcome of Spike B: option (c)** — a Preact toolbar bundled in the observer (11.8 KB gzip); the explanation card loads on the first Explain | React's parse/evaluate cost, not the loading mechanism, dominated: lazy React (a/b) measured ~230 ms first-toolbar p95 and 69 KB gzip, over both budgets; (c) measured 60 ms p95 at normal CPU ([spike-b-toolbar.md](decisions/spike-b-toolbar.md)) | Tech stack §6; architecture §5 |
 | D-09 | **Default model: `openai/gpt-oss-20b`** (settled 2026-10-23 by the evaluation run). `openai/gpt-oss-120b` remains a user choice; `allam-2-7b` is not recommended | gpt-oss-20b: 100% schema validity, no real injection obedience, p95 889 ms, strong answers; 120b slower and not meaningfully better; allam failed schema and obeyed an injection ([p5-prompt-eval.md](decisions/p5-prompt-eval.md#results-and-decision)) | Architecture §6; tech stack §7; `MODEL_CANDIDATES` |
 | D-10 | **Model output is plain text only**; no Markdown rendering in v1 | Removes a sanitizer dependency and an XSS surface | FR-041 |
@@ -365,12 +365,13 @@ The team can test **Linux only** by hand. Other platforms get automated coverage
 | D-13 | **License: MIT** | Simple and permissive; compatible with PDF.js (Apache-2.0), whose license and notices must still ship with the bundled files | `LICENSE`; third-party notices in Phase 10 |
 | D-14 | **Platform matrix:** Linux tested by hand; Windows/macOS covered by automated E2E only; voice claims limited to verified systems; one manual Windows/macOS pass required before public listing | Only Linux hardware is available | [§9 Platform matrix](#platform-matrix-d-14); release gates |
 | D-15 | **Privacy policy hosted on GitHub Pages**; text drafted in `docs/privacy-policy.md` | Free, versioned with the repo | Needs a GitHub repo with Pages enabled (public repo, or a plan that allows Pages on private repos) before Phase 10 |
-| D-17 | **CSP allows WebAssembly on extension pages:** `script-src 'self' 'wasm-unsafe-eval'; object-src 'self'` | PDF.js needs wasm for ICC/CMYK colour, JPEG 2000 and JBIG2; the default MV3 CSP blocks it ([spike-c-pdf.md](decisions/spike-c-pdf.md)). `eval` stays blocked; no remote code | Manifest; ZIP audit requires this exact CSP |
+| D-17 | **CSP allows WebAssembly on extension pages:** `script-src 'self' 'wasm-unsafe-eval'; object-src 'self'; media-src 'none'; frame-src 'none'; form-action 'none'; base-uri 'none'` | PDF.js needs wasm for ICC/CMYK colour, JPEG 2000 and JBIG2; the default MV3 CSP blocks it ([spike-c-pdf.md](decisions/spike-c-pdf.md)). `eval` stays blocked; no remote code. Phase 7 added the `none` directives as defence in depth (no network media, frames, form posts or `<base>`); `media-src` does not cover `blob:` media, so the reader's annotation allowlist is what stops PDF-embedded media | Manifest; ZIP audit requires this exact CSP |
 | D-18 | **Minimum Chrome version 147** | pdfjs-dist 6 uses `Math.sumPrecise` (Chrome 147) without a fallback; other floors: `Uint8Array` base64 140, `Promise.try` 128, `URL.parse` 126, `matchOriginAsFallback` 119 (MDN browser-compat-data 8.1.7). The alternative, PDF.js's polyfilled legacy build, is larger | Manifest; platform matrix; ZIP audit |
 | D-19 | **No Tailwind for v1; plain CSS with shared design tokens** | Global resets (as in Tailwind's preflight) shift the PDF.js text layer (Spike C finding 3); extension pages are simple forms that don't need a utility framework | Tech stack §1, §6; shared classes are namespaced `clavis-*` |
 | D-20 | **Observer budget raised from 15 KB to 18 KB gzip** | The 15 KB figure protected the 150 ms first-toolbar target; measured p95 is 58.5 ms (1× CPU) / 133.9 ms (4×) on a loaded machine. Fitting into 15 KB meant dropping pinch-zoom placement | `scripts/size-budgets.json`; tech stack §6 |
 | D-21 | **Per-tab AI rate limit raised from 10 to 20 requests per minute** | One selection can use up to four requests (core + three lazy tabs), so 10/min throttled ordinary reading; webpages can't trigger requests (trusted clicks only, Phase 2 HIGH-1), so the limit now mainly guards cost | `AI_RATE_LIMIT` in lib/config; architecture §9 rule 9 |
 | D-22 | **Listen uses on-device voices only by default**; an online voice (e.g. Chrome's Google network voices in the Web Speech fallback) is used only when the user explicitly chooses it in Settings → Voice, where it is labelled *online* with a note, and the toolbar marks each online playback | Keeps the approved disclosure ("Listen uses the voices on your computer") true by default; the Phase 6 code review found the fallback can expose network voices, especially on Linux | lib/speech voice resolution; Settings → Voice; privacy policy; §6 inventory |
+| D-23 | **Keep PDF.js CMaps in the package** | About 1 MB of the 2.6 MB ZIP, but without them CJK PDFs that don't embed their fonts render incorrectly; the store ZIP stays under its 3.2 MB budget | wxt.config.ts asset hook; size budgets |
 | D-16 | **Disclosure copy approved** as written in [§4.1](#approved-disclosure-copy-fr-002-fr-009-fr-071) | Defines exactly what users see before anything is sent to Groq | Onboarding, first Explain, settings |
 
 ### Still open
@@ -380,7 +381,7 @@ The team can test **Linux only** by hand. Other platforms get automated coverage
 | Publisher display name and support email | Phase 10 (store submission) | Placeholders until then; the privacy policy draft uses `[PUBLISHER]` / `[SUPPORT_EMAIL]` |
 | Logo and store artwork | Phase 10 | Placeholder icons are fine through Phase 9 |
 | GitHub repository + Pages URL for the privacy policy | Before Phase 10 | No remote exists yet (D-15) |
-| Voice fallback adoption per OS | Needs the user's manual check | Spike D found 0 voices in both engines on this Linux machine; keep the offscreen fallback and `offscreen` permission only if it finds voices `chrome.tts` misses ([spike-d-voices.md](decisions/spike-d-voices.md)) |
+| Voice fallback adoption per OS | Settled 2026-10-23 (D-07) | The user's Chrome on Linux listed the same 19 online voices in both engines, so the offscreen fallback and the `offscreen` permission were removed in Phase 7 ([spike-d-voices.md](decisions/spike-d-voices.md)) |
 | Explanation card technology and budget | Phase 5 | A React card cannot fit the 60 KB lazy-UI budget: author it in Preact or load React only on the first Explain via background injection, and set its own budget |
 | Windows/macOS manual tester | Before public listing | D-14 |
 

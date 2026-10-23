@@ -20,7 +20,7 @@
 | Validation | **Zod** | Runtime schemas for messages and AI output | Defensive extension boundaries |
 | PDF parser/renderer | **Mozilla PDF.js (`pdfjs-dist`)** core + **viewer components** (`pdfjs-dist/web/pdf_viewer`) | Rendering, virtualization, text layer, zoom, find (D-06) | Mature standard; do not build parser or page lifecycle from scratch |
 | TTS | **Chrome `chrome.tts`** | Native word and sentence speech | No Groq cost; extension-specific control |
-| Voice fallback | **Web Speech `speechSynthesis`** in a **`chrome.offscreen`** document (webpages) or directly in the reader page, only where Spike D confirms audio (D-07) | Fallback when `chrome.tts` has no voice | The service worker has no DOM |
+| Voice fallback | None — the offscreen `speechSynthesis` fallback was evaluated and not adopted (D-07) | — | It found the same voices as `chrome.tts` |
 | AI provider | **GroqCloud Chat Completions API** | Context explanation and language operations | User-supplied key; OpenAI-compatible interface |
 | Storage: key/settings | **Chrome Storage API** | Local/session key and preferences | Built-in extension persistence |
 | UI strings | **`chrome.i18n`** with `public/_locales/en/messages.json` | All user-visible text (D-11) | Built in; enables later UI translation |
@@ -123,7 +123,6 @@ export default defineConfig({
     description: '__MSG_extDescription__',
     default_locale: 'en',
     permissions: ['storage', 'tts', 'scripting', 'activeTab', 'contextMenus', 'sidePanel'],
-    // 'offscreen' is added only if Spike D adopts the speechSynthesis fallback (D-07).
     host_permissions: ['https://api.groq.com/*'],
     optional_host_permissions: ['http://*/*', 'https://*/*'],
     action: { default_title: '__MSG_extName__' }
@@ -233,19 +232,7 @@ async function speak(text: string, lang = 'en-US', rate = 1) {
 
 Actual language selection must match a compatible installed voice and may require voice-name selection to avoid misleading accent controls. Verify Chrome TTS `getVoices` behavior and ensure language fallbacks do not mispronounce text silently. **Chrome does not provide guaranteed native voices on every Linux distribution.** Test with actual installations.
 
-**Fallback (D-07):** the service worker has no DOM, so `speechSynthesis` cannot run there. For webpage selections, create an offscreen document and speak from it:
-
-```ts
-// background — only if Spike D adopts the fallback for this OS
-await chrome.offscreen.createDocument({
-  url: 'offscreen.html',
-  reasons: [chrome.offscreen.Reason.AUDIO_PLAYBACK],
-  justification: 'Speak user-selected text when no chrome.tts voice is available',
-});
-// then message the offscreen page: { type: 'OFFSCREEN_SPEAK', text, lang, rate }
-```
-
-Only one offscreen document can exist at a time; reuse it and close it after a period of inactivity. The reader page can call `speechSynthesis` directly. `speechSynthesis.getVoices()` may also be empty on Linux, so the no-voice message must still exist. Native/system voices might rely on external components; avoid universal claims of fully offline speech.
+**Fallback (D-07): not adopted.** The offscreen-document `speechSynthesis` fallback reported the same voices as `chrome.tts` on the user's Chrome, so it was removed with the `offscreen` permission.
 
 Future improved word pronunciations could combine documented dictionary phonetics and licensed recordings. A sentence must still be spoken by TTS even when no recorded audio exists.
 

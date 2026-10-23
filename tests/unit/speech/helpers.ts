@@ -24,10 +24,6 @@ export class FakeEngine implements SpeechEngine {
   speakError: Error | undefined;
   /** When true, speak() automatically reports `started` on the next microtask. */
   autoStart = true;
-  /** When set, the engine offers `peekVoices` (voices known without waiting). */
-  peek: SpeechVoice[] | undefined;
-  /** When set, the engine offers `survey`. */
-  surveyResult: { available: boolean; voices: SpeechVoice[] } | undefined;
   /** Milliseconds `getVoices` takes (fake timers), to model slow late-loading engines. */
   getVoicesDelayMs = 0;
   invalidateCalls = 0;
@@ -58,17 +54,9 @@ export class FakeEngine implements SpeechEngine {
     });
   }
 
-  peekVoices = (): Promise<SpeechVoice[]> =>
-    this.getVoicesError
-      ? Promise.reject(this.getVoicesError)
-      : Promise.resolve(this.peek ?? this.voices);
-
   invalidate = (): void => {
     this.invalidateCalls++;
   };
-
-  survey = (): Promise<{ available: boolean; voices: SpeechVoice[] }> =>
-    Promise.resolve(this.surveyResult ?? { available: true, voices: this.voices });
 
   speak(request: EngineSpeakRequest, sink: (event: EngineEvent) => void): Promise<void> {
     this.speakCalls.push(request);

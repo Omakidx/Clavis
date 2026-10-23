@@ -1,6 +1,11 @@
 import { GroqError } from '../../ai/errors';
 import type { ExplainOptions } from '../../ai/groq';
-import { FEATURES, MODE_FEATURE_FLAGS, MODEL_CANDIDATES } from '../../config/constants';
+import {
+  FEATURES,
+  MODE_FEATURE_FLAGS,
+  MODEL_CANDIDATES,
+  EXTENSION_PAGES,
+} from '../../config/constants';
 import type {
   AiStatus,
   ErrorCode,
@@ -45,7 +50,11 @@ export interface AiHandlerDeps {
  */
 export function mayAcknowledgeDisclosure(sender: ClassifiedSender): boolean {
   if (sender.kind === 'content') return true;
-  return sender.kind === 'extension' && sender.path === PRACTICE_PAGE_PATH;
+  // The practice page and (since Phase 7) the PDF reader host the explanation card.
+  return (
+    sender.kind === 'extension' &&
+    (sender.path === PRACTICE_PAGE_PATH || sender.path === EXTENSION_PAGES.reader)
+  );
 }
 
 /** The model used for a request: the user's choice, else the D-09 candidate (never silently a paid tier). */

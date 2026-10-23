@@ -6,10 +6,13 @@ import {
   handleCommand,
   handleContextMenuClick,
   isInjectableUrl,
+  isReaderUrl,
   injectTabForPopup,
   type InjectionDeps,
 } from '../../../lib/site-access/injection';
 import { injectTabMessage } from '../../../lib/site-access/messages';
+
+const READER = 'chrome-extension://abcdefghijklmnopabcdefghijklmnop/reader.html';
 
 function deps(
   overrides: {
@@ -23,6 +26,7 @@ function deps(
   const value: InjectionDeps = {
     scripting: { executeScript } as never,
     tabs: { sendMessage } as never,
+    readerUrl: READER,
   };
   return { executeScript, sendMessage, value };
 }
@@ -308,5 +312,98 @@ describe('handleContextMenuClick: cross-origin iframe under activeTab', () => {
       ok: false,
       reason: 'no-access',
     });
+  });
+});
+
+describe('the reader page (an extension page that hosts the toolbar itself)', () => {
+  const readerTab = { id: 4, url: `${READER}?file=blob%3Aabc#page=2` };
+
+  it('isReaderUrl matches this extension reader only, ignoring query and fragment', () => {
+    expect(isReaderUrl(READER, READER)).toBe(true);
+    expect(isReaderUrl(READER, `${READER}?x=1#y`)).toBe(true);
+    for (const url of [
+      undefined,
+      '',
+      'not a url',
+      'chrome-extension://otherextensionidotherextensionid/reader.html',
+      'chrome-extension://abcdefghijklmnopabcdefghijklmnop/options.html',
+      'chrome-extension://abcdefghijklmnopabcdefghijklmnop/reader.html.evil',
+      'chrome-extension://abcdefghijklmnopabcdefghijklmnop/sub/reader.html',
+      'https://abcdefghijklmnopabcdefghijklmnop/reader.html',
+      'https://evil.example/reader.html',
+    ]) {
+      expect(isReaderUrl(READER, url), String(url)).toBe(false);
+    }
+  });
+
+  it('the keyboard command asks the reader top frame to open the toolbar WITH focus, and injects nothing', async () => {
+    const { executeScript, sendMessage, value } = deps();
+    const result = await handleCommand(value, 'explain-selection', readerTab);
+    expect(result).toEqual({ ok: true, shown: true });
+    expect(executeScript).not.toHaveBeenCalled();
+    expect(sendMessage).toHaveBeenCalledTimes(1);
+    expect(sendMessage).toHaveBeenCalledWith(
+      4,
+      { v: 1, type: 'CLAVIS_OPEN_SELECTION', focus: true },
+      { frameId: 0 },
+    );
+  });
+
+  it('reports shown:false when there is no selection or the reader does not answer', async () => {
+    const none = deps({ sendMessage: vi.fn(() => Promise.resolve({ ok: true, shown: false })) });
+    expect(await handleCommand(none.value, 'explain-selection', readerTab)).toEqual({
+      ok: true,
+      shown: false,
+    });
+    const gone = deps({ sendMessage: vi.fn(() => Promise.reject(new Error('no receiver'))) });
+    expect(await handleCommand(gone.value, 'explain-selection', readerTab)).toEqual({
+      ok: true,
+      shown: false,
+    });
+  });
+
+  it('the popup path and the context menu use the same route (no focus for the popup)', async () => {
+    const popup = deps();
+    expect(await injectTabForPopup(popup.value, injectTabMessage(4, readerTab.url))).toEqual({
+      ok: true,
+      shown: true,
+    });
+    expect(popup.sendMessage).toHaveBeenCalledWith(
+      4,
+      { v: 1, type: 'CLAVIS_OPEN_SELECTION' },
+      { frameId: 0 },
+    );
+    expect(popup.executeScript).not.toHaveBeenCalled();
+
+    const menu = deps();
+    await handleContextMenuClick(
+      menu.value,
+      { menuItemId: CONTEXT_MENU_ID, frameId: 0 },
+      readerTab,
+    );
+    expect(menu.sendMessage).toHaveBeenCalledWith(
+      4,
+      { v: 1, type: 'CLAVIS_OPEN_SELECTION' },
+      { frameId: 0 },
+    );
+    expect(menu.executeScript).not.toHaveBeenCalled();
+  });
+
+  it('every other extension page stays restricted and is never injected or messaged', async () => {
+    for (const url of [
+      'chrome-extension://abcdefghijklmnopabcdefghijklmnop/options.html',
+      'chrome-extension://abcdefghijklmnopabcdefghijklmnop/popup.html',
+      'chrome-extension://abcdefghijklmnopabcdefghijklmnop/onboarding.html',
+      'chrome-extension://otherextensionidotherextensionid/reader.html',
+      'chrome://extensions',
+    ]) {
+      const { executeScript, sendMessage, value } = deps();
+      expect(await handleCommand(value, 'explain-selection', { id: 4, url }), url).toEqual({
+        ok: false,
+        reason: 'restricted',
+      });
+      expect(executeScript).not.toHaveBeenCalled();
+      expect(sendMessage).not.toHaveBeenCalled();
+    }
   });
 });

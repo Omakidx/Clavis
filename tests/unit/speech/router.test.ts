@@ -15,7 +15,6 @@ import { FakeEngine, ID_A, ID_B, voice } from './helpers';
 
 interface SetupOptions {
   chromeVoices?: ReturnType<typeof voice>[];
-  offscreenVoices?: ReturnType<typeof voice>[];
   preferences?: { ttsLang?: string; ttsVoice?: string };
   os?: 'linux' | 'mac' | 'win' | 'cros' | 'android' | 'other';
 }
@@ -25,15 +24,11 @@ function setup(options: SetupOptions = {}) {
     'chrome-tts',
     options.chromeVoices ?? [voice('chrome-tts', 'en-US')],
   );
-  const offscreenFake = new FakeEngine('offscreen-web-speech', options.offscreenVoices ?? []);
-  const service = new SpeechService({ engines: [chrome, offscreenFake], startTimeoutMs: 1_000 });
-  const handlePageEvent = vi.fn();
-  const handlePageIdle = vi.fn();
+  const service = new SpeechService({ engine: chrome, startTimeoutMs: 1_000 });
   const pushed: { target: PushTarget; message: TtsEventMessage }[] = [];
   const preferences = vi.fn(() => Promise.resolve(options.preferences ?? {}));
   const handlers = createSpeechHandlers({
     service,
-    offscreenEngine: { handlePageEvent, handlePageIdle },
     push: (target, message) => {
       pushed.push({ target, message });
       return Promise.resolve();
@@ -43,11 +38,8 @@ function setup(options: SetupOptions = {}) {
   });
   return {
     chrome,
-    offscreen: offscreenFake,
     service,
     handlers,
-    handlePageEvent,
-    handlePageIdle,
     pushed,
     preferences,
   };
@@ -261,7 +253,6 @@ describe('speech handlers', () => {
 
     it('stop while the voices are still being looked up: no audio starts afterwards', async () => {
       const { handlers, chrome } = setup({ chromeVoices: [] });
-      chrome.peek = [];
       chrome.getVoicesDelayMs = 1_500;
       chrome.voices = [voice('chrome-tts', 'en-US')];
       const speaking = handlers.speak(speakMsg({ requestId: ID_A, lang: 'en' }), SELF);
@@ -314,20 +305,6 @@ describe('speech handlers', () => {
         message: expect.objectContaining({ requestId: ID_A, state: 'cancelled' }),
       }),
     ]);
-  });
-
-  it('forwards offscreen events and idle notices to the offscreen engine', () => {
-    const { handlers, handlePageEvent, handlePageIdle } = setup();
-    const event = {
-      v: 1,
-      type: 'SPEECH_OFFSCREEN_EVENT',
-      requestId: ID_A,
-      state: 'ended',
-    } as const;
-    handlers.offscreenEvent(event);
-    expect(handlePageEvent).toHaveBeenCalledWith(event);
-    handlers.offscreenIdle();
-    expect(handlePageIdle).toHaveBeenCalledTimes(1);
   });
 
   describe('voice and language choice from preferences', () => {
@@ -509,8 +486,7 @@ describe('speech handlers', () => {
     it('treats an unreadable platform as "other" (no Linux hint), without failing', async () => {
       const chrome = new FakeEngine('chrome-tts', []);
       const handlers = createSpeechHandlers({
-        service: new SpeechService({ engines: [chrome] }),
-        offscreenEngine: { handlePageEvent: vi.fn(), handlePageIdle: vi.fn() },
+        service: new SpeechService({ engine: chrome }),
         push: () => Promise.resolve(),
         preferences: () => Promise.resolve({}),
         platform: () => Promise.reject(new Error('no platform')),
@@ -573,7 +549,6 @@ describe('speech handlers', () => {
       const push = vi.fn().mockRejectedValue(new Error('no receiver'));
       const handlers = createSpeechHandlers({
         service,
-        offscreenEngine: { handlePageEvent: vi.fn(), handlePageIdle: vi.fn() },
         push,
         preferences: () => Promise.resolve({}),
         platform: () => Promise.resolve('mac'),
@@ -586,11 +561,13 @@ describe('speech handlers', () => {
   });
 
   describe('GET_VOICES report', () => {
-    it('reports platform, default engine and both engines with their voices', async () => {
+    it('reports platform, default engine and the chrome.tts voices, with network voices marked', async () => {
       const { handlers } = setup({
         os: 'win',
-        chromeVoices: [voice('chrome-tts', 'en_US', { name: 'Zira' })],
-        offscreenVoices: [voice('offscreen-web-speech', 'de-DE', { name: 'Hedda', remote: true })],
+        chromeVoices: [
+          voice('chrome-tts', 'en_US', { name: 'Zira' }),
+          voice('chrome-tts', 'de-DE', { name: 'Hedda', remote: true }),
+        ],
       });
       expect(await handlers.getVoices()).toEqual({
         ok: true,
@@ -599,49 +576,44 @@ describe('speech handlers', () => {
           defaultEngine: 'chrome-tts',
           engines: {
             chromeTts: {
-              voices: [{ name: 'Zira', lang: 'en-US', engine: 'chrome-tts', remote: false }],
-            },
-            offscreen: {
-              available: true,
               voices: [
-                { name: 'Hedda', lang: 'de-DE', engine: 'offscreen-web-speech', remote: true },
+                { name: 'Zira', lang: 'en-US', engine: 'chrome-tts', remote: false },
+                { name: 'Hedda', lang: 'de-DE', engine: 'chrome-tts', remote: true },
               ],
             },
+            // D-07: the offscreen fallback was not adopted; the slot stays for the contract.
+            offscreen: { available: false, voices: [] },
           },
         },
       });
     });
 
-    it('is voicesReportSchema-shaped on this Linux machine: no voices, offscreen available', async () => {
+    it('is voicesReportSchema-shaped on a machine without voices', async () => {
       const { handlers } = setup({ chromeVoices: [], os: 'linux' });
       const reply = await handlers.getVoices();
       expect(voicesReportSchema.parse((reply as { data: unknown }).data)).toEqual({
         platform: 'linux',
         defaultEngine: 'none',
-        engines: { chromeTts: { voices: [] }, offscreen: { available: true, voices: [] } },
+        engines: { chromeTts: { voices: [] }, offscreen: { available: false, voices: [] } },
       });
     });
 
-    it('defaults to the offscreen engine only when chrome.tts has none and it can run', async () => {
-      const off = [voice('offscreen-web-speech', 'en-US')];
-      const usable = setup({ chromeVoices: [], offscreenVoices: off });
-      expect(await usable.handlers.getVoices()).toMatchObject({
-        data: { defaultEngine: 'offscreen-web-speech' },
-      });
-      const broken = setup({ chromeVoices: [], offscreenVoices: off });
-      broken.offscreen.surveyResult = { available: false, voices: off };
-      expect(await broken.handlers.getVoices()).toMatchObject({
-        data: { defaultEngine: 'none', engines: { offscreen: { available: false } } },
-      });
-    });
-
-    it('asks for a fresh survey every time (re-probe, speech-dispatcher installed)', async () => {
+    it('asks the engine for a fresh list every time (speech-dispatcher installed later)', async () => {
       const { handlers, chrome } = setup({ chromeVoices: [] });
       await handlers.getVoices();
-      expect(chrome.invalidateCalls).toBe(1);
+      expect(chrome.refreshCalls).toEqual([true]);
       chrome.voices = [voice('chrome-tts', 'en-US')];
       expect(await handlers.getVoices()).toMatchObject({ data: { defaultEngine: 'chrome-tts' } });
-      expect(chrome.invalidateCalls).toBe(2);
+      expect(chrome.refreshCalls).toEqual([true, true]);
+    });
+
+    it('a failing engine is an empty report, not an error', async () => {
+      const { handlers, chrome } = setup();
+      chrome.getVoicesError = new Error('tts unavailable');
+      expect(await handlers.getVoices()).toMatchObject({
+        ok: true,
+        data: { defaultEngine: 'none', engines: { chromeTts: { voices: [] } } },
+      });
     });
   });
 });

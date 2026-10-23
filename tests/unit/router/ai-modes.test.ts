@@ -179,7 +179,6 @@ describe('first-send disclosure acknowledgement', () => {
   });
 
   it.each([
-    ['the reader (no card until Phase 7)', pageSender('/reader.html')],
     ['the popup', popupSender()],
     ['the options page', pageSender('/options.html')],
     ['the onboarding page', pageSender('/onboarding.html')],
@@ -268,11 +267,11 @@ describe('first-send disclosure acknowledgement', () => {
 
 describe('who may acknowledge', () => {
   const identity = { runtimeId: RUNTIME_ID, extensionOrigin: ORIGIN };
-  it('content scripts and the practice page only', () => {
+  it('content scripts, the practice page and the reader (card hosts) only', () => {
     const allowed = (sender: Parameters<typeof classifySender>[0]) =>
       mayAcknowledgeDisclosure(classifySender(sender, identity));
     expect(allowed(contentSender())).toBe(true);
-    expect(allowed(pageSender('/reader.html'))).toBe(false);
+    expect(allowed(pageSender('/reader.html'))).toBe(true);
     expect(allowed(pageSender('/practice.html'))).toBe(true);
     expect(allowed(pageSender('/options.html'))).toBe(false);
     expect(allowed(pageSender('/onboarding.html'))).toBe(false);

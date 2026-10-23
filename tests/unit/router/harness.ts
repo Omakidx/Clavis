@@ -47,6 +47,7 @@ export const pageSender = (path: string, tabId: number | null = 9): SenderLike =
 /** The real toolbar popup has no tab, and Chrome reports no frameId for tab-less senders. */
 export const popupSender = (): SenderLike => ({ id: RUNTIME_ID, url: `${ORIGIN}/popup.html` });
 
+/** The url the removed offscreen document used to have: now just an unknown extension page. */
 export const offscreenSender = (): SenderLike => ({
   id: RUNTIME_ID,
   url: `${ORIGIN}/offscreen.html`,
@@ -170,10 +171,9 @@ export function createHarness(options: HarnessOptions = {}) {
   });
 
   const chromeTts = new FakeEngine('chrome-tts', [voice('chrome-tts', 'en-US')]);
-  const speechService = new SpeechService({ engines: [chromeTts], startTimeoutMs: 1_000 });
+  const speechService = new SpeechService({ engine: chromeTts, startTimeoutMs: 1_000 });
   const speech = createSpeechHandlers({
     service: speechService,
-    offscreenEngine: { handlePageEvent: vi.fn(), handlePageIdle: vi.fn() },
     push: () => Promise.resolve(),
     preferences: () => settingsStore.getPreferences(),
     platform: () => Promise.resolve('linux'),
@@ -181,6 +181,7 @@ export function createHarness(options: HarnessOptions = {}) {
   const injection = {
     scripting: { executeScript: vi.fn(() => Promise.resolve([{ frameId: 0 }])) },
     tabs: { sendMessage: vi.fn(() => Promise.resolve({ ok: true, shown: true })) },
+    readerUrl: `${ORIGIN}/reader.html`,
   };
 
   const card = createCardHandlers({ scripting: injection.scripting as never });

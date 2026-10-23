@@ -13,7 +13,7 @@ No Critical, High or Medium findings. Model output is only ever rendered as text
 | INFO-1 | Info | Model output can carry page-steered persuasion or URL text, shown as plain text (never a link). | Accepted; output is plain text and labelled as AI-generated. |
 | INFO-2 | Info | Any 400 matching the format pattern triggered the `json_object` fallback (cached 12 h), including `json_validate_failed`. | **Fixed:** `json_validate_failed` excluded. |
 | INFO-3 | Info | Injection targeted `frameIds`, so a navigating frame could get the card in its next document. | **Fixed:** `documentIds` used when known. |
-| INFO-4 | Info | The reader was allowed to send the acknowledgement before it has a card. | **Fixed:** removed until the reader card lands (Phase 7). |
+| INFO-4 | Info | The reader was allowed to send the acknowledgement before it has a card. | **Fixed:** removed until the reader card lands; **restored in Phase 7** when the reader started hosting the card. |
 | INFO-5 | Info | Contract drift: comment and card accepted non-contract disclosure shapes. | **Fixed:** only `SETUP_REQUIRED` + `reason: 'disclosure'`. |
 | INFO-6 | Info | Pressing Explain again on the same selection while loading cancelled and re-sent (Groq may bill the aborted call). | **Fixed:** an in-flight request for the same selection is kept. |
 | INFO-7 | Info | A response arriving between clear-all and abort could re-persist one capability boolean. | Accepted (negligible). |

@@ -8,11 +8,6 @@ import {
 } from '../contracts';
 import { injectTabForPopup, type InjectionDeps } from '../site-access/injection';
 import { isInjectTabMessage, type InjectTabMessage } from '../site-access/messages';
-import {
-  type OffscreenEventMessage,
-  offscreenEventSchema,
-  offscreenIdleSchema,
-} from '../speech/messages';
 import { rejectedSpeakReply, type SpeechHandlers } from '../speech/background';
 import type { createAiHandlers } from './handlers/ai';
 import type { CardHandlers } from './handlers/card';
@@ -49,7 +44,7 @@ export const PUBLIC_SENDERS: SenderRule = {
 /**
  * Key routes (KEY_ROUTES in lib/contracts) and CLEAR_ALL_DATA: ONLY the options and
  * onboarding pages (Phase 2 review LOW-5). Never the reader (it renders untrusted PDFs),
- * the popup, the practice page, a content script or the offscreen document.
+ * the popup, the practice page or a content script.
  */
 export const KEY_SENDERS: SenderRule = { pages: [options, onboarding] };
 
@@ -200,7 +195,7 @@ export function buildRoutes(services: RouteServices): Route[] {
     privilegedRoute('GET_SITE_ACCESS_STATUS', SETTINGS_SENDERS, () =>
       settings.getSiteAccessStatus(),
     ),
-    // Which voices this device has, per engine (Settings voice chooser; D-07 check).
+    // Which voices this device has (Settings voice chooser).
     privilegedRoute('GET_VOICES', SETTINGS_SENDERS, () => speech.getVoices()),
 
     // ---- internal: site access (Spike B messages, plain objects by design) ------
@@ -213,22 +208,6 @@ export function buildRoutes(services: RouteServices): Route[] {
       ),
       handle: (message) => injectTabForPopup(injection, message),
       reject: injectRejected,
-    }),
-
-    // ---- internal: speech ----------------------------------------------------
-    defineRoute<OffscreenEventMessage>({
-      type: 'SPEECH_OFFSCREEN_EVENT',
-      allow: { offscreen: true },
-      parse: parseWith<OffscreenEventMessage>((raw) => offscreenEventSchema.safeParse(raw)),
-      handle: (message) => speech.offscreenEvent(message),
-      replies: false,
-    }),
-    defineRoute({
-      type: 'SPEECH_OFFSCREEN_IDLE',
-      allow: { offscreen: true },
-      parse: parseWith((raw) => offscreenIdleSchema.safeParse(raw)),
-      handle: () => speech.offscreenIdle(),
-      replies: false,
     }),
   ];
 }

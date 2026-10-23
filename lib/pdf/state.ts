@@ -1,19 +1,22 @@
 import { MAX_PDF_BYTES, MAX_PDF_PAGES } from './limits';
 
 /** Error codes the reader can show (docs/architecture.md section 8, requirements section 7). */
-export type ReaderErrorCode = 'CORRUPT' | 'PERMISSION' | 'TOO_LARGE' | 'UNSUPPORTED';
+export type ReaderErrorCode = 'CORRUPT' | 'PERMISSION' | 'TOO_LARGE' | 'UNSUPPORTED' | 'RENDER';
 
 /**
  * Reader state model (docs/architecture.md section 8).
  *
- * Two additions to the normative shape, proposed for the architecture doc:
+ * Additions to the normative shape, proposed for the architecture doc:
  * - `password-required.incorrect` is true after a wrong password, so the prompt can say so.
  * - `error.message` is a short English diagnostic for logs/tests; the UI renders text by `code`.
  * - `error.limit` says whether a TOO_LARGE error is about bytes or pages.
+ * - `error.code` 'RENDER': the viewer could not start or draw (worker or chunk failed to load, an
+ *   unknown internal failure), as opposed to a problem with the file itself.
+ * - `loading.progress` (0..1) while the file is being read; absent until the first chunk.
  */
 export type ReaderState =
   | { phase: 'empty' }
-  | { phase: 'loading'; name: string }
+  | { phase: 'loading'; name: string; progress?: number }
   | { phase: 'ready'; name: string; pageCount: number; page: number; zoom: number }
   | { phase: 'password-required'; name: string; incorrect?: boolean }
   | { phase: 'image-only'; name: string; pageCount: number }
@@ -33,6 +36,7 @@ const DIAGNOSTIC: Record<ReaderErrorCode, string> = {
   PERMISSION: 'The browser could not read the selected file.',
   TOO_LARGE: 'The file exceeds a reader size limit.',
   UNSUPPORTED: 'The file or one of its features is not supported.',
+  RENDER: 'The viewer could not start or draw the document.',
 };
 
 export function errorState(
@@ -49,6 +53,7 @@ export function errorState(
 /** Names PDF.js gives to the errors it throws or rejects with (matched by name across the worker boundary). */
 const CORRUPT_NAMES = new Set([
   'InvalidPDFException',
+  'UnknownErrorException',
   'MissingPDFException',
   'FormatError',
   'XRefParseException',
@@ -78,7 +83,10 @@ export function mapLoadError(error: unknown, fileName = ''): ReaderState | null 
   if (PERMISSION_NAMES.has(name)) return errorState('PERMISSION', name);
   // Allocation failures while buffering or parsing a very large file.
   if (name === 'RangeError') return errorState('TOO_LARGE', name);
-  return errorState('UNSUPPORTED', name);
+  // PDF.js says the response or feature is not something it handles.
+  if (name === 'UnexpectedResponseException') return errorState('UNSUPPORTED', name);
+  // Anything else is not about the file: the chunk or worker failed to load, or PDF.js broke.
+  return errorState('RENDER', name);
 }
 
 export interface FileLike {

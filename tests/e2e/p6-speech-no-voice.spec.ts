@@ -11,7 +11,7 @@ import {
   SENTENCE,
   WORD,
   newId,
-  offscreenDocuments,
+  contextTypes,
   openExtensionPage,
   sendFromPage,
   speakMessage,
@@ -111,23 +111,31 @@ test('a named voice that does not exist is NO_VOICE, not a substitute', async ()
   expect(reply).not.toHaveProperty('data');
 });
 
-test('the first no-voice answer is bounded, and later answers are immediate', async () => {
-  // A fresh worker would repeat the wait; here the earlier tests already learned that there is no
-  // voice. Force a new look with GET_VOICES, then measure the next request after it.
-  await sendFromPage(options, { v: 1, type: 'GET_VOICES' });
-  const first = Date.now();
-  await fromContentScript(speakMessage(WORD));
-  const firstMs = Date.now() - first;
-  // chrome.tts and the offscreen document are probed concurrently: about one voice wait (1.5 s),
-  // never the 3 s the engines needed one after the other. The hard bound is the 4 s probe limit.
-  expect(firstMs).toBeLessThan(4_500);
+test('the first no-voice answer takes about one voice wait; later answers are immediate', async () => {
+  // A fresh browser, so this worker has not yet learned that the machine has no voices.
+  const fresh = await launchExtension();
+  try {
+    const page = await openExtensionPage(fresh.context, fresh.extensionId, 'practice');
+    const first = Date.now();
+    const firstReply = (await sendFromPage(page, speakMessage(WORD))) as SpeechReply;
+    const firstMs = Date.now() - first;
+    expect(firstReply).toMatchObject(NO_VOICE_LINUX);
+    // chrome.tts waits once (1.5 s) for late-loading voices; nothing else is waited for.
+    test.info().annotations.push({ type: 'first-no-voice-ms', description: String(firstMs) });
+    expect(firstMs).toBeLessThan(3_000);
 
-  const second = Date.now();
-  const reply = await fromContentScript(speakMessage(SENTENCE));
-  expect(reply).toMatchObject(NO_VOICE_LINUX);
-  expect(Date.now() - second).toBeLessThan(750);
-  // The remembered "no voice" answer did not leave an offscreen document behind.
-  await expect.poll(async () => (await offscreenDocuments(ext.serviceWorker)).length).toBe(0);
+    const second = Date.now();
+    expect(await sendFromPage(page, speakMessage(SENTENCE))).toMatchObject(NO_VOICE_LINUX);
+    expect(Date.now() - second).toBeLessThan(750);
+  } finally {
+    await fresh.close();
+  }
+});
+
+test('no offscreen document is ever created (D-07: chrome.tts only)', async () => {
+  await fromContentScript(speakMessage(WORD));
+  await sendFromPage(options, { v: 1, type: 'GET_VOICES' });
+  expect(await contextTypes(ext.serviceWorker)).not.toContain('OFFSCREEN_DOCUMENT');
 });
 
 test('TTS_STOP is ok with nothing playing, from a content script and a page', async () => {

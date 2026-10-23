@@ -42,6 +42,40 @@ export const MAX_IMAGE_PIXELS = 50_000_000;
 export const MAX_CANVAS_PIXELS = 4096 * 4096;
 
 /**
+ * Most annotations (links, notes, markup) the reader draws on one page. Every annotation becomes
+ * DOM in the trusted reader page, so a page with 100,000 link annotations froze every extension
+ * page for seconds (Phase 7 security review LOW-1). Real documents have a few dozen per page; the
+ * excess is dropped and the reader says so.
+ */
+export const MAX_ANNOTATIONS_PER_PAGE = 1000;
+
+/**
+ * The only annotation kinds the reader draws (PDF.js `AnnotationType` names). Everything else is
+ * dropped before the viewer sees it: RichMedia, Screen, Sound and Movie annotations would decode
+ * attacker-supplied audio or video in the trusted reader page, FileAttachment and 3D have no use
+ * in a read-only reader, and the rest are print or review marks.
+ */
+export const ALLOWED_ANNOTATION_TYPES = [
+  'LINK',
+  'TEXT',
+  'POPUP',
+  'FREETEXT',
+  'LINE',
+  'SQUARE',
+  'CIRCLE',
+  'POLYGON',
+  'POLYLINE',
+  'HIGHLIGHT',
+  'UNDERLINE',
+  'SQUIGGLY',
+  'STRIKEOUT',
+  'CARET',
+  'INK',
+  'STAMP',
+  'WIDGET',
+] as const;
+
+/**
  * How many leading pages are scanned for text items before the document is declared image-only.
  * Cover pages, blank pages or a full-page logo often come first, so one page is too few; five
  * keeps the check cheap (five getTextContent calls) without scanning the document (FR-059).

@@ -33,3 +33,10 @@ paths = [
   '''(^|/)playwright-report/''',
   '''(^|/)test-results/''',
 ]
+
+# Passwords of the encrypted test PDFs (tests/fixtures/pdf/accept/encrypted-*.pdf). They only
+# unlock those fixtures, so they are test data, not secrets. The Groq key rule still applies.
+[[allowlists]]
+description = "Fixture PDF passwords in the acceptance manifest"
+targetRules = ["generic-api-key"]
+paths = ['''(^|/)tests/fixtures/pdf/accept/manifest\.json$''']

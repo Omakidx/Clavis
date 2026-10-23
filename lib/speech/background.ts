@@ -20,14 +20,9 @@ import { t } from '../i18n';
 import { failure as codedFailure } from '../router/replies';
 import { logger } from '../security/logger';
 import { ChromeTtsEngine } from './engines/chrome-tts';
-import { OffscreenSpeechEngine } from './engines/offscreen';
-import { type OffscreenEventMessage } from './messages';
-import { createOffscreenHost } from './offscreen-host';
 import { SpeechService } from './service';
 import {
   SpeechError,
-  type EngineSurvey,
-  type SpeechEngineId,
   type SpeechMessageKey,
   type SpeechStateEvent,
   type SpeechVoice,
@@ -48,7 +43,6 @@ export interface PushTarget {
 
 export interface SpeechHandlerDeps {
   service: SpeechService;
-  offscreenEngine: Pick<OffscreenSpeechEngine, 'handlePageEvent' | 'handlePageIdle'>;
   push(target: PushTarget, message: TtsEventMessage): Promise<unknown>;
   /** The speech preferences. A failing read behaves like "no preferences". */
   preferences(): Promise<Pick<Preferences, 'ttsLang' | 'ttsVoice'>>;
@@ -112,11 +106,7 @@ export function rejectedSpeakReply(raw: unknown): MessageReply<never> {
     : invalidReply(raw, parsed.issues, parsed.reason);
 }
 
-/**
- * Reason for "the only voices for this language are network voices" (D-22). The contract has no
- * dedicated reason yet; until `'online-only'` is added to errorReasonSchema it is the closest
- * truthful one. Switch this constant when the contract gains it.
- */
+/** Reason for "the only voices for this language are online voices" (D-22: on-device by default). */
 const ONLINE_ONLY_REASON: ErrorReason = 'online-only';
 
 /** Largest voice lists the report carries (voicesReportSchema). */
@@ -348,42 +338,24 @@ export function createSpeechHandlers(deps: SpeechHandlerDeps) {
     },
 
     /**
-     * GET_VOICES (Settings voice chooser, FR-025, and the D-07 check): what each engine can speak
-     * with, freshly probed. The offscreen document is created for the probe only and closed again.
+     * GET_VOICES (Settings voice chooser, FR-025): the voices of this device, freshly probed.
+     * The contract still has an `offscreen` engine slot (D-07: the fallback was not adopted), so
+     * it is reported as unavailable and empty.
      */
     async getVoices(): Promise<MessageReply<VoicesReport>> {
-      const [os, survey] = await Promise.all([platform(), service.survey()]);
-      const byEngine = (id: SpeechEngineId): EngineSurvey | undefined =>
-        survey.find((entry) => entry.engine === id);
-      const chrome = byEngine('chrome-tts');
-      const offscreen = byEngine('offscreen-web-speech');
-      const chromeVoices = toVoiceInfos(chrome?.voices ?? []);
-      const offscreenVoices = toVoiceInfos(offscreen?.voices ?? []);
-      const defaultEngine =
-        chromeVoices.length > 0
-          ? 'chrome-tts'
-          : offscreen?.available === true && offscreenVoices.length > 0
-            ? 'offscreen-web-speech'
-            : 'none';
+      const [os, voices] = await Promise.all([platform(), service.listVoices()]);
+      const chromeVoices = toVoiceInfos(voices);
       return {
         ok: true,
         data: {
           platform: os,
-          defaultEngine,
+          defaultEngine: chromeVoices.length > 0 ? 'chrome-tts' : 'none',
           engines: {
             chromeTts: { voices: chromeVoices },
-            offscreen: { available: offscreen?.available === true, voices: offscreenVoices },
+            offscreen: { available: false, voices: [] },
           },
         },
       };
-    },
-
-    offscreenEvent(event: OffscreenEventMessage): void {
-      deps.offscreenEngine.handlePageEvent(event);
-    },
-
-    offscreenIdle(): void {
-      deps.offscreenEngine.handlePageIdle();
     },
   };
 }
@@ -406,7 +378,7 @@ export interface CreateSpeechDeps {
 
 /**
  * Build the speech stack for the service worker. Registers NO message listener: its messages
- * (TTS_SPEAK, TTS_STOP, GET_VOICES, the offscreen events) are routes in the single message router
+ * (TTS_SPEAK, TTS_STOP, GET_VOICES) are routes in the single message router
  * (lib/router), which checks senders and validates shapes.
  *
  * - The service lives in the worker's memory. If the worker is torn down mid utterance,
@@ -416,9 +388,8 @@ export interface CreateSpeechDeps {
  * - `tts.onVoicesChanged` forgets remembered "no voices" answers (speech-dispatcher installed).
  */
 export function createSpeech(deps: CreateSpeechDeps): SpeechHandlers {
-  const offscreenEngine = new OffscreenSpeechEngine({ host: createOffscreenHost() });
   const service = new SpeechService({
-    engines: [new ChromeTtsEngine(), offscreenEngine],
+    engine: new ChromeTtsEngine(),
     defaultLanguage: uiLanguage(),
     watchVoiceChanges: (listener) => {
       // Chrome 124+. Boot must survive a missing or unimplemented event (older builds, test doubles).
@@ -434,7 +405,6 @@ export function createSpeech(deps: CreateSpeechDeps): SpeechHandlers {
 
   return createSpeechHandlers({
     service,
-    offscreenEngine,
     preferences: deps.preferences,
     platform: async () => toPlatform((await browser.runtime.getPlatformInfo()).os),
     push: (target, message) =>

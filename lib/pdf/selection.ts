@@ -1,92 +1,140 @@
 import { LIMITS } from '../config/constants';
-import { selectionSnapshotSchema, type SelectionKind, type SelectionSnapshot } from '../contracts';
+import type { SelectionKind, SelectionSnapshot } from '../contracts/selection';
+import type { Box, CapturedSelection, SelectionRects } from '../selection/capture';
+import { classifySelection } from '../selection/classify';
+import { isEditableSelection, isOwnUiSelection, isRangeRendered } from '../selection/eligibility';
+import { newSelectionId } from '../selection/ids';
+import { normalizeText, truncateText } from '../selection/text';
+import { extractPdfContext } from './context';
+import { normalizeKangxiRadicals } from './radicals';
 
-/** What was selected inside the viewer's text layers. */
-export interface PdfSelection {
-  /** Whitespace-normalised selected string, cut to LIMITS.maxSelectionChars. */
-  text: string;
-  /** 1-based page where the selection starts (a selection may span pages). */
-  page: number;
-  /** True when the selection was longer than the limit and has been cut. */
-  truncated: boolean;
-}
+/**
+ * Selection capture for the PDF reader (FR-053): the same `CapturedSelection` the webpage observer
+ * produces, so the shared toolbar, Listen and the explanation card treat it identically. What
+ * differs is the source (`'pdf'`), the page number and where the context comes from
+ * (lib/pdf/context.ts: the same page only).
+ *
+ * Eligibility is `captureSelection`'s, minus the document-protocol check (the reader is an
+ * extension page) plus "both ends inside a PDF.js text layer of THIS viewer".
+ */
 
-/** Raw selection length examined before whitespace normalisation (UTF-16 code units). */
+/** Read at most this much raw selection text before normalizing (bounds select-all cost). */
 export const RAW_SELECTION_CAP = LIMITS.maxSelectionChars * 4;
 
+const LANG_TAG = /^[A-Za-z]{2,8}(?:-[A-Za-z0-9]{1,8}){0,4}$/;
+
 function elementOf(node: Node | null): Element | null {
-  if (!node) return null;
-  return node instanceof Element ? node : node.parentElement;
+  if (node === null) return null;
+  return node.nodeType === 1 ? (node as Element) : node.parentElement;
 }
 
-function pageOf(node: Node | null): number | null {
-  const pageEl = elementOf(node)?.closest<HTMLElement>('.page[data-page-number]');
-  const value = Number(pageEl?.dataset['pageNumber']);
+/** The `.textLayer` that holds `node`, when it belongs to `root`. */
+export function textLayerOf(node: Node | null, root: Element): Element | null {
+  const layer = elementOf(node)?.closest('.textLayer') ?? null;
+  return layer !== null && root.contains(layer) ? layer : null;
+}
+
+/** The 1-based PDF page of a text layer (`.page[data-page-number]`), or null. */
+export function pageOfLayer(layer: Element): number | null {
+  const value = Number(
+    layer.closest<HTMLElement>('.page[data-page-number]')?.dataset['pageNumber'],
+  );
   return Number.isInteger(value) && value > 0 ? value : null;
 }
 
-function insideTextLayer(node: Node | null, root: Element): boolean {
-  const el = elementOf(node);
-  return el !== null && root.contains(el) && el.closest('.textLayer') !== null;
+/** `lang` of the text only when the PDF set one inside the viewer; the reader's own UI language says nothing about it. */
+function languageHintOf(el: Element | null, root: Element): string | undefined {
+  const lang = el?.closest('[lang]');
+  const value =
+    lang !== null && lang !== undefined && root.contains(lang) ? lang.getAttribute('lang') : null;
+  return value !== null && LANG_TAG.test(value) ? value : undefined;
 }
 
-function cutAtLimit(text: string): { text: string; truncated: boolean } {
-  if (text.length <= LIMITS.maxSelectionChars) return { text, truncated: false };
-  let end = LIMITS.maxSelectionChars;
-  // Do not split a surrogate pair.
-  const code = text.charCodeAt(end - 1);
-  if (code >= 0xd800 && code <= 0xdbff) end -= 1;
-  return { text: text.slice(0, end).trimEnd(), truncated: true };
+function intersect(a: Box, b: Box): Box | null {
+  const box = {
+    left: Math.max(a.left, b.left),
+    top: Math.max(a.top, b.top),
+    right: Math.min(a.right, b.right),
+    bottom: Math.min(a.bottom, b.bottom),
+  };
+  return box.right > box.left && box.bottom > box.top ? box : null;
 }
 
 /**
- * Read the current window selection when, and only when, both of its ends are inside a PDF.js
- * text layer under `root`. Text is taken from window.getSelection() (architecture section 8);
- * nothing is reconstructed from canvases or from other pages.
+ * Live line boxes of `range`, clipped to the scrolling viewer (`clip`). Null while the selection is
+ * entirely scrolled out of the viewer: the toolbar then hides, and returns when it scrolls back.
+ * `first` and `last` are the first and last line that is at least partly visible, so the toolbar
+ * never anchors to text nobody can see (the text layer's boxes are not clipped by the scroller).
  */
-export function readPdfSelection(selection: Selection | null, root: Element): PdfSelection | null {
-  if (!selection || selection.rangeCount === 0 || selection.isCollapsed) return null;
-  if (!insideTextLayer(selection.anchorNode, root) || !insideTextLayer(selection.focusNode, root)) {
-    return null;
+export function viewerRects(range: Range, clip: Element): SelectionRects | null {
+  const view = clip.getBoundingClientRect();
+  const lines: Box[] = [];
+  for (const rect of Array.from(range.getClientRects())) {
+    if (rect.width < 1 || rect.height <= 0) continue;
+    const visible = intersect(rect, view);
+    if (visible !== null) lines.push(visible);
   }
-  const range = selection.getRangeAt(0);
-  const page = pageOf(range.startContainer) ?? pageOf(selection.anchorNode);
-  if (page === null) return null;
-  // Bound the raw string before any regex runs: a whole-document selection can be megabytes.
-  // Four times the limit leaves room for the whitespace that normalisation removes.
-  const full = selection.toString();
-  let raw = full.slice(0, RAW_SELECTION_CAP);
-  const last = raw.charCodeAt(raw.length - 1);
-  if (raw.length === RAW_SELECTION_CAP && last >= 0xd800 && last <= 0xdbff) raw = raw.slice(0, -1);
-  const normalized = raw.replace(/\s+/g, ' ').trim();
-  if (normalized === '') return null;
-  const cut = cutAtLimit(normalized);
-  return { text: cut.text, page, truncated: cut.truncated || full.length > RAW_SELECTION_CAP };
+  const first = lines[0];
+  const last = lines[lines.length - 1];
+  if (first === undefined || last === undefined) return null;
+  const bounds = lines.reduce((a, b) => ({
+    left: Math.min(a.left, b.left),
+    top: Math.min(a.top, b.top),
+    right: Math.max(a.right, b.right),
+    bottom: Math.max(a.bottom, b.bottom),
+  }));
+  return { first, last, bounds };
 }
 
 /**
- * Rough kind classification for the spike. The real classifier belongs to the selection module
- * (Phase 4); this keeps the snapshot schema satisfied until it is shared.
+ * Capture the current selection when, and only when, both of its ends are inside PDF.js text
+ * layers under `root` (the scrolling viewer container). Null when it does not qualify: collapsed,
+ * outside the PDF, in an input (the find box), inside Clavis's own UI, or not rendered.
+ * Pure local work; nothing leaves the page.
  */
-export function classifyKind(text: string): SelectionKind {
-  const words = text.split(/\s+/).filter(Boolean).length;
-  if (words <= 1) return 'word';
-  if (words <= 4) return 'phrase';
-  const sentenceCount = text.split(/[.!?]+(?:\s|$)/).filter((s) => s.trim() !== '').length;
-  return sentenceCount <= 1 && words <= 60 ? 'sentence' : 'passage';
-}
+export function capturePdfSelection(win: Window, root: Element): CapturedSelection | null {
+  const selection = win.getSelection();
+  if (selection === null || selection.rangeCount === 0 || selection.isCollapsed) return null;
+  const range = selection.getRangeAt(0).cloneRange();
+  const layer = textLayerOf(range.startContainer, root);
+  if (layer === null || textLayerOf(range.endContainer, root) === null) return null;
+  const page = pageOfLayer(layer);
+  if (page === null) return null;
+  const doc = win.document;
+  if (isEditableSelection(selection, doc, range) || isOwnUiSelection(selection)) return null;
+  if (!isRangeRendered(range)) return null;
 
-/** Build and validate a `source: 'pdf'` SelectionSnapshot; null when it does not satisfy the schema. */
-export function toPdfSelectionSnapshot(
-  selection: PdfSelection,
-  selectionId: string = crypto.randomUUID(),
-): SelectionSnapshot | null {
-  const result = selectionSnapshotSchema.safeParse({
-    selectionId,
+  const normalized = normalizeKangxiRadicals(
+    normalizeText(selection.toString().slice(0, RAW_SELECTION_CAP)),
+  );
+  if (normalized === '') return null;
+
+  const overLimit = normalized.length > LIMITS.maxSelectionChars;
+  const text = truncateText(normalized, LIMITS.maxSelectionChars);
+  const el = elementOf(range.commonAncestorContainer);
+  const languageHint = languageHintOf(el, root);
+  const kind: SelectionKind = overLimit ? 'passage' : classifySelection(text, languageHint);
+  const context = extractPdfContext(range, layer);
+  const dir = el !== null && win.getComputedStyle(el).direction === 'rtl' ? 'rtl' : 'ltr';
+
+  const snapshot: SelectionSnapshot = {
+    selectionId: newSelectionId(),
     source: 'pdf',
-    kind: classifyKind(selection.text),
-    text: selection.text,
-    page: selection.page,
-  });
-  return result.success ? result.data : null;
+    kind,
+    text,
+    ...(context.before === '' ? {} : { contextBefore: context.before }),
+    ...(context.after === '' ? {} : { contextAfter: context.after }),
+    ...(languageHint === undefined ? {} : { languageHint }),
+    page,
+  };
+
+  const captured: CapturedSelection = {
+    snapshot,
+    overLimit,
+    ...(overLimit ? { fullText: normalized } : {}),
+    dir,
+    range,
+    getRects: () => (range.collapsed ? null : viewerRects(range, root)),
+  };
+  return captured;
 }

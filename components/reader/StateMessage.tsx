@@ -13,34 +13,81 @@ function errorText(code: ReaderErrorCode, limit: 'bytes' | 'pages' | undefined):
       return t('readerErrorTooLarge', String(Math.round(MAX_PDF_BYTES / (1024 * 1024))));
     case 'UNSUPPORTED':
       return t('readerErrorUnsupported');
+    case 'RENDER':
+      return t('readerErrorRender');
   }
 }
 
-/** Message for the non-document states. `ready` and `password-required` render nothing here. */
-export function StateMessage({ state, dragging }: { state: ReaderState; dragging: boolean }) {
+interface StateMessageProps {
+  state: ReaderState;
+  /** A file is being dragged over the page. */
+  dragging: boolean;
+  /** Opens the file picker (the empty state's and the error states' action). */
+  onOpen?: () => void;
+}
+
+/**
+ * Message for the non-document states. `ready` and `password-required` render nothing here.
+ * Every message is Clavis's own localized text chosen by state/code: nothing from the PDF (its
+ * file name is the only exception and is rendered as a text node by React) reaches markup.
+ */
+export function StateMessage({ state, dragging, onOpen }: StateMessageProps) {
   switch (state.phase) {
     case 'empty':
       return (
-        <p className="reader-message" data-testid="state-empty">
-          {dragging ? t('readerDropActive') : t('readerEmptyHint')}
-        </p>
+        <section className="reader-empty" data-testid="state-empty" data-dragging={dragging}>
+          <h2 className="reader-empty__title">{t('readerEmptyTitle')}</h2>
+          <p>{t('readerEmptyBody')}</p>
+          {onOpen ? (
+            <div className="clavis-actions reader-empty__actions">
+              <button
+                type="button"
+                className="clavis-button clavis-button--primary"
+                onClick={onOpen}
+              >
+                {t('readerEmptyChoose')}
+              </button>
+            </div>
+          ) : null}
+          <p className="reader-empty__drop">
+            {dragging ? t('readerDropActive') : t('readerEmptyHint')}
+          </p>
+          <p className="clavis-muted">{t('readerEmptyChrome')}</p>
+          <p className="clavis-muted">{t('readerShortcutsHint')}</p>
+        </section>
       );
     case 'loading':
       return (
-        <p className="reader-message" role="status" data-testid="state-loading">
-          {t('readerLoading', state.name)}
-        </p>
+        <div className="reader-message" role="status" data-testid="state-loading">
+          <p>{t('readerLoading', state.name)}</p>
+          {state.progress === undefined ? null : (
+            <progress
+              className="reader-progress"
+              max={100}
+              value={Math.round(state.progress * 100)}
+              aria-label={t('readerLoading', state.name)}
+              data-testid="state-progress"
+            />
+          )}
+        </div>
       );
     case 'error':
       return (
-        <p
+        <div
           className="reader-message reader-message--error"
           role="alert"
           data-testid="state-error"
           data-code={state.code}
         >
-          {errorText(state.code, state.limit)}
-        </p>
+          <p>{errorText(state.code, state.limit)}</p>
+          {onOpen ? (
+            <div className="clavis-actions reader-empty__actions">
+              <button type="button" className="clavis-button" onClick={onOpen}>
+                {t('readerChooseAnother')}
+              </button>
+            </div>
+          ) : null}
+        </div>
       );
     case 'image-only':
       return (

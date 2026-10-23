@@ -113,7 +113,11 @@ Console alternative (options page console): `chrome.runtime.sendMessage({v:1,typ
 
 Reader page option (not implemented, no edits to `entrypoints/reader`): extension pages have `speechSynthesis` directly, so the reader can reuse `registerOffscreenSpeech`'s voice logic as a "direct Web Speech" engine inside its own `SpeechService([ChromeTtsEngine, DirectWebSpeechEngine])` and skip the offscreen document entirely. Measured here: a reader-style extension page reports 0 voices and `synthesis-failed` on this machine, exactly like the offscreen document.
 
-## Provisional recommendation for D-07
+## Outcome (2026-10-23): fallback not adopted
+
+The user's check on branded Chrome 154 / Linux (no speech-dispatcher) showed **Chrome voices: 19, Fallback voices: 19** in Settings → Voice — the same voices (all online Google voices). Per the criterion below, the offscreen fallback adds nothing and was removed, together with the `offscreen` permission. On that machine Listen uses on-device voices only (D-22), so it reports "Only online voices are available" until the user picks an online voice or installs `speech-dispatcher` + `espeak-ng`.
+
+## Provisional recommendation for D-07 (historical)
 
 1. **Linux without speech-dispatcher (this machine): do not adopt the fallback.** Proven: 0 voices on both engines, and both fail instantly when forced. Ship the actionable no-voice message (`speechNoVoice`), not a fallback.
 2. **Linux with speech-dispatcher + espeak-ng, Windows, macOS: no evidence yet that the fallback helps.** In Chromium both `chrome.tts` and Web Speech sit on the same platform speech controller, so the expectation (**unverified hypothesis**) is that the voice lists match and `chrome.tts` alone suffices. The fallback is justified on an OS only if step 3 of the manual check shows the offscreen engine listing a usable voice that `chrome.tts` lacks.

@@ -16,14 +16,14 @@
 | A-004 | Never place API key in content script | Webpage context is untrusted | Only privileged background/settings/reader contexts handle credentials |
 | A-005 | Shared domain action and result contracts | Web and PDF use same explain/listen workflows | Multiple UI entry points; one adapter for speech and AI |
 | A-006 | PDF.js custom extension page built on PDF.js viewer components | Native Chrome PDF viewer cannot reliably host normal content scripts; viewer components give virtualization, text layer and find for free | User explicitly opens PDF in reader; no browser-wide PDF hijack; local files only in v1 |
-| A-007 | `chrome.tts` preferred, capability-detected; Web Speech fallback in an offscreen document if proven | No AI cost, good Chrome integration; the service worker has no DOM | Not guaranteed Linux voices; fallback/support message required |
+| A-007 | `chrome.tts`, capability-detected; the offscreen Web Speech fallback was evaluated and not adopted (D-07) | No AI cost, good Chrome integration; the fallback found no extra voices | Not guaranteed Linux voices; honest no-voice / online-only messages |
 | A-008 | Structured responses with runtime validation | Predictable cards, failure isolation | Model feature checks and safe fallback when schema mode unavailable |
 | A-009 | Explicit user-triggered AI requests | Privacy and cost control | Selection itself has zero network transmission to Groq |
 | A-010 | Future provider interface from day one | Later OpenRouter/Gemini support | v1 contains only `GroqProvider`; no premature complex router |
 | A-011 | Optional all-sites access + runtime content-script registration, with `activeTab` fallback (D-02) | Automatic toolbar for consenting users; on-demand use for everyone else | Two injection paths to test; manifest has no static `content_scripts` for websites |
 | A-012 | Core request + lazy per-tab requests (D-05) | One request per Explain; free-tier friendly | Mode set and schemas differ from a "one mode per tab" design; per-selection in-memory result cache |
 | A-013 | Tiny always-on observer with a bundled Preact toolbar; card loaded on first Explain (D-08) | Page weight and 150 ms toolbar target | Chosen by Spike B measurement (see §5) |
-| A-014 | Extension-page CSP allows `wasm-unsafe-eval` only (D-17) | PDF.js wasm decoders | ZIP audit enforces the exact CSP |
+| A-014 | Extension-page CSP allows `wasm-unsafe-eval` only and blocks media, frames, form posts and `<base>` (D-17) | PDF.js wasm decoders | ZIP audit enforces the exact CSP |
 
 ## 2. Container/context architecture
 
@@ -70,7 +70,6 @@ flowchart TD
 ```text
 entrypoints/background.ts        # service worker: bootstrap listeners synchronously
 entrypoints/content.ts           # selection observer; registered at runtime, not in manifest
-entrypoints/offscreen/index.html # speechSynthesis fallback (only if D-07 adopts it)
 entrypoints/popup/index.html     # action launcher, provider status
 entrypoints/onboarding/index.html
 entrypoints/options/index.html   # user key settings, tests, preferences
@@ -92,8 +91,7 @@ This table is the single source of truth for permissions; the privacy policy, st
 | `activeTab` | `permissions` | Must | Current-tab injection from the context menu or toolbar icon when site access is declined |
 | `contextMenus` | `permissions` | Must | **Explain with Clavis** entry; the fallback path for users without site access (FR-018) |
 | `sidePanel` | `permissions` | Should | Large accessible explanations; include only if the side panel ships |
-| `offscreen` | `permissions` | Provisional | Present while D-07 awaits the user's voice check; removed if the fallback finds no extra voices |
-| `content_security_policy.extension_pages` | manifest | Must | Exactly `script-src 'self' 'wasm-unsafe-eval'; object-src 'self'` (D-17) |
+| `content_security_policy.extension_pages` | manifest | Must | Exactly `script-src 'self' 'wasm-unsafe-eval'; object-src 'self'; media-src 'none'; frame-src 'none'; form-action 'none'; base-uri 'none'` (D-17; the `none` directives added in Phase 7) |
 | `commands.explain-selection` (Alt+Shift+E) | manifest | Must | Keyboard path to the toolbar (FR-016); not a permission |
 | `minimum_chrome_version` 147 | manifest | Must | D-18 (set by PDF.js 6's use of `Math.sumPrecise`) |
 | `https://api.groq.com/*` | `host_permissions` | Must | Background Groq API calls; narrowly scoped endpoint |
@@ -366,13 +364,13 @@ flowchart LR
     F -->|No| ERR[Explain unavailable voice]
 ```
 
-**Phase 6 implementation notes.** `TTS_SPEAK` resolves the voice as: an explicit `voiceName` exactly (else `NO_VOICE`), then the saved `ttsVoice` only if it speaks the requested language, then the best match by language (local before remote, `chrome.tts` before the offscreen fallback) — never a voice for another language. The reply comes only after the engine starts (`speakResultSchema`, with `remote`); `TTS_EVENT` (ended/cancelled/error) goes to exactly the requesting document. On Linux with no voices, `NO_VOICE` carries `reason: 'no-voice-linux'`. `GET_VOICES` reports per-engine voices for Settings → Voice. On the toolbar, Listen has its own run slot, so it never closes an open explanation.
+**Phase 6 implementation notes.** `TTS_SPEAK` resolves the voice as: an explicit `voiceName` exactly (else `NO_VOICE`), then the saved `ttsVoice` only if it speaks the requested language, then the best match by language among on-device voices (D-22) — never a voice for another language. The reply comes only after the engine starts (`speakResultSchema`, with `remote`); `TTS_EVENT` (ended/cancelled/error) goes to exactly the requesting document. On Linux with no voices, `NO_VOICE` carries `reason: 'no-voice-linux'`. `GET_VOICES` reports per-engine voices for Settings → Voice. On the toolbar, Listen has its own run slot, so it never closes an open explanation.
 
 **Responsibilities:**
 
 - `SpeechService`: `getVoices`, `speak({ text, lang, rate })`, `stop`, `isSupported` and TTS event adapters; hides which engine is used.
 - Prefer `chrome.tts` for extension-level playback; request `tts` permission. Query available voices before advertising specific language/accent selections. Chrome TTS often lacks voices on Linux.
-- **Fallback (D-07):** the service worker has **no DOM**, so it cannot call `speechSynthesis`. For webpage selections, the background creates an offscreen document (`chrome.offscreen.createDocument`, reason `AUDIO_PLAYBACK`) that runs `speechSynthesis` and relays start/end/error events back; it closes the document when idle. Extension pages such as the reader call `speechSynthesis` directly. Adopt the fallback per OS only after Spike D confirms audible output; `speechSynthesis.getVoices()` can also be empty on Linux.
+- **Fallback (D-07): not adopted.** An offscreen-document `speechSynthesis` fallback was built in Spike D and Phase 6, but the user's check showed it reports the same voices as `chrome.tts`, so it was removed along with the `offscreen` permission.
 - Speaking one selection cancels the previous utterance (`chrome.tts.stop()`), except when future queueing is intentionally implemented.
 - Rate presets: Normal `1.0`, Slow `0.75` (subject to engine behavior); validate bounds.
 - Word and sentence work through the same TTS interface. Respect natural punctuation; avoid slicing a normal sentence into separate single-word calls.
@@ -415,21 +413,23 @@ flowchart TD
 ```ts
 type ReaderState =
   | { phase: 'empty' }
-  | { phase: 'loading'; name: string }
+  | { phase: 'loading'; name: string; progress?: number /* 0..1 while reading the file */ }
   | { phase: 'ready'; name: string; pageCount: number; page: number; zoom: number }
   | { phase: 'password-required'; name: string; incorrect?: boolean }
   | { phase: 'image-only'; name: string; pageCount: number }
   | {
       phase: 'error';
-      code: 'CORRUPT' | 'PERMISSION' | 'TOO_LARGE' | 'UNSUPPORTED';
+      code: 'CORRUPT' | 'PERMISSION' | 'TOO_LARGE' | 'UNSUPPORTED' | 'RENDER';
       limit?: 'bytes' | 'pages'; // for TOO_LARGE: 100 MiB file or 5,000 pages
       message: string; // diagnostic only; the UI shows a localized message per code
     };
 ```
 
+**Phase 7 implementation notes.** The reader mounts the same selection controller, Preact toolbar (closed shadow root), Listen and explanation card as webpages (FR-053); snapshots carry `source: 'pdf'` and the page number. PDF.js runs with `annotationMode: ENABLE`, annotation editing disabled, auto-linking off, XFA off and no scripting manager. `ENABLE` would also render media annotations (RichMedia, Screen, Sound: a play button that decodes PDF-embedded audio/video in this trusted page), so the reader filters each page's annotations to an allowlist (links, text/popup notes, FreeText, markup, stamps and widgets as static appearances) capped at 1,000 per page (a banner says when the cap applies). The allowlist is the real control: the CSP's `media-src 'none'` blocks network media but Chrome does not apply it to `blob:` media, which is what PDF.js uses. Links go through a custom link service that opens only http/https/mailto (mailto keeps only the address, subject and body) in a new tab after a confirm dialog that ignores double-clicks and clicks that started before it opened. Unknown load failures map to `RENDER`. The reader is a trusted extension context; a sandboxed viewer page is the long-term containment (Later).
+
 ### PDF selection and context
 
-For v1, rely on `window.getSelection()` in the PDF text layer while preserving page-number metadata. Multi-page/column selection can have unintuitive reading order; **do not** reconstruct large passages from canvas or extract every page. Show the exact selected string for user confirmation before a large AI send. Context can be taken from nearby text items on that page, bounded to the same small character ceiling as webpages, not the full document. Treat scanned-only pages as nonselectable without OCR and show guidance.
+For v1, rely on `window.getSelection()` in the PDF text layer while preserving page-number metadata. Context (lib/pdf/context.ts) comes only from the text layer of the page where the selection starts (`contextAfter` only if it also ends there), skipping hidden and off-page text, at most 500 characters per side. Multi-page/column selection can have unintuitive reading order; **do not** reconstruct large passages from canvas or extract every page. Show the exact selected string for user confirmation before a large AI send. Context can be taken from nearby text items on that page, bounded to the same small character ceiling as webpages, not the full document. Treat scanned-only pages as nonselectable without OCR and show guidance.
 
 ## 9. Persistence, privacy and telemetry
 
@@ -455,7 +455,7 @@ These rules are the single source of truth for key handling; other documents lin
 1. At startup in the background, call `chrome.storage.local.setAccessLevel({ accessLevel: 'TRUSTED_CONTEXTS' })` **before** registering any message route that reads storage. Explicitly verify in tests that `chrome.storage.session` is also unreadable from content scripts.
 2. Persistent keys live in `chrome.storage.local`; session-only keys live in `chrome.storage.session`. Never use `chrome.storage.sync` for secrets. Neither area is an encrypted vault or OS keychain; the settings UI must say so and must not claim encryption.
 3. Only the background reads the key. Content scripts send `AI_EXPLAIN`; there is no message that returns the key, and `GET_PUBLIC_SETTINGS` returns `hasKey: boolean` and non-secret preferences only (`publicSettingsSchema`).
-4. One background router (`lib/router`) owns the single `runtime.onMessage` listener and checks every route's sender: `sender.id === chrome.runtime.id`, extension pages matched by **exact path**, no website `sender.tab`. Key routes (`SET_API_KEY`, `TEST_API_KEY`, `REMOVE_API_KEY`, `GET_KEY_STATUS`, `CLEAR_ALL_DATA`) only from `/options.html` and `/onboarding.html`; settings and status routes also from `/popup.html`; never from the reader, the practice page or the offscreen document. Unknown types get no reply; a known type from a disallowed sender or with a bad shape gets `INVALID_REQUEST`.
+4. One background router (`lib/router`) owns the single `runtime.onMessage` listener and checks every route's sender: `sender.id === chrome.runtime.id`, extension pages matched by **exact path**, no website `sender.tab`. Key routes (`SET_API_KEY`, `TEST_API_KEY`, `REMOVE_API_KEY`, `GET_KEY_STATUS`, `CLEAR_ALL_DATA`) only from `/options.html` and `/onboarding.html`; settings and status routes also from `/popup.html`; never from the reader or the practice page. Unknown types get no reply; a known type from a disallowed sender or with a bad shape gets `INVALID_REQUEST`.
 5. Key inputs are masked by default; the UI may show the last 4 characters only.
 6. Removing the key clears the chosen storage area, in-memory references, connection status and any cache tied to it, and aborts in-flight requests. Key metadata (storage area, last4, verification, models) lives in the **same area as the key**, so a session-only key leaves nothing in `chrome.storage.local`. Key reads and writes `await whenStorageLockedDown()` and fail with `STORAGE_UNAVAILABLE` if it resolved `false`; deletion is allowed regardless.
 7. One user-supplied key per provider; no developer key is ever shipped. Groq is reached only over `https:` within the narrow host permission.

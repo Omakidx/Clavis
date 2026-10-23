@@ -1,10 +1,10 @@
 // @vitest-environment jsdom
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { browser } from 'wxt/browser';
 import { PasswordPrompt } from '../../../components/reader/PasswordPrompt';
-import { SelectionPanel } from '../../../components/reader/SelectionPanel';
+import { LinkConfirm, OPEN_GUARD_MS } from '../../../components/reader/LinkConfirm';
 import { StateMessage } from '../../../components/reader/StateMessage';
 import type { ReaderState } from '../../../lib/pdf/state';
 
@@ -21,12 +21,44 @@ const renderState = (state: ReaderState, dragging = false) =>
   render(<StateMessage state={state} dragging={dragging} />);
 
 describe('StateMessage', () => {
-  it('shows the open hint when empty and the drop hint while dragging', () => {
+  it('explains the reader when empty, and names the drop target while dragging', () => {
     const { unmount } = renderState({ phase: 'empty' });
-    expect(screen.getByTestId('state-empty')).toHaveTextContent('readerEmptyHint');
+    const empty = screen.getByTestId('state-empty');
+    expect(empty).toHaveTextContent('readerEmptyTitle');
+    expect(empty).toHaveTextContent('readerEmptyBody');
+    expect(empty).toHaveTextContent('readerEmptyHint');
+    // Why Chrome's own viewer cannot host Clavis, and how to get the file here.
+    expect(empty).toHaveTextContent('readerEmptyChrome');
+    expect(empty).toHaveTextContent('readerShortcutsHint');
     unmount();
     renderState({ phase: 'empty' }, true);
     expect(screen.getByTestId('state-empty')).toHaveTextContent('readerDropActive');
+  });
+
+  it('offers the file picker from the empty state and from an error', async () => {
+    const onOpen = vi.fn();
+    const user = userEvent.setup();
+    const { unmount } = render(
+      <StateMessage state={{ phase: 'empty' }} dragging={false} onOpen={onOpen} />,
+    );
+    await user.click(screen.getByRole('button', { name: 'readerEmptyChoose' }));
+    unmount();
+    render(
+      <StateMessage
+        state={{ phase: 'error', code: 'CORRUPT', message: 'x' }}
+        dragging={false}
+        onOpen={onOpen}
+      />,
+    );
+    await user.click(screen.getByRole('button', { name: 'readerChooseAnother' }));
+    expect(onOpen).toHaveBeenCalledTimes(2);
+  });
+
+  it('shows read progress while loading', () => {
+    renderState({ phase: 'loading', name: 'big.pdf', progress: 0.42 });
+    const bar = screen.getByTestId('state-progress');
+    expect(bar).toHaveAttribute('value', '42');
+    expect(bar).toHaveAttribute('aria-label', 'readerLoading(big.pdf)');
   });
 
   it('announces loading with the file name', () => {
@@ -38,6 +70,7 @@ describe('StateMessage', () => {
     ['CORRUPT', 'readerErrorCorrupt'],
     ['PERMISSION', 'readerErrorPermission'],
     ['UNSUPPORTED', 'readerErrorUnsupported'],
+    ['RENDER', 'readerErrorRender'],
   ] as const)('shows a distinct alert for %s', (code, key) => {
     renderState({ phase: 'error', code, message: 'diagnostic' });
     const alert = screen.getByRole('alert');
@@ -120,29 +153,74 @@ describe('PasswordPrompt', () => {
   });
 });
 
-describe('SelectionPanel', () => {
-  it('shows the empty message without a selection', () => {
-    render(<SelectionPanel selection={null} />);
-    expect(screen.getByTestId('selection-none')).toBeInTheDocument();
+describe('LinkConfirm', () => {
+  it('shows the URL as text, focuses Cancel and cancels with Escape', async () => {
+    const onAnswer = vi.fn();
+    const user = userEvent.setup();
+    render(<LinkConfirm url="https://example.com/<b>x</b>" onAnswer={onAnswer} />);
+    // The URL is a text node: no element is created from it.
+    expect(screen.getByTestId('link-confirm').querySelector('b')).toBeNull();
+    expect(screen.getByTestId('link-confirm')).toHaveTextContent(
+      'readerLinkConfirmBody(https://example.com/<b>x</b>)',
+    );
+    expect(screen.getByRole('button', { name: 'readerLinkCancel' })).toHaveFocus();
+    await user.keyboard('{Escape}');
+    expect(onAnswer).toHaveBeenCalledExactlyOnceWith(false);
   });
 
-  it('shows text, page and the snapshot source/kind of the last selection', () => {
-    render(
-      <SelectionPanel
-        selection={{
-          truncated: false,
-          snapshot: {
-            selectionId: '3f2b8c1e-5d4a-4c2b-9e1f-0a1b2c3d4e5f',
-            source: 'pdf',
-            kind: 'sentence',
-            text: 'A selected sentence.',
-            page: 4,
-          },
-        }}
-      />,
-    );
-    expect(screen.getByTestId('selection-text')).toHaveTextContent('A selected sentence.');
-    expect(screen.getByTestId('selection-page')).toHaveAttribute('data-page', '4');
-    expect(document.querySelector('[data-source="pdf"][data-kind="sentence"]')).not.toBeNull();
+  it('opens only on the explicit button and keeps Tab inside the dialog', async () => {
+    const onAnswer = vi.fn();
+    const user = userEvent.setup();
+    render(<LinkConfirm url="https://example.com/" onAnswer={onAnswer} />);
+    // Cancel is last in order: Tab wraps to Open, Shift+Tab wraps back.
+    await user.tab();
+    expect(screen.getByRole('button', { name: 'readerLinkOpen' })).toHaveFocus();
+    await user.tab({ shift: true });
+    expect(screen.getByRole('button', { name: 'readerLinkCancel' })).toHaveFocus();
+    // Keyboard activation is immediate; pointer clicks are guarded (see the guard tests below).
+    screen.getByRole('button', { name: 'readerLinkOpen' }).focus();
+    await user.keyboard('{Enter}');
+    expect(onAnswer).toHaveBeenCalledExactlyOnceWith(true);
+  });
+
+  describe('double-click guard (MEDIUM-1)', () => {
+    afterEach(() => vi.useRealTimers());
+
+    it('ignores pointer clicks on Open right after the dialog appears, and any part of a multi-click', async () => {
+      const onAnswer = vi.fn();
+      render(<LinkConfirm url="https://example.com/" onAnswer={onAnswer} />);
+      const open = screen.getByRole('button', { name: 'readerLinkOpen' });
+      // The second click of a double click lands here almost at once.
+      fireEvent.click(open, { detail: 1 });
+      fireEvent.click(open, { detail: 2 });
+      fireEvent.click(open, { detail: 3 });
+      expect(onAnswer).not.toHaveBeenCalled();
+    });
+
+    it('accepts a deliberate single click after the guard time, but never a multi-click', async () => {
+      vi.useFakeTimers();
+      const onAnswer = vi.fn();
+      render(<LinkConfirm url="https://example.com/" onAnswer={onAnswer} />);
+      const open = screen.getByRole('button', { name: 'readerLinkOpen' });
+      await vi.advanceTimersByTimeAsync(OPEN_GUARD_MS + 50);
+      fireEvent.click(open, { detail: 2 });
+      expect(onAnswer).not.toHaveBeenCalled();
+      fireEvent.click(open, { detail: 1 });
+      expect(onAnswer).toHaveBeenCalledExactlyOnceWith(true);
+    });
+
+    it('keyboard activation (detail 0) works immediately', () => {
+      const onAnswer = vi.fn();
+      render(<LinkConfirm url="https://example.com/" onAnswer={onAnswer} />);
+      fireEvent.click(screen.getByRole('button', { name: 'readerLinkOpen' }), { detail: 0 });
+      expect(onAnswer).toHaveBeenCalledExactlyOnceWith(true);
+    });
+
+    it('Cancel is never delayed', () => {
+      const onAnswer = vi.fn();
+      render(<LinkConfirm url="https://example.com/" onAnswer={onAnswer} />);
+      fireEvent.click(screen.getByRole('button', { name: 'readerLinkCancel' }), { detail: 1 });
+      expect(onAnswer).toHaveBeenCalledExactlyOnceWith(false);
+    });
   });
 });

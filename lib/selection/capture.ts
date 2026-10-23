@@ -155,7 +155,7 @@ export function captureSelection(win: Window = window): CapturedSelection | null
  */
 export function trimCaptured(captured: CapturedSelection): CapturedSelection {
   const { fullText, snapshot } = captured;
-  const { contextBefore, languageHint } = snapshot;
+  const { contextBefore, languageHint, page } = snapshot;
   const text = trimToWordBoundary(fullText ?? snapshot.text, LIMITS.maxSelectionChars);
   return {
     snapshot: {
@@ -165,6 +165,7 @@ export function trimCaptured(captured: CapturedSelection): CapturedSelection {
       text,
       ...(contextBefore === undefined ? {} : { contextBefore }),
       ...(languageHint === undefined ? {} : { languageHint }),
+      ...(page === undefined ? {} : { page }),
     },
     overLimit: false,
     dir: captured.dir,

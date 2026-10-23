@@ -1,4 +1,10 @@
-/* Layout for the PDF reader shell. Tokens come from components/common/page.css. */
+/*
+ * Layout for the PDF reader shell. Tokens and the shared `clavis-` primitives (buttons, inputs,
+ * actions) come from components/common/page.css, which is namespaced and has no universal rule, so
+ * nothing here or there changes the size of PDF.js's `.page` divs or its text layer (the Spike C
+ * misalignment, docs/decisions/spike-c-pdf.md finding 1). Do NOT add `* { box-sizing }`, padding on
+ * `.page` or any rule on `.pdfViewer`, `.page`, `.canvasWrapper` or `.textLayer` here.
+ */
 
 .reader {
   display: flex;
@@ -7,20 +13,23 @@
   height: 100dvh;
   background: var(--bg);
   color: var(--fg);
-}
-
-.reader[data-dragging='true'] .reader__stage {
-  outline: 3px dashed var(--accent);
-  outline-offset: -6px;
+  scroll-behavior: auto;
 }
 
 .reader__header {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px 16px;
-  padding: 8px 16px;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-4);
   border-bottom: 1px solid var(--border);
+}
+
+.reader__heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0 var(--space-3);
+  min-width: 0;
 }
 
 .reader__title {
@@ -29,40 +38,52 @@
   line-height: 1.25;
 }
 
+.reader__file {
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  color: var(--muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .reader-toolbar {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 8px 12px;
+  gap: var(--space-2) var(--space-4);
 }
 
 .reader-toolbar__group {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: var(--space-1);
 }
 
 .reader-toolbar__page {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--space-2);
   margin: 0;
 }
 
-.reader-toolbar__find-status {
+.reader-find {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.reader-find__status {
   min-width: 6rem;
   color: var(--muted);
   font-size: 0.875rem;
 }
 
+/* Fixed-width fields: size includes padding and border. */
 .reader-input {
-  min-height: 40px;
-  padding: 4px 8px;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  background: var(--bg);
-  color: var(--fg);
-  font: inherit;
+  box-sizing: border-box;
+  width: auto;
 }
 
 .reader-input--page {
@@ -70,13 +91,32 @@
 }
 
 .reader-input--find {
-  width: 12rem;
+  width: 14rem;
+  max-width: 100%;
 }
 
-.reader .button:disabled,
-.reader .reader-input:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
+.reader-input--zoom {
+  width: auto;
+  min-width: 7rem;
+}
+
+.reader-icon-button {
+  min-width: var(--target);
+  padding-inline: var(--space-2);
+  font-size: 1.25rem;
+  line-height: 1;
+}
+
+.reader-toggle[aria-pressed='true'] {
+  border-color: var(--accent);
+  background: var(--info-bg);
+}
+
+.reader__main {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
 }
 
 .reader__stage {
@@ -91,6 +131,11 @@
   inset: 0;
   overflow: auto;
   background: var(--surface);
+  scroll-behavior: auto;
+}
+
+.reader__viewer-container:focus-visible {
+  outline-offset: calc(var(--ring-width) * -1);
 }
 
 .reader__overlay {
@@ -99,7 +144,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 16px;
+  overflow: auto;
+  padding: var(--space-4);
   background: var(--bg);
 }
 
@@ -107,42 +153,87 @@
   background: rgb(0 0 0 / 0.45);
 }
 
-.reader-message {
+/* Drop target: covers the whole stage while a file is dragged over the page. */
+.reader__drop {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 3px dashed var(--accent);
+  background: color-mix(in srgb, var(--bg) 88%, var(--accent));
+  font-size: 1.25rem;
+  font-weight: 600;
+  pointer-events: none;
+}
+
+.reader-empty {
   max-width: 36rem;
-  margin: 0;
   text-align: center;
-  color: var(--muted);
+}
+
+.reader-empty p {
+  margin: 0 0 var(--space-3);
   overflow-wrap: anywhere;
 }
 
-.reader-message--error {
-  color: #b42318;
+.reader-empty__title {
+  margin: 0 0 var(--space-3);
+  font-size: 1.5rem;
+  line-height: 1.25;
 }
 
-@media (prefers-color-scheme: dark) {
-  .reader-message--error {
-    color: #ff9b91;
-  }
+.reader-empty__actions {
+  justify-content: center;
+}
+
+.reader-empty__drop {
+  font-weight: 600;
+}
+
+.reader-message {
+  max-width: 36rem;
+  color: var(--muted);
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+
+.reader-message p {
+  margin: 0 0 var(--space-3);
+}
+
+.reader-message--error {
+  color: var(--danger);
+}
+
+.reader-progress {
+  width: min(24rem, 100%);
+  accent-color: var(--accent);
 }
 
 .reader-banner {
   margin: 0;
-  padding: 8px 16px;
+  padding: var(--space-2) var(--space-4);
   background: var(--surface);
   border-bottom: 1px solid var(--border);
   color: var(--fg);
 }
 
+.reader-banner--error {
+  background: var(--danger-bg);
+  color: var(--danger);
+}
+
 .reader-dialog {
   max-width: 28rem;
-  padding: 16px;
+  padding: var(--space-4);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-lg);
   background: var(--bg);
 }
 
 .reader-dialog h2 {
-  margin: 0 0 8px;
+  margin: 0 0 var(--space-2);
   font-size: 1.125rem;
 }
 
@@ -153,41 +244,50 @@
 .reader-dialog__field {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  margin-bottom: 12px;
+  gap: var(--space-1);
+  margin-bottom: var(--space-3);
 }
 
-.reader-selection {
-  flex: 0 0 auto;
-  max-height: 9rem;
-  overflow: auto;
-  padding: 8px 16px;
-  border-top: 1px solid var(--border);
-  font-size: 0.875rem;
+.reader-message--error,
+.reader-dialog .reader-message--error {
+  font-weight: 600;
 }
 
-.reader-selection h2 {
-  margin: 0 0 4px;
-  font-size: 0.875rem;
+@media (prefers-reduced-motion: reduce) {
+  .reader,
+  .reader * {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+  }
 }
 
-.reader-selection p {
-  margin: 0 0 4px;
-  overflow-wrap: anywhere;
-}
+/* Forced colors (Windows high contrast): use system colours and keep every boundary visible. */
+@media (forced-colors: active) {
+  .reader__header,
+  .reader-banner {
+    border-color: CanvasText;
+  }
 
-.reader-selection__text {
-  white-space: pre-wrap;
-}
+  .reader-input,
+  .clavis-button,
+  .reader-dialog {
+    border-color: ButtonText;
+  }
 
-/*
- * components/common/page.css is namespaced (`clavis-` classes, no universal rule), so it no
- * longer collides with PDF.js, which names every page div `.page` and sizes it assuming
- * `box-sizing: content-box` and no padding. The reader components still use the legacy
- * `.button`, `.button--primary` and `.page__actions` aliases defined there. Only the reader's
- * own fixed-width inputs need border-box so their size includes padding.
- */
-.reader .reader-input,
-.reader .button {
-  box-sizing: border-box;
+  .reader-toggle[aria-pressed='true'] {
+    border-color: Highlight;
+    outline: 2px solid Highlight;
+  }
+
+  .reader__drop {
+    border-color: Highlight;
+    background: Canvas;
+    color: CanvasText;
+  }
+
+  .reader__viewer-container:focus-visible {
+    outline-color: Highlight;
+  }
 }

@@ -40,8 +40,13 @@ export function useReaderController() {
     const viewerElement = viewerRef.current;
     if (container && viewerElement) controller.attach({ container, viewerElement });
     controller.setLinkConfirmer(confirmExternalLink);
+    // Closing the tab or navigating away releases the PDF bytes, canvases and worker at once
+    // (UJ-04) instead of waiting for the page to be torn down.
+    const release = () => void controller.destroy();
+    window.addEventListener('pagehide', release);
     return () => {
-      void controller.destroy();
+      window.removeEventListener('pagehide', release);
+      release();
     };
   }, [controller, confirmExternalLink]);
 

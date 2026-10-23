@@ -15,6 +15,8 @@ type Tabs = Pick<typeof browser.tabs, 'sendMessage'>;
 export interface InjectionDeps {
   scripting: Scripting;
   tabs: Tabs;
+  /** `runtime.getURL('/reader.html')`: the one extension page that hosts the toolbar itself. */
+  readerUrl: string;
 }
 
 /** The toolbar is bundled into the observer (D-08), so the observer is the only file injected. */
@@ -87,6 +89,25 @@ async function openSelection(
 }
 
 /**
+ * Whether `url` is this extension's own reader page (any query or fragment). Only scheme,
+ * host and path are compared, so another extension's reader.html or a look-alike never matches.
+ */
+export function isReaderUrl(readerUrl: string, url: string | undefined): boolean {
+  if (url === undefined) return false;
+  try {
+    const own = new URL(readerUrl);
+    const candidate = new URL(url);
+    return (
+      candidate.protocol === own.protocol &&
+      candidate.host === own.host &&
+      candidate.pathname === own.pathname
+    );
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Declined-access path (D-02 step 5, FR-018): with only the `activeTab` grant,
  * inject the observer into ONE frame (context menu) or all reachable frames
  * (popup button, shortcut) of ONE tab, then open the toolbar for the selection
@@ -97,6 +118,14 @@ export async function explainInTab(
   target: { tabId: number; frameId: number | undefined; url: string | undefined },
   options: { focus?: boolean } = {},
 ): Promise<InjectResult> {
+  // The reader is an extension page: it mounts the selection toolbar itself, so it is asked to
+  // open it. Extension pages are never injected into, and any other one stays restricted.
+  if (isReaderUrl(deps.readerUrl, target.url)) {
+    return {
+      ok: true,
+      shown: await openSelection(deps.tabs, target.tabId, 0, options.focus === true),
+    };
+  }
   if (!isInjectableUrl(target.url)) return { ok: false, reason: 'restricted' };
   const injected = await injectFiles(deps.scripting, target.tabId, target.frameId, OBSERVER_FILES);
   if (!injected.ok) return injected;

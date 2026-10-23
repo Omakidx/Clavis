@@ -23,6 +23,11 @@ export const DEFAULT_TIMINGS: ObserverTimings = { change: 120, key: 40, pointer:
 
 export interface SelectionObserverOptions {
   win?: Window;
+  /**
+   * Replaces `captureSelection` for hosts whose selections are not ordinary webpage text (the PDF
+   * reader's text layer, source 'pdf'). It must apply the same eligibility rules.
+   */
+  capture?: (win: Window) => CapturedSelection | null;
   timings?: Partial<ObserverTimings>;
   /** A new, different, qualifying selection was captured. */
   onSelection(selection: CapturedSelection): void;
@@ -76,6 +81,7 @@ export function startSelectionObserver(options: SelectionObserverOptions): Selec
   const win = options.win ?? window;
   const doc = win.document;
   const timings = { ...DEFAULT_TIMINGS, ...options.timings };
+  const capture = options.capture ?? captureSelection;
 
   let timer: number | undefined;
   let dueAt = 0;
@@ -87,7 +93,7 @@ export function startSelectionObserver(options: SelectionObserverOptions): Selec
 
   /** `silent` records the capture without notifying (the caller presents it itself). */
   function evaluate(silent: boolean, mayShow = true): CapturedSelection | null {
-    const captured = captureSelection(win);
+    const captured = capture(win);
     if (captured === null) {
       if (last !== null) {
         last = null;

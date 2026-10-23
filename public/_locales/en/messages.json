@@ -235,10 +235,6 @@
     "message": "Clavis PDF reader",
     "description": "Main heading and tab title of the PDF reader page."
   },
-  "readerPlaceholder": {
-    "message": "The PDF reader will be available in a later phase.",
-    "description": "Placeholder text on the PDF reader page while the reader is not built yet."
-  },
   "readerOpen": {
     "message": "Open PDF",
     "description": "Reader toolbar button that opens a file picker for a local PDF."
@@ -247,9 +243,65 @@
     "message": "Close PDF",
     "description": "Reader toolbar button that closes the current PDF and frees its memory."
   },
+  "readerEmptyTitle": {
+    "message": "Read a PDF with Clavis",
+    "description": "Heading of the reader's empty state, shown before any PDF is open."
+  },
+  "readerEmptyChoose": {
+    "message": "Choose a PDF…",
+    "description": "Large button in the reader's empty state that opens the file picker (the toolbar's Open PDF button does the same)."
+  },
+  "readerEmptyBody": {
+    "message": "Select a word or a sentence in the PDF to hear it read aloud or get an explanation, the same way as on a web page. Listening never sends anything. Explain sends only the text you selected and a little of the text around it.",
+    "description": "Reader empty-state paragraph that says what the reader is for and what leaves the device."
+  },
+  "readerEmptyChrome": {
+    "message": "Chrome's built-in PDF viewer can't show Clavis. If a PDF opened there, download it and open it here, or drag the file onto this page.",
+    "description": "Reader empty-state note explaining why PDFs must be opened in the Clavis reader rather than Chrome's own viewer."
+  },
+  "readerShortcutsHint": {
+    "message": "Keyboard: N and P (or J and K) change page, + and − zoom, PageUp and PageDown scroll, Ctrl+F finds text.",
+    "description": "Reader empty-state line listing the keyboard shortcuts. Keep the key names as written."
+  },
+  "readerDocTitle": {
+    "message": "$FILE$ — Clavis PDF reader",
+    "description": "Browser tab title while a PDF is open. $FILE$ is the file name.",
+    "placeholders": { "FILE": { "content": "$1" } }
+  },
+  "readerToolsLabel": {
+    "message": "PDF reader tools",
+    "description": "Accessible name of the reader toolbar that holds open, page, zoom and find controls."
+  },
+  "readerGroupPages": {
+    "message": "Pages",
+    "description": "Accessible name of the group of page navigation controls in the reader toolbar."
+  },
+  "readerGroupZoom": {
+    "message": "Zoom",
+    "description": "Accessible name of the group of zoom controls in the reader toolbar."
+  },
+  "readerOpened": {
+    "message": "Opened $FILE$. Page count: $PAGES$.",
+    "description": "Screen-reader announcement when a PDF has finished opening. $FILE$ is the file name, $PAGES$ the number of pages.",
+    "placeholders": { "FILE": { "content": "$1" }, "PAGES": { "content": "$2" } }
+  },
+  "readerClosedLive": {
+    "message": "PDF closed.",
+    "description": "Screen-reader announcement when the PDF was closed."
+  },
+  "readerPageLive": {
+    "message": "Page $PAGE$ of $TOTAL$",
+    "description": "Screen-reader announcement when the visible page changes. $PAGE$ is the page number, $TOTAL$ the number of pages.",
+    "placeholders": { "PAGE": { "content": "$1" }, "TOTAL": { "content": "$2" } }
+  },
+  "readerZoomLive": {
+    "message": "Zoom $PERCENT$%",
+    "description": "Screen-reader announcement when the zoom level changes. $PERCENT$ is a whole number.",
+    "placeholders": { "PERCENT": { "content": "$1" } }
+  },
   "readerEmptyHint": {
-    "message": "Choose a PDF from this computer, or drop one here. The file stays on your device.",
-    "description": "Reader empty-state text shown before any PDF is open; also the drag-and-drop target label."
+    "message": "Choose a PDF from this computer, or drop one anywhere on this page. The file stays on your device.",
+    "description": "Reader empty-state line under the Open PDF button; it also names the drag-and-drop target."
   },
   "readerDropActive": {
     "message": "Drop the PDF to open it",
@@ -327,6 +379,18 @@
     "message": "Searching…",
     "description": "Shown while find-in-document is still searching."
   },
+  "readerFindToggle": {
+    "message": "Find",
+    "description": "Reader toolbar button that shows or hides the find-in-document bar."
+  },
+  "readerFindClose": {
+    "message": "Close find",
+    "description": "Accessible name of the button that closes the find-in-document bar."
+  },
+  "readerFindCase": {
+    "message": "Match case",
+    "description": "Toggle in the find bar: when on, find only matches the exact capital and small letters typed."
+  },
   "readerErrorCorrupt": {
     "message": "This PDF is damaged and can't be opened. Try another copy of the file.",
     "description": "Reader error shown when the PDF structure is invalid, truncated or empty."
@@ -348,6 +412,22 @@
   "readerErrorUnsupported": {
     "message": "Clavis can't read this file. Choose a different PDF.",
     "description": "Reader error shown when the file is not a PDF or uses a feature the reader does not support."
+  },
+  "readerErrorRender": {
+    "message": "Clavis couldn't start its PDF viewer or draw this document. Reload this page and try again. If it keeps happening, try a different PDF.",
+    "description": "Reader error shown when the viewer itself fails (not a problem with the chosen file)."
+  },
+  "readerRenderIssue": {
+    "message": "Some pages couldn't be drawn. The rest of the document still works.",
+    "description": "Reader notice shown while one or more pages failed to render."
+  },
+  "readerAnnotationsLimited": {
+    "message": "Some links and notes on a page are not shown because the page has too many of them. The text is unaffected.",
+    "description": "Reader notice shown when a PDF page has more annotations (links, notes, markup) than the reader draws."
+  },
+  "readerChooseAnother": {
+    "message": "Choose another PDF",
+    "description": "Button shown with a reader error that opens the file picker again."
   },
   "readerImageOnly": {
     "message": "This PDF appears image-only. Its pages are pictures without text, so text can't be selected. Text recognition (OCR) isn't available in this version.",
@@ -394,24 +474,6 @@
   "readerLinkCancel": {
     "message": "Cancel",
     "description": "Button that cancels opening an external link from a PDF."
-  },
-  "readerSelectionTitle": {
-    "message": "Last selection (developer panel)",
-    "description": "Heading of the small developer panel that shows the latest text selection captured from the PDF."
-  },
-  "readerSelectionNone": {
-    "message": "Nothing selected in the PDF text.",
-    "description": "Developer panel text when no PDF text is selected."
-  },
-  "readerSelectionPage": {
-    "message": "Page $PAGE$",
-    "description": "Developer panel label for the page a selection starts on. $PAGE$ is a page number.",
-    "placeholders": { "PAGE": { "content": "$1" } }
-  },
-  "readerSelectionTruncated": {
-    "message": "Cut to the first $MAX$ characters.",
-    "description": "Developer panel note when a selection was longer than the limit. $MAX$ is the character limit.",
-    "placeholders": { "MAX": { "content": "$1" } }
   },
   "uiBack": {
     "message": "Back",

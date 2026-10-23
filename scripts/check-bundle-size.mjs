@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // Content-script bundle-size budget check (docs/tech-stack.md section 6, D-08).
-// Usage: node scripts/check-bundle-size.mjs [--dir <build dir>] [--budgets <file>]
+// Usage: node scripts/check-bundle-size.mjs [--dir <build dir>] [--budgets <file>] [--verbose]
+// Aggregate rows that match more than 3 files show `first (+N more)`; --verbose lists every file.
 // Exit 0 when every budget holds, 1 on an overrun or a missing required file, 2 on bad input.
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import path from 'node:path';
@@ -10,10 +11,15 @@ import { gzipSync } from 'node:zlib';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 function parseArgs(argv) {
-  const opts = { dir: undefined, budgets: path.join(root, 'scripts', 'size-budgets.json') };
+  const opts = {
+    dir: undefined,
+    budgets: path.join(root, 'scripts', 'size-budgets.json'),
+    verbose: false,
+  };
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
     if (arg === '--dir') opts.dir = argv[++i];
+    else if (arg === '--verbose') opts.verbose = true;
     else if (arg === '--budgets') opts.budgets = path.resolve(argv[++i] ?? '');
     else throw new Error(`Unknown argument: ${arg}`);
   }
@@ -46,6 +52,9 @@ function expand(buildDir, pattern) {
   }
   return names.filter((name) => regex.test(name)).map((name) => (dir ? `${dir}/${name}` : name));
 }
+
+const summarize = (files, verbose) =>
+  files.length > 3 && !verbose ? `${files[0]} (+${files.length - 1} more)` : files.join(' + ');
 
 const kb = (bytes) => `${(bytes / 1024).toFixed(2)} KB`;
 
@@ -83,7 +92,7 @@ function main() {
       return { file, raw: raw.length, gzip: gzipSync(raw, { level: 9 }).length };
     });
     const groups = budget.aggregate
-      ? [{ label: matched.join(' + '), items: measured }]
+      ? [{ label: summarize(matched, opts.verbose), items: measured }]
       : measured.map((m) => ({ label: m.file, items: [m] }));
     for (const group of groups) {
       const raw = group.items.reduce((sum, m) => sum + m.raw, 0);

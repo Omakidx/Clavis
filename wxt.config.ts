@@ -15,10 +15,9 @@ export default defineConfig({
     // browser-compat-data). Other floors: Uint8Array base64 140, Promise.try 128,
     // URL.parse 126, matchOriginAsFallback 119.
     minimum_chrome_version: '147',
-    // 'offscreen' is PROVISIONAL for Spike D (D-07); remove it here, in
-    // scripts/expected-permissions.json and in architecture.md §3 if the
-    // speechSynthesis fallback is not adopted.
-    permissions: ['storage', 'tts', 'scripting', 'activeTab', 'contextMenus', 'offscreen'],
+    // D-07: Listen uses chrome.tts only (the offscreen Web Speech fallback found the same voices
+    // and was not adopted), so there is no 'offscreen' permission.
+    permissions: ['storage', 'tts', 'scripting', 'activeTab', 'contextMenus'],
     // 'sidePanel' is added when the side panel ships (FR-042, Phase 8).
     host_permissions: ['https://api.groq.com/*'],
     // Requested at onboarding from a user gesture (D-02); never at install.
@@ -32,10 +31,14 @@ export default defineConfig({
       },
     },
     // D-17: allow WebAssembly (never eval) on extension pages so PDF.js can use its
-    // wasm decoders for ICC/CMYK colour, JPEG 2000 and JBIG2. Must match
-    // scripts/expected-permissions.json exactly.
+    // wasm decoders for ICC/CMYK colour, JPEG 2000 and JBIG2. The reader page is a trusted
+    // context that renders untrusted PDFs, so the policy also forbids what it never needs:
+    // media (PDF audio/video annotations), frames, form submission and a <base> override
+    // (Phase 7 security review). No connect-src: the page itself fetches only extension files and
+    // PDF.js's worker needs the same. Must match scripts/expected-permissions.json exactly.
     content_security_policy: {
-      extension_pages: "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'",
+      extension_pages:
+        "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'; media-src 'none'; frame-src 'none'; form-action 'none'; base-uri 'none'",
     },
   },
   hooks: {

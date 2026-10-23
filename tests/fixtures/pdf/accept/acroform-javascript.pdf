@@ -1,0 +1,50 @@
+%PDF-1.7
+%‚„œ”
+1 0 obj
+<</Type /Font /Subtype /Type1 /BaseFont /Helvetica>>
+endobj
+2 0 obj
+<</Type /XObject /Subtype /Form /BBox [0 0 200 24] /Resources <</Font <</Helv 1 0 R>>>> /Length 55>>
+stream
+/Tx BMC q BT /Helv 12 Tf 0 g 4 8 Td (Alice) Tj ET Q EMC
+endstream
+endobj
+3 0 obj
+<</Type /Annot /Subtype /Widget /FT /Tx /T (name) /V (Alice) /DV (Alice) /Rect [72 600 272 624] /F 4 /DA (/Helv 12 Tf 0 g) /MK <</BC [0 0 0]>> /AP <</N 2 0 R>> /AA <</K <</S /JavaScript /JS (app.alert('field-keystroke'))>> /F <</S /JavaScript /JS (app.alert('field-format'))>>>>>>
+endobj
+4 0 obj
+<</Type /Annot /Subtype /Widget /FT /Btn /Ff 65536 /T (go) /Rect [72 540 172 564] /F 4 /MK <</CA (Run) /BC [0 0 0]>> /DA (/Helv 12 Tf 0 g) /A <</S /JavaScript /JS (app.alert('button-click'); app.launchURL('https://evil.example/clavis-form-js', true))>>>>
+endobj
+5 0 obj
+<</Type /Catalog /Pages 6 0 R /AcroForm <</Fields [3 0 R 4 0 R] /DA (/Helv 12 Tf 0 g) /DR <</Font <</Helv 1 0 R>>>> /NeedAppearances true>> /OpenAction <</S /JavaScript /JS (app.alert('open-action'); app.launchURL('https://evil.example/clavis-open-action', true); this.print())>> /Names <</JavaScript <</Names [(clavis-init) <</S /JavaScript /JS (app.alert('document-level'))>>]>>>>>>
+endobj
+6 0 obj
+<</Type /Pages /Kids [8 0 R] /Count 1>>
+endobj
+7 0 obj
+<< /Length 115>>
+stream
+BT /F1 16 Tf 72 700 Td (This form has a text field and PDF JavaScript.) Tj ET
+BT /F1 12 Tf 72 632 Td (Name:) Tj ET
+
+endstream
+endobj
+8 0 obj
+<</Type /Page /Parent 6 0 R /MediaBox [0 0 612 792] /Resources <</Font <</F1 1 0 R>>>> /Contents 7 0 R /Annots [3 0 R 4 0 R]>>
+endobj
+xref
+0 9
+0000000000 65535 f 
+0000000015 00000 n 
+0000000083 00000 n 
+0000000272 00000 n 
+0000000568 00000 n 
+0000000838 00000 n 
+0000001238 00000 n 
+0000001293 00000 n 
+0000001458 00000 n 
+trailer
+<</Size 9 /Root 5 0 R >>
+startxref
+1600
+%%EOF

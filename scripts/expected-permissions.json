@@ -19,7 +19,7 @@
     "options_ui"
   ],
   "minimum_chrome_version": "147",
-  "permissions": ["storage", "tts", "scripting", "activeTab", "contextMenus", "offscreen"],
+  "permissions": ["storage", "tts", "scripting", "activeTab", "contextMenus"],
   "optional_permissions": [],
   "host_permissions": ["https://api.groq.com/*"],
   "optional_host_permissions": ["http://*/*", "https://*/*"],
@@ -30,6 +30,6 @@
     }
   },
   "content_security_policy": {
-    "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'"
+    "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'; media-src 'none'; frame-src 'none'; form-action 'none'; base-uri 'none'"
   }
 }

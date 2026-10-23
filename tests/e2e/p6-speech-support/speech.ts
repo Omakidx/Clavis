@@ -4,9 +4,8 @@ import type { BrowserContext, Page, Worker } from '@playwright/test';
 declare const chrome: {
   runtime: {
     sendMessage(message: unknown): Promise<unknown>;
-    getContexts(filter: { contextTypes: string[] }): Promise<{ documentUrl?: string }[]>;
+    getContexts(filter: { contextTypes: string[] }): Promise<{ contextType?: string }[]>;
   };
-  offscreen: { closeDocument(): Promise<void> };
 };
 
 export interface SpeechReply {
@@ -62,13 +61,13 @@ export function sendFromPage(page: Page, message: unknown): Promise<unknown> {
   return page.evaluate((m) => chrome.runtime.sendMessage(m), message);
 }
 
-/** Offscreen documents currently open, read from the service worker. */
-export function offscreenDocuments(worker: Worker): Promise<{ documentUrl?: string }[]> {
-  return worker.evaluate(() =>
-    chrome.runtime.getContexts({ contextTypes: ['OFFSCREEN_DOCUMENT'] }),
+/** Every extension context of this worker's extension, by type (to prove no offscreen document exists). */
+export function contextTypes(worker: Worker): Promise<string[]> {
+  return worker.evaluate(async () =>
+    (
+      await chrome.runtime.getContexts({
+        contextTypes: ['OFFSCREEN_DOCUMENT', 'TAB', 'POPUP', 'BACKGROUND'],
+      })
+    ).map((context) => (context as { contextType?: string }).contextType ?? ''),
   );
-}
-
-export function closeOffscreen(worker: Worker): Promise<void> {
-  return worker.evaluate(() => chrome.offscreen.closeDocument());
 }

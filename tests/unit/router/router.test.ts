@@ -39,7 +39,7 @@ describe('sender matrix: privileged routes', () => {
       ['reader', pageSender('/reader.html')],
       ['popup', popupSender()],
       ['practice', pageSender('/practice.html')],
-      ['offscreen', offscreenSender()],
+      ['former offscreen url', offscreenSender()],
       ['content', contentSender()],
     ] as const;
     for (const [who, sender] of rejected) {
@@ -334,10 +334,7 @@ describe('listener behaviour', () => {
     const h = createHarness();
     for (const route of h.routes) {
       const rule = route.allow;
-      expect(
-        rule.content === true || rule.offscreen === true || (rule.pages?.length ?? 0) > 0,
-        route.type,
-      ).toBe(true);
+      expect(rule.content === true || (rule.pages?.length ?? 0) > 0, route.type).toBe(true);
     }
   });
 });
@@ -408,7 +405,7 @@ describe('internal routes keep their own reply shapes', () => {
     }
   });
 
-  it('SPEECH_OFFSCREEN_* events: only the offscreen document is heard, and nobody gets a reply', async () => {
+  it('SPEECH_OFFSCREEN_* messages are gone (D-07): nobody is heard, nobody gets a reply', async () => {
     const h = createHarness();
     const event = { v: 1, type: 'SPEECH_OFFSCREEN_EVENT', requestId: REQ_A, state: 'ended' };
     const idle = { v: 1, type: 'SPEECH_OFFSCREEN_IDLE' };
@@ -424,5 +421,8 @@ describe('internal routes keep their own reply shapes', () => {
         expect(await reply).toBeUndefined();
       }
     }
+    expect(h.routes.map((route) => route.type).filter((type) => /OFFSCREEN/.test(type))).toEqual(
+      [],
+    );
   });
 });

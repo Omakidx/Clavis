@@ -75,11 +75,6 @@ export class ChromeTtsEngine implements SpeechEngine {
     }));
   }
 
-  /** What chrome.tts knows right now; never waits. */
-  peekVoices(): Promise<SpeechVoice[]> {
-    return this.query();
-  }
-
   invalidate(): void {
     this.waitedForEmptyList = false;
   }

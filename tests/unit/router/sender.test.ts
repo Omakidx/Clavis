@@ -34,8 +34,8 @@ describe('classifySender', () => {
     expect(result.tabId).toBeUndefined();
   });
 
-  it('recognises the offscreen document, which must have no tab', () => {
-    expect(classify(offscreenSender())).toMatchObject({ kind: 'offscreen' });
+  it('no longer recognises the offscreen document (D-07: the fallback was removed)', () => {
+    expect(classify(offscreenSender()).kind).toBe('unknown');
     expect(
       classify({ ...offscreenSender(), tab: { id: 1, url: `${ORIGIN}/offscreen.html` } }).kind,
     ).toBe('unknown');

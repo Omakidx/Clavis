@@ -1,4 +1,5 @@
 import { browser } from 'wxt/browser';
+import { EXTENSION_PAGES } from '../config/constants';
 import { t } from '../i18n';
 import { createSiteAccessController, type SiteAccessController } from './controller';
 import {
@@ -59,6 +60,7 @@ export function registerSiteAccess(options: SiteAccessOptions): SiteAccess {
   const injection: InjectionDeps = {
     scripting: browser.scripting,
     tabs: browser.tabs,
+    readerUrl: browser.runtime.getURL(EXTENSION_PAGES.reader),
   };
   const controller = createSiteAccessController({
     registration,

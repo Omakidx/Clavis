@@ -4,7 +4,6 @@ import { SPEECH_TIMING } from './constants';
 import {
   SpeechError,
   type EngineEvent,
-  type EngineSurvey,
   type SpeakInput,
   type SpeakResult,
   type SpeechEngine,
@@ -12,6 +11,9 @@ import {
   type SpeechVoice,
 } from './types';
 import { findNamedVoice, hasUsableVoice, sameLanguage, selectVoice } from './voice-selection';
+
+/** Voices tried per request: the saved/explicit one, then one best match. */
+const MAX_ATTEMPTS = 2;
 
 /** Resolves `undefined` instead of `promise`'s value when `ms` pass first. */
 function orDeadline<T>(promise: Promise<T>, ms: number): Promise<T | undefined> {
@@ -33,12 +35,9 @@ function orDeadline<T>(promise: Promise<T>, ms: number): Promise<T | undefined> 
   });
 }
 
-const voiceKey = (engine: SpeechEngine, voice: SpeechVoice): string =>
-  `${engine.id}\u0000${voice.name}`;
-
 export interface SpeechServiceOptions {
-  /** Routing order: the first engine with a suitable voice wins (D-07: chrome.tts, then offscreen). */
-  engines: readonly SpeechEngine[];
+  /** The speech engine (D-07: chrome.tts; the offscreen Web Speech fallback was not adopted). */
+  engine: SpeechEngine;
   /** Longest an engine may take to report `start` for ONE attempt (also capped by the deadline). */
   startTimeoutMs?: number;
   /** Overall budget of one `speak()`: lookup and all attempts together. */
@@ -98,68 +97,15 @@ function validate(input: SpeakInput): SpeakInput {
 }
 
 /**
- * Voice lists of one `speak()` call, fetched at most once per engine. When chrome.tts has nothing
- * yet, every engine is queried CONCURRENTLY, so the slow waits (chrome.tts for its voices to
- * load, the offscreen document starting up) overlap instead of adding up.
- */
-class VoiceLookup {
-  sawVoices = false;
-  private readonly lists = new Map<SpeechEngine, Promise<SpeechVoice[] | undefined>>();
-
-  constructor(private readonly engines: readonly SpeechEngine[]) {}
-
-  /** Voices of `engine`, or undefined when it is unavailable (logged, never thrown). */
-  get(engine: SpeechEngine): Promise<SpeechVoice[] | undefined> {
-    let list = this.lists.get(engine);
-    if (list === undefined) {
-      list = engine.getVoices().then(
-        (voices) => {
-          if (voices.length > 0) this.sawVoices = true;
-          return voices;
-        },
-        (error: unknown) => {
-          logger.warn('speech_engine_unavailable', {
-            mode: engine.id,
-            status: describeError(error),
-          });
-          return undefined;
-        },
-      );
-      this.lists.set(engine, list);
-    }
-    return list;
-  }
-
-  /** Look at the first engine without waiting; if it is empty, start every engine at once. */
-  async prime(): Promise<void> {
-    const first = this.engines[0];
-    if (first?.peekVoices === undefined) return;
-    let quick: SpeechVoice[];
-    try {
-      quick = await first.peekVoices();
-    } catch {
-      return;
-    }
-    if (hasUsableVoice(quick)) {
-      this.sawVoices = true;
-      this.lists.set(first, Promise.resolve(quick));
-      return;
-    }
-    for (const engine of this.engines) void this.get(engine);
-  }
-}
-
-/**
- * Engine-agnostic speech facade (architecture §7). Owns routing, the
- * one-utterance-at-a-time rule, state events and the start timeout; engines
- * only know how to talk to chrome.tts or the offscreen document.
+ * Speech facade (architecture §7). Owns voice choice, the one-utterance-at-a-time rule, state
+ * events and the start deadline; the engine only knows how to talk to chrome.tts.
  *
- * Honesty rule (FR-023): `speak()` resolves only after an engine reported
- * `start`. Engines that never start, error early or end silently are failures,
- * and when no engine can speak the result is NO_VOICE, never a fake success.
+ * Honesty rule (FR-023): `speak()` resolves only after the engine reported `start`. A voice that
+ * never starts, errors early or ends silently is a failure, and when nothing can speak the result
+ * is NO_VOICE, never a fake success.
  */
 export class SpeechService {
-  private readonly engines: readonly SpeechEngine[];
+  private readonly engine: SpeechEngine;
   private readonly startTimeoutMs: number;
   private readonly speakDeadlineMs: number;
   private readonly defaultLanguage: string | undefined;
@@ -167,15 +113,11 @@ export class SpeechService {
   private active: Utterance | undefined;
   /** The `speak()` that has not started audio yet (looking up voices, between attempts). */
   private pending: { requestId: string; generation: number } | undefined;
-  /** Saved voice names that no engine had at the last full look; skip until the list changes. */
-  private readonly missingSaved = new Set<string>();
   /** Bumped by every speak()/stop() so a stale speak() can detect it was superseded. */
   private generation = 0;
 
-  private surveying: Promise<EngineSurvey[]> | undefined;
-
   constructor(options: SpeechServiceOptions) {
-    this.engines = options.engines;
+    this.engine = options.engine;
     this.startTimeoutMs = options.startTimeoutMs ?? SPEECH_TIMING.startTimeoutMs;
     this.speakDeadlineMs = options.speakDeadlineMs ?? SPEECH_TIMING.speakDeadlineMs;
     this.defaultLanguage = options.defaultLanguage;
@@ -192,44 +134,25 @@ export class SpeechService {
     };
   }
 
-  /** Forget every remembered "no voices" answer; the next request looks again. */
+  /** Forget a remembered "no voices" answer; the next request looks again. */
   invalidateVoices(): void {
-    this.missingSaved.clear();
-    for (const engine of this.engines) engine.invalidate?.();
+    this.engine.invalidate?.();
   }
 
   /**
-   * What every engine can speak with, freshly probed (Settings voice report, FR-025, D-07 check).
-   * Engines are probed concurrently; one that cannot run is reported `available: false` with no
-   * voices. Concurrent callers share one survey, so the offscreen document is not closed under
-   * a second probe.
+   * The voices of this device, freshly probed (Settings voice report, FR-025). Never rejects: an
+   * engine that cannot answer has no voices.
    */
-  survey(): Promise<EngineSurvey[]> {
-    this.surveying ??= this.runSurvey().finally(() => {
-      this.surveying = undefined;
-    });
-    return this.surveying;
-  }
-
-  private async runSurvey(): Promise<EngineSurvey[]> {
-    this.invalidateVoices();
-    return Promise.all(
-      this.engines.map(async (engine): Promise<EngineSurvey> => {
-        try {
-          const result =
-            engine.survey === undefined
-              ? { available: true, voices: await engine.getVoices({ refresh: true }) }
-              : await engine.survey();
-          return { engine: engine.id, ...result };
-        } catch (error) {
-          logger.warn('speech_engine_unavailable', {
-            mode: engine.id,
-            status: describeError(error),
-          });
-          return { engine: engine.id, available: false, voices: [] };
-        }
-      }),
-    );
+  async listVoices(): Promise<SpeechVoice[]> {
+    try {
+      return await this.engine.getVoices({ refresh: true });
+    } catch (error) {
+      logger.warn('speech_engine_unavailable', {
+        mode: this.engine.id,
+        status: describeError(error),
+      });
+      return [];
+    }
   }
 
   /**
@@ -242,13 +165,13 @@ export class SpeechService {
    *
    * Voice choice (never a voice for another language, FR-024; on-device only unless the user chose
    * a network voice, D-22):
-   * 1. `voiceName`: exactly that voice, in the first engine that has it. Missing: NO_VOICE.
+   * 1. `voiceName`: exactly that voice. Missing: NO_VOICE.
    * 2. `preferredVoice`: that voice if it still exists and speaks `lang` (or no `lang` is known,
    *    or the voice reports no language); otherwise fall through, so a removed or mismatched saved
    *    voice never blocks Listen.
-   * 3. Best ON-DEVICE voice for `lang` (exact tag, then same language), engine by engine in
-   *    routing order, skipping a voice that already failed. Without `lang`, an on-device voice of
-   *    the system language, else the first on-device voice. Network voices are never used here.
+   * 3. Best ON-DEVICE voice for `lang` (exact tag, then same language), skipping a voice that
+   *    already failed. Without `lang`, an on-device voice of the system language, else the first
+   *    on-device voice. Network voices are never used here.
    */
   async speak(input: SpeakInput): Promise<SpeakResult> {
     const request = validate(input);
@@ -265,61 +188,51 @@ export class SpeechService {
   private async run(request: SpeakInput, generation: number): Promise<SpeakResult> {
     const deadlineAt = Date.now() + this.speakDeadlineMs;
     const remaining = (): number => deadlineAt - Date.now();
-    const lookup = new VoiceLookup(this.engines);
-    const voicesOf = async (engine: SpeechEngine): Promise<SpeechVoice[] | undefined> => {
-      const voices = await orDeadline(lookup.get(engine), remaining());
-      this.assertCurrent(generation);
-      return voices;
-    };
-    await orDeadline(lookup.prime(), remaining());
+
+    let voices: SpeechVoice[] | undefined;
+    try {
+      voices = await orDeadline(this.engine.getVoices(), remaining());
+    } catch (error) {
+      logger.warn('speech_engine_unavailable', {
+        mode: this.engine.id,
+        status: describeError(error),
+      });
+    }
     this.assertCurrent(generation);
+    const all = voices ?? [];
 
     /** Voices that already failed to start in this call. */
     const failed = new Set<string>();
-    let attempted = false;
-    const attempt = async (
-      engine: SpeechEngine,
-      voice: SpeechVoice | undefined,
-    ): Promise<SpeakResult | undefined> => {
+    let attempts = 0;
+    const attempt = async (voice: SpeechVoice): Promise<SpeakResult | undefined> => {
       const budget = Math.min(this.startTimeoutMs, remaining());
-      if (budget <= 0) return undefined;
-      attempted = true;
+      if (budget <= 0 || attempts >= MAX_ATTEMPTS) return undefined;
+      attempts++;
       try {
-        return await this.startOn(engine, voice, request, budget);
+        return await this.startOn(voice, request, budget);
       } catch (error) {
         if (error instanceof SpeechError && error.code === 'REQUEST_CANCELLED') throw error;
-        logger.warn('speech_engine_failed', { mode: engine.id, requestId: request.requestId });
+        logger.warn('speech_engine_failed', { mode: this.engine.id, requestId: request.requestId });
         this.assertCurrent(generation);
-        if (voice !== undefined) failed.add(voiceKey(engine, voice));
+        failed.add(voice.name);
         return undefined;
       }
     };
 
     const named = request.voiceName ?? request.preferredVoice;
-    const explicit = request.voiceName !== undefined;
-    if (named !== undefined && (explicit || !this.missingSaved.has(named))) {
-      let everyEngineAnswered = true;
-      let found = false;
-      for (const engine of this.engines) {
-        const voices = await voicesOf(engine);
-        if (voices === undefined) {
-          everyEngineAnswered = false;
-          continue;
-        }
-        const voice = findNamedVoice(voices, named);
-        if (voice === undefined) continue;
-        found = true;
-        // A saved voice for another language than the text must not read it aloud. A voice that
-        // reports no language was chosen by the user all the same, so it is accepted.
-        if (
-          !explicit &&
-          request.lang !== undefined &&
-          voice.lang !== '' &&
-          !sameLanguage(voice.lang, request.lang)
-        ) {
-          break;
-        }
-        const result = await attempt(engine, voice);
+    if (named !== undefined) {
+      const explicit = request.voiceName !== undefined;
+      const voice = findNamedVoice(all, named);
+      // A saved voice for another language than the text must not read it aloud. A voice that
+      // reports no language was chosen by the user all the same, so it is accepted.
+      const fits =
+        voice !== undefined &&
+        (explicit ||
+          request.lang === undefined ||
+          voice.lang === '' ||
+          sameLanguage(voice.lang, request.lang));
+      if (voice !== undefined && fits) {
+        const result = await attempt(voice);
         if (result !== undefined) return result;
         // An explicit voice that does not start is an error; a saved one falls back to a match.
         if (explicit) {
@@ -330,11 +243,8 @@ export class SpeechService {
             'start-failed',
           );
         }
-        break;
-      }
-      if (!found && everyEngineAnswered && !explicit) this.missingSaved.add(named);
-      if (!found && explicit) {
-        throw lookup.sawVoices
+      } else if (voice === undefined && explicit) {
+        throw all.length > 0
           ? new SpeechError(
               'NO_VOICE',
               'The chosen voice is not installed.',
@@ -350,30 +260,19 @@ export class SpeechService {
       }
     }
 
-    let onlineOnly = false;
-    for (const engine of this.engines) {
-      const voices = await voicesOf(engine);
-      if (voices === undefined) continue;
-      const open = voices.filter((voice) => !failed.has(voiceKey(engine, voice)));
-      const local = open.filter((voice) => !voice.remote);
-      const voice = this.bestLocalVoice(local, request.lang);
-      if (voice === undefined) {
-        // Network voices exist for this language, but Listen does not send text off the device.
-        if (
-          this.bestLocalVoice(
-            open.filter((v) => v.remote),
-            request.lang,
-          ) !== undefined
-        ) {
-          onlineOnly = true;
-        }
-        continue;
-      }
-      const result = await attempt(engine, voice);
+    for (;;) {
+      const open = all.filter((voice) => !failed.has(voice.name));
+      const voice = this.bestLocalVoice(
+        open.filter((candidate) => !candidate.remote),
+        request.lang,
+      );
+      if (voice === undefined) break;
+      const result = await attempt(voice);
       if (result !== undefined) return result;
+      if (attempts >= MAX_ATTEMPTS || remaining() <= 0) break;
     }
 
-    if (attempted) {
+    if (failed.size > 0 || attempts > 0) {
       throw new SpeechError(
         'NO_VOICE',
         'A voice was found but it never started speaking.',
@@ -381,7 +280,12 @@ export class SpeechService {
         'start-failed',
       );
     }
-    if (onlineOnly) {
+    // Network voices exist for this language, but Listen does not send text off the device.
+    const online = this.bestLocalVoice(
+      all.filter((voice) => voice.remote),
+      request.lang,
+    );
+    if (online !== undefined) {
       throw new SpeechError(
         'NO_VOICE',
         'Only online voices exist for this language.',
@@ -389,7 +293,7 @@ export class SpeechService {
         'online-only',
       );
     }
-    if (lookup.sawVoices && request.lang !== undefined) {
+    if (all.length > 0 && request.lang !== undefined) {
       throw new SpeechError(
         'NO_VOICE',
         `No installed voice matches language ${request.lang}.`,
@@ -437,7 +341,7 @@ export class SpeechService {
     this.generation++;
     const hadPending = this.pending !== undefined && (requestId === undefined || pendingMatch);
     const cancelled = this.cancelActive();
-    await Promise.all(this.engines.map((engine) => this.stopEngine(engine)));
+    await this.stopEngine();
     return cancelled || hadPending;
   }
 
@@ -465,11 +369,11 @@ export class SpeechService {
 
   /** One start attempt; fails (NO_VOICE) if audio has not started after `timeoutMs`. */
   private startOn(
-    engine: SpeechEngine,
-    voice: SpeechVoice | undefined,
+    voice: SpeechVoice,
     request: SpeakInput,
     timeoutMs: number,
   ): Promise<SpeakResult> {
+    const engine = this.engine;
     return new Promise<SpeakResult>((resolve, reject) => {
       const utterance: Utterance = {
         requestId: request.requestId,
@@ -485,9 +389,9 @@ export class SpeechService {
           resolve({
             requestId: request.requestId,
             engine: engine.id,
-            voiceName: voice?.name || undefined,
-            lang: voice?.lang || request.lang,
-            remote: voice?.remote ?? false,
+            voiceName: voice.name || undefined,
+            lang: voice.lang || request.lang,
+            remote: voice.remote,
           });
         },
       };
@@ -496,7 +400,7 @@ export class SpeechService {
       utterance.timer = setTimeout(() => {
         if (utterance.started || utterance.settled) return;
         // Reported support but no audio: stop the engine and fail honestly.
-        this.stopQuietly(engine);
+        this.stopQuietly();
         utterance.failBeforeStart(
           new SpeechError('NO_VOICE', 'The voice did not start in time.', 'speechStartFailed'),
         );
@@ -509,7 +413,7 @@ export class SpeechService {
         requestId: request.requestId,
         text: request.text,
         // A chosen voice speaks its own language tag: engines reject or ignore a mismatching one.
-        lang: voice?.lang ? voice.lang : request.lang,
+        lang: voice.lang ? voice.lang : request.lang,
         rate: request.rate,
         voice,
       };
@@ -534,7 +438,7 @@ export class SpeechService {
         return;
       }
       // cancelled/error/ended before any `start`: no audio was proven. Fail so the next engine can try.
-      this.stopQuietly(utterance.engine);
+      this.stopQuietly();
       utterance.failBeforeStart(
         new SpeechError(
           'NO_VOICE',
@@ -562,7 +466,7 @@ export class SpeechService {
         new SpeechError('REQUEST_CANCELLED', 'Superseded by a newer request.', 'speechCancelled'),
       );
     }
-    this.stopQuietly(utterance.engine);
+    this.stopQuietly();
     return true;
   }
 
@@ -572,16 +476,16 @@ export class SpeechService {
     if (this.active === utterance) this.active = undefined;
   }
 
-  private stopQuietly(engine: SpeechEngine): void {
-    void this.stopEngine(engine);
+  private stopQuietly(): void {
+    void this.stopEngine();
   }
 
   /** Never rejects or throws, whatever the engine does. */
-  private async stopEngine(engine: SpeechEngine): Promise<void> {
+  private async stopEngine(): Promise<void> {
     try {
-      await engine.stop();
+      await this.engine.stop();
     } catch (error) {
-      logger.warn('speech_stop_failed', { mode: engine.id, status: describeError(error) });
+      logger.warn('speech_stop_failed', { mode: this.engine.id, status: describeError(error) });
     }
   }
 

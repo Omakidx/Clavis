@@ -28,8 +28,11 @@ describe('mapLoadError', () => {
     ['NotAllowedError', 'PERMISSION'],
     ['SecurityError', 'PERMISSION'],
     ['RangeError', 'TOO_LARGE'],
+    ['UnknownErrorException', 'CORRUPT'],
     ['UnexpectedResponseException', 'UNSUPPORTED'],
-    ['SomethingNew', 'UNSUPPORTED'],
+    // Not about the file: the chunk, worker or PDF.js itself failed.
+    ['SomethingNew', 'RENDER'],
+    ['TypeError', 'RENDER'],
   ] as const)('maps %s to %s', (name, code) => {
     const state = mapLoadError(named(name), 'a.pdf');
     expect(state).toMatchObject({ phase: 'error', code });
@@ -55,8 +58,8 @@ describe('mapLoadError', () => {
   });
 
   it('handles non-Error throwables', () => {
-    expect(mapLoadError('boom')).toMatchObject({ phase: 'error', code: 'UNSUPPORTED' });
-    expect(mapLoadError(null)).toMatchObject({ phase: 'error', code: 'UNSUPPORTED' });
+    expect(mapLoadError('boom')).toMatchObject({ phase: 'error', code: 'RENDER' });
+    expect(mapLoadError(null)).toMatchObject({ phase: 'error', code: 'RENDER' });
   });
 });
 

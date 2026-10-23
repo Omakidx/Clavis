@@ -7,6 +7,8 @@ export interface SelectionControllerOptions {
   loadToolbar: ToolbarLoader;
   /** What Listen, Explain, the trim button and dismissal do (Phases 5 and 6 plug in here). */
   actions?: ToolbarActions;
+  /** Capture override for non-webpage hosts such as the PDF reader (see the observer option). */
+  capture?: SelectionObserverOptions['capture'];
   /** Test seam for the observer. */
   observerTimings?: SelectionObserverOptions['timings'];
   win?: Window;
@@ -88,6 +90,7 @@ export function createSelectionController(
   const observer = startSelectionObserver({
     ...(options.win === undefined ? {} : { win: options.win }),
     ...(options.observerTimings === undefined ? {} : { timings: options.observerTimings }),
+    ...(options.capture === undefined ? {} : { capture: options.capture }),
     onSelection(selection) {
       void present(selection);
     },

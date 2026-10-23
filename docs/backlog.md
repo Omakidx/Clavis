@@ -63,14 +63,14 @@ Work in this order. Phases 3, 4 and 7 can overlap once Phase 2 closes; see the d
 | FR-039 | Loading/error/rate-limit states | 5 | Done |
 | FR-040 | Model capability checks | 5 | Done |
 | FR-041 | Plain-text output only | 5 | Done |
-| FR-050 | Open local PDF (picker, drag-drop) | 7 | Not started |
-| FR-051 | Render with PDF.js viewer components | 7 | Not started |
-| FR-052 | Aligned selectable text layer | 7 | Not started |
-| FR-053 | Same Listen/Explain in PDFs | 7 | Not started |
-| FR-054 | Page navigation, zoom, fit-width | 7 | Not started |
-| FR-055 | PDF error states | 7 | Not started |
-| FR-056 | No interception of Chrome's PDF viewer | 7 | Not started |
-| FR-059 | Virtualized pages | 7 | Not started |
+| FR-050 | Open local PDF (picker, drag-drop) | 7 | Done |
+| FR-051 | Render with PDF.js viewer components | 7 | Done |
+| FR-052 | Aligned selectable text layer | 7 | Done |
+| FR-053 | Same Listen/Explain in PDFs | 7 | Done |
+| FR-054 | Page navigation, zoom, fit-width | 7 | Done |
+| FR-055 | PDF error states | 7 | Done |
+| FR-056 | No interception of Chrome's PDF viewer | 7 | Done |
+| FR-059 | Virtualized pages | 7 | Done |
 | FR-070 | Key only in trusted contexts | 3 | Done |
 | FR-071 | Key storage caveats; session mode | 3 | Done |
 | FR-072 | Revoked key / transient errors | 5 | Done (key routes and AI_EXPLAIN) |
@@ -91,7 +91,7 @@ Work in this order. Phases 3, 4 and 7 can overlap once Phase 2 closes; see the d
 | FR-037 | Translate tab | 8 | Not started |
 | FR-042 | Side panel for long answers | 8 | Not started |
 | FR-043 | Opt-in cross-selection cache | 8 | Not started |
-| FR-057 | PDF find-in-document | 7 | Not started |
+| FR-057 | PDF find-in-document | 7 | Done (find bar, Ctrl+F) |
 | FR-078 | Reset / clear all data | 8 | Done |
 
 ### Could / Later / Won't
@@ -102,7 +102,7 @@ FR-026 (IPA and recorded audio) is a Could. FR-058 (remote PDF URLs) and FR-079 
 
 | ID | Risk | Likelihood | Impact | Mitigation | Owner phase |
 | --- | --- | --- | --- | --- | --- |
-| R-01 | `chrome.tts` has no voice on the Linux dev machine, so Listen can't be shown working locally | Confirmed | Medium | Install `speech-dispatcher` + `espeak-ng` for the positive path; test the offscreen fallback (D-07); keep the no-voice message honest | 2 |
+| R-01 | `chrome.tts` has no voice on the Linux dev machine, so Listen can't be shown working locally | Confirmed | Medium | Install `speech-dispatcher` + `espeak-ng` for the positive path; online voices only when chosen (D-22; the offscreen fallback was not adopted, D-07); keep the no-voice message honest | 2 |
 | R-02 | Voices on Windows/macOS never checked by a person | High | Medium | Automated non-voice E2E on CI; one manual tester pass before public listing (D-14); no voice claims until then | 9–10 |
 | R-03 | First toolbar after page load misses 150 ms because UI code must load | Low (mitigated) | Medium | Spike B: bundled Preact toolbar measured 60 ms p95 (D-08); re-measure on a quiet machine | 2 |
 | R-04 | Reasoning models are slow or truncate JSON on the free tier | Medium | High | Spike A model comparison and token budgets (D-09) | 2 |
@@ -111,5 +111,6 @@ FR-026 (IPA and recorded audio) is a Could. FR-058 (remote PDF URLs) and FR-079 
 | R-07 | Groq changes model IDs or free-tier limits | Medium | Medium | Model list fetched at runtime; clear "choose another model" path; recheck before release | 5, 11 |
 | R-08 | No GitHub repo / Pages yet for the privacy policy URL | Low | High (blocks submission) | Create repo and enable Pages before Phase 10 (D-15) | 10 |
 | R-09 | PDF.js viewer components change API between versions | Medium (seen in Spike C) | Medium | Pin exact version; keep worker, core and viewer identical; re-read release notes on every bump | 7 |
-| R-10 | Store ZIP grew to ~2.5 MB with the PDF engine and data files | Medium | Low | Reader size budgets in Phase 7; drop CMaps if CJK without embedded fonts is out of scope | 7 |
+| R-10 | Store ZIP grew to ~2.5 MB with the PDF engine and data files | Medium | Low | Reader size budgets and a 3.2 MB store-ZIP cap enforced by `audit:zip` (Phase 7); CMaps kept for CJK (D-23) | 7 |
+| R-12 | A PDF.js bug lets a hostile PDF act with the reader's trusted-context privileges (key, `scripting`) | Low | High | Annotation allowlist, no scripting/XFA, link confirmation, tightened CSP ([phase-7-security-review.md](decisions/phase-7-security-review.md)); keep PDF.js patched; move the viewer into a sandboxed page (Later) | 7, later |
 | R-11 | Observer budget could fill up as Phases 5–6 add actions | Medium | Medium | Budget raised to 18 KB (D-20) with latency headroom; the explanation card still loads separately on the first Explain (Phase 5) | 5 |

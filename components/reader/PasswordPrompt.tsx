@@ -27,7 +27,6 @@ export function PasswordPrompt({ fileName, incorrect, onSubmit, onCancel }: Pass
   return (
     <form
       className="reader-dialog"
-      role="group"
       aria-labelledby={headingId}
       onSubmit={submit}
       data-testid="password-prompt"
@@ -37,7 +36,7 @@ export function PasswordPrompt({ fileName, incorrect, onSubmit, onCancel }: Pass
       <label className="reader-dialog__field">
         <span>{t('readerPasswordLabel')}</span>
         <input
-          className="reader-input"
+          className="clavis-input reader-input"
           type="password"
           autoComplete="off"
           // The prompt only exists because the user just chose an encrypted file.
@@ -53,11 +52,11 @@ export function PasswordPrompt({ fileName, incorrect, onSubmit, onCancel }: Pass
           {t('readerPasswordIncorrect')}
         </p>
       ) : null}
-      <div className="page__actions">
-        <button type="submit" className="button button--primary">
+      <div className="clavis-actions">
+        <button type="submit" className="clavis-button clavis-button--primary">
           {t('readerPasswordSubmit')}
         </button>
-        <button type="button" className="button" onClick={onCancel}>
+        <button type="button" className="clavis-button" onClick={onCancel}>
           {t('readerPasswordCancel')}
         </button>
       </div>

@@ -1,6 +1,7 @@
 {
-  "$comment": "Content-script budget from docs/tech-stack.md section 6 (D-08, raised to 18 KB by D-20). KB means 1024 bytes. Sizes are gzip level 9 of the built file. The toolbar (Preact) is bundled into the observer; the explanation card loads separately (Phase 5) with its own budget: it carries its own Preact copy, the card styles and the session logic, and must stay free of zod and React.",
+  "$comment": "Content-script budget from docs/tech-stack.md section 6 (D-08, raised to 18 KB by D-20). KB means 1024 bytes. Sizes are gzip level 9 of the built file. The toolbar (Preact) is bundled into the observer; the explanation card loads separately (Phase 5) with its own budget: it carries its own Preact copy, the card styles and the session logic, and must stay free of zod and React. Reader budgets (Phase 7): the reader page loads reader-page-js at start, reader-lazy-ui on the first selection/Explain, pdfjs-js on the first opened file, pdfjs-data files on demand. Hashed chunk names come from the bundler; patterns match by prefix. maxZipBytes (3.2 MB) caps the store ZIP and is enforced by scripts/audit-zip.mjs after `npm run zip`.",
   "buildDir": ".output/chrome-mv3",
+  "maxZipBytes": 3355443,
   "budgets": [
     {
       "id": "content-observer",
@@ -14,6 +15,57 @@
       "description": "Explanation card, injected on the first Explain (Phase 5, D-08); not part of the observer",
       "files": ["content-scripts/explain-card.js"],
       "maxGzipBytes": 20480,
+      "required": true
+    },
+    {
+      "id": "reader-page-js",
+      "description": "PDF reader page JavaScript loaded at start (shell, React, selection controller, Listen); excludes PDF.js and the lazily loaded toolbar/card",
+      "files": [
+        "chunks/reader-*.js",
+        "chunks/i18n-*.js",
+        "chunks/constants-*.js",
+        "chunks/trust-*.js",
+        "chunks/listen-*.js"
+      ],
+      "aggregate": true,
+      "maxGzipBytes": 98304,
+      "required": true
+    },
+    {
+      "id": "reader-lazy-ui",
+      "description": "Toolbar (Preact) and explanation card, loaded by the reader on the first selection and the first Explain",
+      "files": [
+        "chunks/toolbar-*.js",
+        "chunks/preact-*.js",
+        "chunks/explanation-*.js",
+        "chunks/errors-*.js"
+      ],
+      "aggregate": true,
+      "maxGzipBytes": 24576,
+      "required": true
+    },
+    {
+      "id": "pdfjs-js",
+      "description": "PDF.js core, viewer components and worker, loaded when the first PDF is opened",
+      "files": ["chunks/pdf-*.js", "chunks/pdf_viewer-*.js", "assets/pdf.worker.min-*.mjs"],
+      "aggregate": true,
+      "maxGzipBytes": 614400,
+      "required": true
+    },
+    {
+      "id": "pdfjs-data",
+      "description": "PDF.js runtime data (CMaps, standard fonts, ICC profiles, wasm decoders), fetched on demand; sum of per-file gzip",
+      "files": ["pdfjs/cmaps/*", "pdfjs/standard_fonts/*", "pdfjs/iccs/*", "pdfjs/wasm/*"],
+      "aggregate": true,
+      "maxGzipBytes": 1945600,
+      "required": true
+    },
+    {
+      "id": "reader-css",
+      "description": "Reader stylesheet (PDF.js viewer CSS plus the shell)",
+      "files": ["assets/reader-*.css"],
+      "aggregate": true,
+      "maxGzipBytes": 49152,
       "required": true
     }
   ]

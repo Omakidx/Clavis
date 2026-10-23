@@ -8,15 +8,13 @@ import { EXTENSION_PAGES } from '../config/constants';
  * - `content`   a content script in a web page (http/https, or an about:blank / srcdoc
  *               frame that inherits one) with a tab.
  * - `extension` one of OUR pages, matched by EXACT path (see EXTENSION_PAGE_PATHS).
- * - `offscreen` our offscreen document, matched by exact path.
  * - `unknown`   anything else: another extension, a non-listed extension page, a page we
  *               do not recognise, an extension page embedded in a website, no url.
  */
-export type SenderKind = 'content' | 'extension' | 'offscreen' | 'unknown';
+export type SenderKind = 'content' | 'extension' | 'unknown';
 
 /** The practice page is built by the onboarding workstream (entrypoints/practice). */
 export const PRACTICE_PAGE_PATH = '/practice.html' as const;
-export const OFFSCREEN_PAGE = '/offscreen.html' as const;
 
 export const EXTENSION_PAGE_PATHS = [
   EXTENSION_PAGES.options,
@@ -29,9 +27,9 @@ export type ExtensionPagePath = (typeof EXTENSION_PAGE_PATHS)[number];
 
 export interface ClassifiedSender {
   kind: SenderKind;
-  /** Exact path of the extension page or offscreen document. */
-  path?: ExtensionPagePath | typeof OFFSCREEN_PAGE;
-  /** The sender's tab; absent for the popup and for the offscreen document. */
+  /** Exact path of the extension page. */
+  path?: ExtensionPagePath;
+  /** The sender's tab; absent for the popup. */
   tabId?: number;
   frameId?: number;
   /** Chrome's id of the sender's document: new on every navigation, so it tells documents of one frame apart. */
@@ -109,12 +107,6 @@ export function classifySender(sender: SenderLike, identity: SenderIdentity): Cl
     // the extension page it looks like: the embedding page controls its surroundings.
     const tabUrl = parseUrl(sender.tab?.url);
     if (tabUrl !== undefined && !ownsUrl(own, tabUrl)) return unknown;
-    if (url.pathname === OFFSCREEN_PAGE) {
-      // The offscreen document has no tab.
-      return sender.tab === undefined
-        ? { kind: 'offscreen', path: OFFSCREEN_PAGE, ...located }
-        : unknown;
-    }
     if (!KNOWN_PAGES.has(url.pathname)) return unknown;
     // Our pages are always top frames. A frame of one of them (e.g. the reader framing
     // /options.html) is not trusted as that page. Chrome only reports `frameId` for senders in a

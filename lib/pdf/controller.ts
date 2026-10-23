@@ -1,15 +1,14 @@
 import type { PDFDocumentLoadingTask, PDFDocumentProxy } from 'pdfjs-dist';
 import type { PDFLinkService, PDFViewer } from 'pdfjs-dist/web/pdf_viewer.mjs';
+import { confirmingLinkService, toSafeExternalUrl } from './links';
+import { allowedAnnotationTypes, guardAnnotations } from './annotations';
+import { findStateName, IDLE_FIND, type FindStatus } from './find';
 import { isImageOnly } from './image-only';
-import {
-  ALLOWED_LINK_SCHEMES,
-  FIT_WIDTH,
-  MAX_CANVAS_PIXELS,
-  MAX_IMAGE_PIXELS,
-  MAX_PDF_BYTES,
-} from './limits';
+import { FIT_WIDTH, MAX_CANVAS_PIXELS, MAX_IMAGE_PIXELS, MAX_PDF_BYTES } from './limits';
 import { PasswordGate } from './password';
+import { normalizeKangxiRadicals } from './radicals';
 import { loadPdfJs, type PdfJs } from './pdfjs';
+import { readFileBytes } from './read';
 import { isWasmAllowed } from './wasm';
 import {
   EMPTY_STATE,
@@ -23,11 +22,7 @@ import {
   type ReaderState,
 } from './state';
 
-export interface FindStatus {
-  state: 'idle' | 'pending' | 'found' | 'not-found' | 'wrapped';
-  current: number;
-  total: number;
-}
+export type { FindStatus };
 
 /** Page/zoom of the document on screen; present whenever a document is displayed. */
 export interface ViewStatus {
@@ -48,6 +43,21 @@ export interface ReaderSnapshot {
    * grows; E2E tests use it to know when the viewer is idle after a zoom or scroll.
    */
   renderCount: number;
+  /**
+   * Pages that failed to draw since the document opened (a cancelled render is not a failure).
+   * The shell shows a notice while this is above zero; the other pages stay usable.
+   */
+  pageErrors: number;
+  /**
+   * Some page had more annotations than the reader draws (MAX_ANNOTATIONS_PER_PAGE) and the excess
+   * was dropped. The shell shows a notice; reset when the document closes.
+   */
+  annotationsLimited: boolean;
+  /**
+   * Name of the file being opened or shown, kept for every state of it (also after an error, so
+   * the user knows which file failed); empty when no file is open. Shown as text only.
+   */
+  fileName: string;
 }
 
 export interface ViewerElements {
@@ -77,16 +87,23 @@ export interface ReaderControllerOptions {
   maxPages?: number;
 }
 
-const IDLE_FIND: FindStatus = { state: 'idle', current: 0, total: 0 };
+export { toSafeExternalUrl };
 
-/** Return a displayable, credential-free http(s)/mailto URL, or null for anything else. */
-export function toSafeExternalUrl(raw: string): URL | null {
-  const url = URL.parse(raw);
-  if (!url) return null;
-  if (!(ALLOWED_LINK_SCHEMES as readonly string[]).includes(url.protocol)) return null;
-  url.username = '';
-  url.password = '';
-  return url;
+/**
+ * An XFA-only form: the file says it has XFA (`IsXFAPresent`) and has no AcroForm fields. With XFA
+ * off (`enableXfa: false`, `isPureXfa` is always false) PDF.js would draw only the "Please wait,
+ * your viewer does not support XFA" placeholder page, so say so instead. A hybrid form (XFA plus
+ * AcroForm fields) is a normal document whose static fields still show.
+ */
+async function isXfaOnly(doc: PDFDocumentProxy): Promise<boolean> {
+  try {
+    const { info } = await doc.getMetadata();
+    if ((info as { IsXFAPresent?: unknown } | undefined)?.IsXFAPresent !== true) return false;
+    const fields = await doc.getFieldObjects();
+    return fields === null || fields.size === 0;
+  } catch {
+    return false;
+  }
 }
 
 /**
@@ -102,12 +119,24 @@ export class PdfReaderController {
   readonly #opts: ReaderControllerOptions;
   readonly #listeners = new Set<() => void>();
   readonly #gate: PasswordGate;
-  #snapshot: ReaderSnapshot = { state: EMPTY_STATE, view: null, find: IDLE_FIND, renderCount: 0 };
+  #snapshot: ReaderSnapshot = {
+    state: EMPTY_STATE,
+    view: null,
+    find: IDLE_FIND,
+    renderCount: 0,
+    pageErrors: 0,
+    annotationsLimited: false,
+    fileName: '',
+  };
   #viewer: PDFViewer | null = null;
   #linkService: PDFLinkService | null = null;
   #eventBus: InstanceType<PdfJs['viewer']['EventBus']> | null = null;
   #task: PDFDocumentLoadingTask | null = null;
   #doc: PDFDocumentProxy | null = null;
+  /** The query of the search in progress, and whether PDF.js has reported on it yet. */
+  #findQuery: string | null = null;
+  #findConfirmed = false;
+  #annotationTypes: ReadonlySet<number> = new Set();
   #fileName = '';
   /** Incremented by every open/close so stale async continuations can bail out. */
   #token = 0;
@@ -173,19 +202,37 @@ export class PdfReaderController {
     this.#fileName = file.name;
     const meta = validateFileMeta(file, this.#opts.maxBytes ?? MAX_PDF_BYTES);
     if (meta) {
-      this.#setSnapshot({ state: meta });
+      this.#setSnapshot({ state: meta, fileName: file.name });
       return;
     }
-    this.#setSnapshot({ state: { phase: 'loading', name: file.name } });
+    this.#setSnapshot({ state: { phase: 'loading', name: file.name }, fileName: file.name });
 
-    let bytes: Uint8Array;
+    let bytes: Uint8Array | null;
     try {
-      bytes = new Uint8Array(await file.arrayBuffer());
+      let shown = 0;
+      bytes = await readFileBytes(file, {
+        isCancelled: () => token !== this.#token,
+        onProgress: ({ loaded, total }) => {
+          // Whole percents only: a 100 MiB file arrives in thousands of chunks.
+          const progress = total > 0 ? Math.floor((loaded / total) * 100) / 100 : 0;
+          if (token !== this.#token || progress === shown) return;
+          shown = progress;
+          this.#setSnapshot({ state: { phase: 'loading', name: file.name, progress } });
+        },
+      });
     } catch (error) {
-      if (token === this.#token) this.#fail(error);
+      // Failing to read the file at all (permissions removed, file gone, disk error) is the
+      // user's file system, not PDF.js: Chromium reports it as NotReadableError, or as a bare
+      // `TypeError: network error` from Blob#stream(). Both get the "couldn't read this file" copy.
+      if (token === this.#token) {
+        this.#setSnapshot({
+          state: errorState('PERMISSION', error instanceof Error ? error.name : 'Error'),
+          view: null,
+        });
+      }
       return;
     }
-    if (token !== this.#token) return;
+    if (bytes === null || token !== this.#token) return;
     if (!hasPdfHeader(bytes)) {
       this.#setSnapshot({ state: notAPdfState() });
       return;
@@ -247,7 +294,7 @@ export class PdfReaderController {
   async close(): Promise<void> {
     await this.#reset();
     this.#fileName = '';
-    this.#setSnapshot({ state: EMPTY_STATE, view: null, find: IDLE_FIND });
+    this.#setSnapshot({ state: EMPTY_STATE, view: null, find: IDLE_FIND, fileName: '' });
   }
 
   /**
@@ -272,7 +319,7 @@ export class PdfReaderController {
       console.warn('PDF viewer cleanup failed', error instanceof Error ? error.name : 'error');
     }
     this.#viewer?.cleanup();
-    this.#setSnapshot({ view: null, find: IDLE_FIND });
+    this.#setSnapshot({ view: null, find: IDLE_FIND, pageErrors: 0, annotationsLimited: false });
     if (task) {
       try {
         await task.destroy();
@@ -298,35 +345,13 @@ export class PdfReaderController {
   #ensureViewer(pdf: PdfJs): void {
     if (this.#viewer) return;
     const { viewer: v, lib } = pdf;
+    this.#annotationTypes = allowedAnnotationTypes(lib.AnnotationType);
     const eventBus = new v.EventBus();
     const confirm: LinkConfirmer = (url) => this.#confirm(url);
     if (!this.#elements) throw new Error('PdfReaderController: attach() the viewer elements first');
     const { container, viewerElement } = this.#elements;
 
-    // PDFLinkService variant that never navigates by itself: external links are shown with a
-    // neutral href and open in a new tab only after the user confirms (architecture section 8).
-    class ConfirmingLinkService extends v.PDFLinkService {
-      override addLinkAttributes(link: HTMLAnchorElement, url: string): void {
-        const safe = toSafeExternalUrl(url);
-        link.removeAttribute('target');
-        link.rel = 'noopener noreferrer nofollow';
-        link.href = '#';
-        if (!safe) {
-          link.title = '';
-          link.onclick = () => false;
-          return;
-        }
-        link.title = safe.href;
-        link.onclick = (event: MouseEvent) => {
-          event.preventDefault();
-          void confirm(safe.href).then((ok) => {
-            if (ok) window.open(safe.href, '_blank', 'noopener,noreferrer');
-          });
-          return false;
-        };
-      }
-    }
-
+    const ConfirmingLinkService = confirmingLinkService(v.PDFLinkService, confirm);
     const linkService = new ConfirmingLinkService({ eventBus });
     const findController = new v.PDFFindController({ linkService, eventBus });
     const viewer = new v.PDFViewer({
@@ -335,14 +360,23 @@ export class PdfReaderController {
       eventBus,
       linkService,
       findController,
-      // Links only: no form widgets and no scripting manager, so PDF JavaScript never runs.
+      // Links only: ENABLE draws link/popup annotations but no AcroForm widgets as editable
+      // inputs (ENABLE_FORMS would), and no scripting manager exists, so PDF JavaScript never runs.
       annotationMode: lib.AnnotationMode.ENABLE,
+      // Reading only: no annotation editors, no highlight/stamp/ink tools, no paste or
+      // drag-and-drop of images into the document.
+      annotationEditorMode: lib.AnnotationEditorType.DISABLE,
+      // Do not turn plain-text URLs into clickable links; real link annotations still work.
+      enableAutoLinking: false,
       maxCanvasPixels: MAX_CANVAS_PIXELS,
     });
     linkService.setViewer(viewer);
 
     const countRender = () => this.#setSnapshot({ renderCount: this.#snapshot.renderCount + 1 });
-    eventBus.on('pagerendered', countRender);
+    eventBus.on('pagerendered', (evt: { error?: unknown }) => {
+      countRender();
+      if (evt.error) this.#setSnapshot({ pageErrors: this.#snapshot.pageErrors + 1 });
+    });
     eventBus.on('textlayerrendered', countRender);
     eventBus.on('pagechanging', (evt: { pageNumber: number }) => {
       this.#setView({ page: evt.pageNumber });
@@ -350,24 +384,62 @@ export class PdfReaderController {
     eventBus.on('scalechanging', (evt: { scale: number; presetValue?: string }) => {
       this.#setView({ zoom: evt.scale, scaleValue: evt.presetValue ?? String(evt.scale) });
     });
+    // A new query starts a new search; events still in flight from the previous one (they carry
+    // its match index, "47 of 100") are ignored until PDF.js reports a state for THIS query.
     eventBus.on(
       'updatefindmatchescount',
       (evt: { matchesCount: { current: number; total: number } }) => {
+        if (this.#findQuery !== null && !this.#findConfirmed) return;
         this.#setFind({ ...evt.matchesCount });
       },
     );
     eventBus.on(
       'updatefindcontrolstate',
-      (evt: { state: number; matchesCount: { current: number; total: number } }) => {
-        const names = ['found', 'not-found', 'wrapped', 'pending'] as const;
-        const state = names[evt.state] ?? 'found';
-        this.#setFind({ state, ...evt.matchesCount });
+      (evt: {
+        state: number;
+        matchesCount: { current: number; total: number };
+        rawQuery?: string | null;
+      }) => {
+        if (this.#findQuery !== null) {
+          if (evt.rawQuery !== undefined && evt.rawQuery !== this.#findQuery) return;
+          this.#findConfirmed = true;
+        }
+        this.#setFind({ state: findStateName(evt.state), ...evt.matchesCount });
       },
     );
 
     this.#eventBus = eventBus;
     this.#linkService = linkService;
     this.#viewer = viewer;
+    this.#followContainerSize(viewer, container);
+  }
+
+  /**
+   * PDF.js viewer components compute `page-width` (and `page-fit`, `auto`) once, when the scale is
+   * set; only the PDF.js app listens to window resizes. Without this the page keeps its width when
+   * the window shrinks (a horizontal scrollbar) or grows (a gap) while the select still says "Fit
+   * width". Re-apply the NAMED scale when the container's size changes, at most once per frame; a
+   * numeric zoom is left alone.
+   */
+  #followContainerSize(viewer: PDFViewer, container: HTMLElement): void {
+    if (typeof ResizeObserver !== 'function') return;
+    let size = '';
+    let frame = 0;
+    const refit = (): void => {
+      frame = 0;
+      const value = viewer.currentScaleValue;
+      if (!this.#doc || !value || !Number.isNaN(Number(value))) return;
+      viewer.currentScaleValue = value;
+    };
+    new ResizeObserver(() => {
+      const next = `${container.clientWidth}x${container.clientHeight}`;
+      if (next === size) return;
+      const first = size === '';
+      size = next;
+      // The first callback only reports the initial size.
+      if (first || frame !== 0) return;
+      frame = requestAnimationFrame(refit);
+    }).observe(container);
   }
 
   #setFind(patch: Partial<FindStatus>): void {
@@ -386,17 +458,35 @@ export class PdfReaderController {
       this.#task = null;
       return;
     }
-    if (doc.isPureXfa) {
+    // A valid file with an empty page tree never fires `pagesinit`: the reader would say
+    // "Opening..." for ever. Nothing to show means nothing usable.
+    if (doc.numPages < 1) {
+      this.#setSnapshot({ state: errorState('CORRUPT', 'no pages') });
+      void this.#task?.destroy();
+      this.#task = null;
+      return;
+    }
+    if (await isXfaOnly(doc)) {
+      if (token !== this.#token) return;
       this.#setSnapshot({ state: errorState('UNSUPPORTED', 'XFA-only form') });
       void this.#task?.destroy();
       this.#task = null;
       return;
     }
+    if (token !== this.#token) return;
     this.#doc = doc;
     const ready = new Promise<void>((resolve) => {
       eventBus.on('pagesinit', () => resolve(), { once: true });
     });
-    viewer.setDocument(doc);
+    // The viewer only ever sees pages whose annotations are allowlisted and capped (annotations.ts).
+    viewer.setDocument(
+      guardAnnotations(doc, {
+        allowed: this.#annotationTypes,
+        onTruncated: () => {
+          if (token === this.#token) this.#setSnapshot({ annotationsLimited: true });
+        },
+      }),
+    );
     linkService.setDocument(doc, null);
     await ready;
     if (token !== this.#token) return;
@@ -440,6 +530,14 @@ export class PdfReaderController {
     if (viewer) viewer.currentPageNumber = clampPage(page, viewer.pagesCount);
   }
 
+  firstPage(): void {
+    this.goToPage(1);
+  }
+
+  lastPage(): void {
+    this.goToPage(this.#ready?.pagesCount ?? 1);
+  }
+
   nextPage(): void {
     this.#ready?.nextPage();
   }
@@ -467,18 +565,27 @@ export class PdfReaderController {
     if (viewer) viewer.currentScaleValue = FIT_WIDTH;
   }
 
-  find(query: string, options: { previous?: boolean; again?: boolean } = {}): void {
+  find(
+    query: string,
+    options: { previous?: boolean; again?: boolean; caseSensitive?: boolean } = {},
+  ): void {
     const eventBus = this.#eventBus;
     if (!eventBus || !this.#doc) return;
     if (query.trim() === '') {
       this.clearFind();
       return;
     }
+    // Kangxi radicals the user typed or pasted would never match the ideographs PDF.js indexes.
+    const text = normalizeKangxiRadicals(query);
+    if (!options.again || this.#findQuery !== text) {
+      this.#findQuery = text;
+      this.#findConfirmed = false;
+    }
     eventBus.dispatch('find', {
       source: this,
       type: options.again ? 'again' : '',
-      query,
-      caseSensitive: false,
+      query: text,
+      caseSensitive: options.caseSensitive ?? false,
       entireWord: false,
       highlightAll: true,
       findPrevious: options.previous ?? false,
@@ -487,6 +594,8 @@ export class PdfReaderController {
   }
 
   clearFind(): void {
+    this.#findQuery = null;
+    this.#findConfirmed = false;
     this.#eventBus?.dispatch('findbarclose', { source: this });
     this.#setSnapshot({ find: IDLE_FIND });
   }

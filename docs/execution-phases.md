@@ -1,9 +1,9 @@
 # Execution phases — Clavis
 
-**Document status:** v1 end-to-end implementation playbook (rev. 1.1 — decisions D-01 … D-22)  
+**Document status:** v1 end-to-end implementation playbook (rev. 1.1 — decisions D-01 … D-23)  
 **Baseline:** 2026-10-22 · **Goal:** deliver a privacy-conscious, production-ready Chrome MV3 extension with Groq BYOK, word/sentence pronunciation, contextual explanations, and a custom PDF reader.
 
-> Use this as the project's **build checklist and milestone tracker**. Feature IDs correspond to [requirements.md](requirements.md); implementation boundaries are in [architecture.md](architecture.md); approved tools are in [tech-stack.md](tech-stack.md). Product decisions D-01 … D-22 are in [requirements.md §11](requirements.md#11-product-decisions).
+> Use this as the project's **build checklist and milestone tracker**. Feature IDs correspond to [requirements.md](requirements.md); implementation boundaries are in [architecture.md](architecture.md); approved tools are in [tech-stack.md](tech-stack.md). Product decisions D-01 … D-23 are in [requirements.md §11](requirements.md#11-product-decisions).
 
 ## 0. Delivery philosophy and estimates
 
@@ -35,7 +35,7 @@ flowchart TD
 
 | Phase | Approx. effort | Exit gate |
 | --- | --- | --- |
-| 0 — Specification & risks | Done 2026-10-22 | Scope frozen, decisions D-01 … D-22 logged |
+| 0 — Specification & risks | Done 2026-10-22 | Scope frozen, decisions D-01 … D-23 logged |
 | 1 — Scaffold & CI | Done 2026-10-22 | Unpacked extension loads; lint/test/build pipeline works |
 | 2 — Feasibility spikes | Engineering done 2026-10-22; awaiting user runs | Groq call + model comparison, permission flow + toolbar latency, PDF viewer text layer and TTS capability proven |
 | 3 — Onboarding & BYOK | Done 2026-10-22 | Site access, valid/invalid keys, trusted storage and settings covered |
@@ -68,7 +68,7 @@ Effort counts are overlapping planning estimates, not additive deadlines; use th
 - [x] Select the target Chrome versions/OS testing matrix — Linux by hand, Windows/macOS automated, minimum Chrome tentatively 116, later set to 147 by D-18 ([platform matrix](requirements.md#platform-matrix-d-14), D-14).
 - [x] Record legal/privacy decisions and remaining open items — MIT license (D-13, `LICENSE` added), privacy policy on GitHub Pages with a [draft](privacy-policy.md) (D-15); publisher, support email and logo deferred to Phase 10 ([still open](requirements.md#still-open)).
 
-**Deliverables (done 2026-10-22):** approved scope and decisions D-01 … D-22 ([requirements.md §11](requirements.md#11-product-decisions)); ADRs A-001 … A-013 ([architecture.md §1](architecture.md#1-architectural-decisions-adrs)); requirement checklist, prioritized backlog and risk register ([backlog.md](backlog.md)); privacy policy draft ([privacy-policy.md](privacy-policy.md)).  
+**Deliverables (done 2026-10-22):** approved scope and decisions D-01 … D-23 ([requirements.md §11](requirements.md#11-product-decisions)); ADRs A-001 … A-013 ([architecture.md §1](architecture.md#1-architectural-decisions-adrs)); requirement checklist, prioritized backlog and risk register ([backlog.md](backlog.md)); privacy policy draft ([privacy-policy.md](privacy-policy.md)).  
 **Gate:** No launch-time features are ambiguous or promised beyond demonstrated browser capabilities. **Passed** — remaining unknowns are either Phase 2 spike outputs with defined decision criteria or Phase 10 publishing details.
 
 ## Phase 1 — Repository, WXT scaffold and developer tooling
@@ -142,10 +142,10 @@ Effort counts are overlapping planning estimates, not additive deadlines; use th
 - [x] `SpeechService` with `chrome.tts` first, offscreen `speechSynthesis` second, honest `NO_VOICE` last; Stop, rate presets, new-speak-cancels-previous (121 unit tests).
 - [x] Linux dev machine (no speech-dispatcher): `chrome.tts` 0 voices, offscreen `speechSynthesis` 0 voices, reader-page `speechSynthesis` 0 voices → `NO_VOICE` for word and sentence, never a fake playing state.
 - [x] Offscreen document lifecycle works (create, reuse, idle close at 20 s).
-- [ ] **User:** in your own Chrome, check voice counts per engine and listen to word/sentence/slow playback; optionally install `speech-dispatcher espeak-ng` and repeat. Then decide D-07: keep the offscreen fallback and `offscreen` permission only if it finds voices `chrome.tts` misses.
+- [x] **User check (2026-10-23):** Settings → Voice showed 19 Chrome voices and the same 19 fallback voices (all online) → D-07: fallback not adopted; removed with the `offscreen` permission.
 
 **Deliverables (2026-10-22):** spike implementations in `lib/ai`, `lib/site-access`, `lib/selection`, `components/tooltip`, `lib/pdf`, `components/reader`, `lib/speech`, `entrypoints/offscreen`; findings in `docs/decisions/`; decisions D-08, D-17 and D-18; [security review](decisions/phase-2-security-review.md) fixes.  
-**Gate:** All four spikes have a demonstrable working or consciously downgraded implementation path. **Engineering passed 2026-10-22** (`npm run ci`, full E2E suite). D-09 settled 2026-10-23; **closes when the user's voice check settles D-07.**
+**Gate:** All four spikes have a demonstrable working or consciously downgraded implementation path. **Engineering passed 2026-10-22** (`npm run ci`, full E2E suite). D-09 and D-07 settled 2026-10-23 — **Phase 2 closed.**
 
 **Phase 2 follow-ups:**
 
@@ -267,7 +267,7 @@ Effort counts are overlapping planning estimates, not additive deadlines; use th
 
 **Phase 6 follow-ups:**
 
-- D-07: the user's check in Settings → Voice decides whether the offscreen fallback and the `offscreen` permission stay.
+- D-07 settled 2026-10-23: fallback not adopted; offscreen engine and permission removed (done in the Phase 7 branch).
 - Phase 7: Listen in the PDF reader via the same `ToolbarActions.listen`.
 - Observer budget: 17.7 of 18 KB — trim toolbar copy/CSS before adding anything to the always-loaded script.
 - Optional: per-case no-voice copy (no voice for this language / voice never started) would need another error `reason`.
@@ -281,27 +281,29 @@ Effort counts are overlapping planning estimates, not additive deadlines; use th
 
 ### Minimum working local PDF reader
 
-- [ ] Add `reader` extension page with Open PDF, file picker and drag/drop.
-- [ ] Bundle PDF.js core, viewer components, `pdf_viewer.css` and the matching worker (same version); configure assets for built extension.
-- [ ] Load local file via `File`/`ArrayBuffer`; enforce reasonable per-file limit and show progress.
-- [ ] Mount `PDFViewer` with `EventBus`, `PDFLinkService` and `PDFFindController` in the React shell (D-06); `isEvalSupported: false`; confirm before external links.
-- [ ] Add page number, navigation, zoom +/−, fit width, loading and error components driven by viewer events.
-- [ ] Use shared `SelectionSnapshot` + tooltip, selection anchor logic, Explain and Listen.
-- [ ] Capture page metadata for selections across words/sentences.
-- [ ] Clean up on close: `setDocument(null)`, `doc.destroy()`, object URLs.
-- [ ] Test PDF at different zoom/rotation, page count, 100-page documents (virtualization) and keyboard focus.
+- [x] Add `reader` extension page with Open PDF, file picker and drag/drop.
+- [x] Bundle PDF.js core, viewer components, `pdf_viewer.css` and the matching worker (same version); configure assets for built extension.
+- [x] Load local file via `File`/`ArrayBuffer`; enforce reasonable per-file limit and show progress.
+- [x] Mount `PDFViewer` with `EventBus`, `PDFLinkService` and `PDFFindController` in the React shell (D-06); `isEvalSupported: false`; confirm before external links.
+- [x] Add page number, navigation, zoom +/−, fit width, loading and error components driven by viewer events.
+- [x] Use shared `SelectionSnapshot` + tooltip, selection anchor logic, Explain and Listen.
+- [x] Capture page metadata for selections across words/sentences.
+- [x] Clean up on close: `setDocument(null)`, `doc.destroy()`, object URLs.
+- [x] Test PDF at different zoom/rotation, page count, 100-page documents (virtualization) and keyboard focus.
 
 ### Hardening and reader enhancements
 
-- [ ] Wire find-in-document UI to `PDFFindController` (Should).
-- [ ] Add password prompt handling for encrypted PDF via `onPassword`.
-- [ ] Clearly distinguish corrupt file vs scan-only text vs missing font/worker.
-- [ ] Verify no PDF bytes are posted to Groq; only user-selected text and bounded context on Explain.
+- [x] Wire find-in-document UI to `PDFFindController` (Should).
+- [x] Add password prompt handling for encrypted PDF via `onPassword`.
+- [x] Clearly distinguish corrupt file vs scan-only text vs missing font/worker.
+- [x] Verify no PDF bytes are posted to Groq; only user-selected text and bounded context on Explain.
 
 Remote PDF URLs and thumbnails are not part of v1 (D-03; thumbnails are a Could).
 
 **Deliverables:** Stable local PDF reader, common explanations/TTS, graceful limitations.  
 **Gate:** FR-050–056 and FR-059 pass; FR-057 if implemented; scanned-only file not misrepresented as selectable.
+
+**Status (2026-10-23): complete.** Gate met by the reader E2E suites and the independent acceptance suite ([p7-reader-acceptance.md](decisions/p7-reader-acceptance.md)); security review findings fixed ([phase-7-security-review.md](decisions/phase-7-security-review.md)). Also in this phase: D-07 settled (offscreen voice fallback and `offscreen` permission removed), D-23 (keep CMaps), store-ZIP cap. Follow-ups: sandboxed viewer page (Later); CJK Radicals Supplement characters in Chrome-printed PDFs are not normalised; JBIG2/JPEG 2000/font coverage gaps listed in the acceptance report.
 
 ## Phase 8 — Integrated UX and accessibility
 

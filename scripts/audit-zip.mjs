@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 // Release ZIP audit (docs/architecture.md section 11 item 6; FR-075, FR-076, FR-077).
-// Usage: node scripts/audit-zip.mjs [--zip <file>] [--strict]
+// Usage: node scripts/audit-zip.mjs [--zip <file>] [--strict] [--allowlist <file>] [--budgets <file>]
+// The store ZIP size cap is `maxZipBytes` in scripts/size-budgets.json (checked here because the ZIP
+// only exists after `npm run zip`).
 // Default target: newest .output/*-chrome.zip. Exit 0 = clean, 1 = violations, 2 = bad input.
 // --strict turns warnings into failures (the npm script "audit:zip" always passes it).
 //
@@ -17,11 +19,12 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const outputDir = path.join(root, '.output');
 
 function parseArgs(argv) {
-  const opts = { zip: undefined, strict: false, allowlist: undefined };
+  const opts = { zip: undefined, strict: false, allowlist: undefined, budgets: undefined };
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
     if (arg === '--zip') opts.zip = path.resolve(argv[++i] ?? '');
     else if (arg === '--allowlist') opts.allowlist = path.resolve(argv[++i] ?? '');
+    else if (arg === '--budgets') opts.budgets = path.resolve(argv[++i] ?? '');
     else if (arg === '--strict') opts.strict = true;
     else throw new Error(`Unknown argument: ${arg}`);
   }
@@ -119,11 +122,28 @@ function main() {
   const fail = (check, message) => failures.push({ check, message });
   const warn = (check, message) => warnings.push({ check, message });
 
+  const budgetsPath = opts.budgets ?? path.join(root, 'scripts', 'size-budgets.json');
+  const maxZipBytes = JSON.parse(readFileSync(budgetsPath, 'utf8')).maxZipBytes;
+
   const zipBuffer = readFileSync(zipPath);
   const entries = readZip(zipBuffer).filter((entry) => !entry.isDirectory);
   const names = new Set(entries.map((entry) => entry.name));
   console.log(`Auditing ${path.relative(root, zipPath) || zipPath}`);
   console.log(`  ${entries.length} files, ${(zipBuffer.length / 1024).toFixed(1)} KB compressed\n`);
+
+  // 0. Store package size cap.
+  if (typeof maxZipBytes === 'number') {
+    const mb = (bytes) => `${(bytes / 1024 / 1024).toFixed(2)} MB`;
+    console.log(
+      `  ZIP size ${zipBuffer.length} bytes (${mb(zipBuffer.length)}) of ${maxZipBytes} allowed (${mb(maxZipBytes)})\n`,
+    );
+    if (zipBuffer.length > maxZipBytes) {
+      fail(
+        'size',
+        `ZIP is ${zipBuffer.length} bytes (${mb(zipBuffer.length)}), cap is ${maxZipBytes} bytes (${mb(maxZipBytes)}); over by ${zipBuffer.length - maxZipBytes} bytes`,
+      );
+    }
+  }
 
   // 1. Entry names: path safety and forbidden files.
   for (const entry of entries) {

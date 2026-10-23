@@ -95,7 +95,7 @@ export type PublicMessage = z.infer<typeof publicMessageSchema>;
 //   - key routes (SET/TEST/REMOVE_API_KEY, GET_KEY_STATUS, CLEAR_ALL_DATA):
 //     exactly /options.html and /onboarding.html
 //   - settings and status routes: /options.html, /onboarding.html, /popup.html
-//   Never the reader (untrusted PDFs) or the offscreen document.
+//   Never the reader (it shows untrusted PDFs).
 // ---------------------------------------------------------------------------
 
 /** Secret-bearing string: no whitespace or control characters, bounded length. */

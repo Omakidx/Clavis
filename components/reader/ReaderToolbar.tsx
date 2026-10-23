@@ -1,13 +1,16 @@
-import { useRef, useState, type FormEvent, type KeyboardEvent } from 'react';
+import { useState, type FormEvent, type Ref } from 'react';
 import { t } from '../../lib/i18n';
-import type { FindStatus, PdfReaderController, ViewStatus } from '../../lib/pdf/controller';
+import type { PdfReaderController, ViewStatus } from '../../lib/pdf/controller';
 import { FIT_WIDTH, ZOOM_PRESETS } from '../../lib/pdf/limits';
 
 interface ReaderToolbarProps {
   controller: PdfReaderController;
   view: ViewStatus | null;
-  find: FindStatus;
+  findOpen: boolean;
+  onToggleFind: () => void;
   onOpen: () => void;
+  /** Ref of the Open PDF button, so the shell can return focus to it. */
+  openRef?: Ref<HTMLButtonElement>;
   onClose: () => void;
 }
 
@@ -21,22 +24,22 @@ function zoomValue(view: ViewStatus | null): string {
   return preset === undefined ? 'custom' : String(preset);
 }
 
-function FindSummary({ find }: { find: FindStatus }) {
-  if (find.state === 'not-found') return <>{t('readerFindNotFound')}</>;
-  if (find.state === 'pending') return <>{t('readerFindPending')}</>;
-  if (find.total > 0) {
-    return <>{t('readerFindCount', [String(find.current), String(find.total)])}</>;
-  }
-  return null;
-}
-
-/** Rendered with a `key` that changes per opened file, so draft state never leaks between documents. */
-export function ReaderToolbar({ controller, view, find, onOpen, onClose }: ReaderToolbarProps) {
+/**
+ * Open/close, page navigation, zoom and the find toggle. Rendered with a `key` that changes per
+ * opened file, so the page-number draft never leaks between documents. Everything is a native
+ * control in DOM order (no roving tabindex): Tab visits them in the order they read.
+ */
+export function ReaderToolbar({
+  controller,
+  view,
+  findOpen,
+  onToggleFind,
+  onOpen,
+  openRef,
+  onClose,
+}: ReaderToolbarProps) {
   const disabled = view === null;
   const [pageDraft, setPageDraft] = useState<string | null>(null);
-  const [query, setQuery] = useState('');
-  const queryRef = useRef('');
-
   const pageCount = view?.pageCount ?? 0;
 
   const commitPage = (event?: FormEvent) => {
@@ -45,45 +48,36 @@ export function ReaderToolbar({ controller, view, find, onOpen, onClose }: Reade
     setPageDraft(null);
   };
 
-  const onQueryChange = (value: string) => {
-    queryRef.current = value;
-    setQuery(value);
-    controller.find(value);
-  };
-
-  const onFindKey = (event: KeyboardEvent<HTMLInputElement>) => {
-    if (event.key === 'Enter') {
-      event.preventDefault();
-      controller.find(queryRef.current, { again: true, previous: event.shiftKey });
-    } else if (event.key === 'Escape') {
-      onQueryChange('');
-    }
-  };
-
   return (
-    <div className="reader-toolbar" role="toolbar" aria-label={t('readerTitle')}>
-      <button type="button" className="button button--primary" onClick={onOpen}>
-        {t('readerOpen')}
-      </button>
-
-      <button type="button" className="button" disabled={disabled} onClick={onClose}>
-        {t('readerClose')}
-      </button>
-
+    <div className="reader-toolbar">
       <div className="reader-toolbar__group">
         <button
+          ref={openRef}
           type="button"
-          className="button"
+          className="clavis-button clavis-button--primary"
+          onClick={onOpen}
+        >
+          {t('readerOpen')}
+        </button>
+        <button type="button" className="clavis-button" disabled={disabled} onClick={onClose}>
+          {t('readerClose')}
+        </button>
+      </div>
+
+      <div className="reader-toolbar__group" role="group" aria-label={t('readerGroupPages')}>
+        <button
+          type="button"
+          className="clavis-button reader-icon-button"
           disabled={disabled}
           onClick={() => controller.previousPage()}
           aria-label={t('readerPrevPage')}
           title={t('readerPrevPage')}
         >
-          ‹
+          <span aria-hidden="true">‹</span>
         </button>
-        <form className="reader-toolbar__page" onSubmit={commitPage}>
+        <form className="reader-toolbar__page" onSubmit={commitPage} noValidate>
           <input
-            className="reader-input reader-input--page"
+            className="clavis-input reader-input reader-input--page"
             type="number"
             inputMode="numeric"
             min={1}
@@ -99,29 +93,29 @@ export function ReaderToolbar({ controller, view, find, onOpen, onClose }: Reade
         </form>
         <button
           type="button"
-          className="button"
+          className="clavis-button reader-icon-button"
           disabled={disabled}
           onClick={() => controller.nextPage()}
           aria-label={t('readerNextPage')}
           title={t('readerNextPage')}
         >
-          ›
+          <span aria-hidden="true">›</span>
         </button>
       </div>
 
-      <div className="reader-toolbar__group">
+      <div className="reader-toolbar__group" role="group" aria-label={t('readerGroupZoom')}>
         <button
           type="button"
-          className="button"
+          className="clavis-button reader-icon-button"
           disabled={disabled}
           onClick={() => controller.zoomOut()}
           aria-label={t('readerZoomOut')}
           title={t('readerZoomOut')}
         >
-          −
+          <span aria-hidden="true">−</span>
         </button>
         <select
-          className="reader-input"
+          className="clavis-select reader-input reader-input--zoom"
           disabled={disabled}
           aria-label={t('readerZoomLabel')}
           data-testid="zoom-select"
@@ -144,59 +138,38 @@ export function ReaderToolbar({ controller, view, find, onOpen, onClose }: Reade
         </select>
         <button
           type="button"
-          className="button"
+          className="clavis-button reader-icon-button"
           disabled={disabled}
           onClick={() => controller.zoomIn()}
           aria-label={t('readerZoomIn')}
           title={t('readerZoomIn')}
         >
-          +
+          <span aria-hidden="true">+</span>
         </button>
         <button
           type="button"
-          className="button"
+          className="clavis-button"
           disabled={disabled}
           onClick={() => controller.fitWidth()}
+          data-testid="fit-width"
         >
           {t('readerFitWidth')}
         </button>
       </div>
 
-      <div className="reader-toolbar__group reader-toolbar__find">
-        <input
-          className="reader-input reader-input--find"
-          type="search"
+      <div className="reader-toolbar__group">
+        <button
+          type="button"
+          className="clavis-button reader-toggle"
           disabled={disabled}
-          placeholder={t('readerFindLabel')}
-          aria-label={t('readerFindLabel')}
-          data-testid="find-input"
-          value={query}
-          onChange={(e) => onQueryChange(e.target.value)}
-          onKeyDown={onFindKey}
-        />
-        <button
-          type="button"
-          className="button"
-          disabled={disabled || query.trim() === ''}
-          onClick={() => controller.find(query, { again: true, previous: true })}
-          aria-label={t('readerFindPrev')}
-          title={t('readerFindPrev')}
+          aria-pressed={findOpen}
+          aria-controls={findOpen ? 'reader-find-bar' : undefined}
+          aria-keyshortcuts="Control+F Meta+F"
+          onClick={onToggleFind}
+          data-testid="find-toggle"
         >
-          ↑
+          {t('readerFindToggle')}
         </button>
-        <button
-          type="button"
-          className="button"
-          disabled={disabled || query.trim() === ''}
-          onClick={() => controller.find(query, { again: true })}
-          aria-label={t('readerFindNext')}
-          title={t('readerFindNext')}
-        >
-          ↓
-        </button>
-        <span className="reader-toolbar__find-status" role="status" data-testid="find-status">
-          <FindSummary find={find} />
-        </span>
       </div>
     </div>
   );

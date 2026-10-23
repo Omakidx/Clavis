@@ -1,189 +1,296 @@
 // @vitest-environment jsdom
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { LIMITS } from '../../../lib/config/constants';
 import { selectionSnapshotSchema } from '../../../lib/contracts';
+import { trimCaptured } from '../../../lib/selection/capture';
+import { markOwnUi } from '../../../lib/selection/own-ui';
 import {
   RAW_SELECTION_CAP,
-  classifyKind,
-  readPdfSelection,
-  toPdfSelectionSnapshot,
+  capturePdfSelection,
+  pageOfLayer,
+  textLayerOf,
+  viewerRects,
 } from '../../../lib/pdf/selection';
+import { buildViewer, layerOf, mockPdfLayout, select, spanTexts } from './support';
 
-/** Minimal DOM shaped like PDF.js output: .page[data-page-number] > .textLayer > span*. */
-function buildViewer(pages: Array<{ number: number; spans: string[] }>): HTMLElement {
-  const root = document.createElement('div');
-  for (const p of pages) {
-    const page = document.createElement('div');
-    page.className = 'page';
-    page.dataset['pageNumber'] = String(p.number);
-    const layer = document.createElement('div');
-    layer.className = 'textLayer';
-    for (const text of p.spans) {
-      const span = document.createElement('span');
-      span.textContent = text;
-      layer.append(span);
-      layer.append(document.createElement('br'));
-    }
-    page.append(layer);
-    root.append(page);
-  }
-  document.body.append(root);
-  return root;
-}
-
-function select(from: Node, fromOffset: number, to: Node, toOffset: number): Selection {
-  const selection = document.getSelection()!;
-  selection.setBaseAndExtent(from, fromOffset, to, toOffset);
-  return selection;
-}
-
+beforeEach(() => mockPdfLayout());
 afterEach(() => {
   document.getSelection()?.removeAllRanges();
   document.body.replaceChildren();
 });
 
-describe('readPdfSelection', () => {
-  it('returns the exact selected string and the page it starts on', () => {
+const capture = (root: HTMLElement) => capturePdfSelection(window, root);
+
+describe('capturePdfSelection', () => {
+  it('builds a schema-valid pdf snapshot: source, page, kind, text and same-page context', () => {
     const root = buildViewer([
-      { number: 3, spans: ['The quick brown fox jumps over the lazy dog.'] },
+      { number: 2, spans: ['Elsewhere.'] },
+      {
+        number: 3,
+        spans: ['The quick brown fox jumps over the lazy dog.', 'Next line on page three.'],
+      },
     ]);
-    const text = root.querySelector('span')!.firstChild!;
-    const picked = readPdfSelection(select(text, 4, text, 19), root);
-    expect(picked).toEqual({ text: 'quick brown fox', page: 3, truncated: false });
+    const first = spanTexts(layerOf(root, 3))[0]!;
+    select(first, 0, first, first.length);
+    const captured = capture(root)!;
+    expect(captured).not.toBeNull();
+    expect(selectionSnapshotSchema.safeParse(captured.snapshot).success).toBe(true);
+    expect(captured.snapshot).toMatchObject({
+      source: 'pdf',
+      page: 3,
+      kind: 'sentence',
+      text: 'The quick brown fox jumps over the lazy dog.',
+      contextAfter: 'Next line on page three.',
+    });
+    expect(captured.snapshot.contextBefore).toBeUndefined();
+    expect(JSON.stringify(captured.snapshot)).not.toContain('Elsewhere');
+    expect(captured.overLimit).toBe(false);
   });
 
-  it('normalises whitespace and line breaks inside a multi-line selection', () => {
-    const root = buildViewer([{ number: 1, spans: ['First line  ', 'second   line'] }]);
-    const spans = root.querySelectorAll('span');
-    const picked = readPdfSelection(
-      select(spans[0]!.firstChild!, 0, spans[1]!.firstChild!, 13),
-      root,
-    );
-    expect(picked?.text).toBe('First line second line');
-  });
-
-  it('reports the page where a cross-page selection starts', () => {
+  it('classifies with the shared classifier: word, phrase, sentence, passage', () => {
     const root = buildViewer([
-      { number: 7, spans: ['end of page seven'] },
-      { number: 8, spans: ['start of page eight'] },
+      {
+        number: 1,
+        spans: [
+          'Clavis',
+          'quick brown fox',
+          'The quick brown fox jumps over the lazy dog.',
+          'One sentence here. And a second sentence follows it.',
+        ],
+      },
     ]);
-    const spans = root.querySelectorAll('span');
-    const picked = readPdfSelection(
-      select(spans[0]!.firstChild!, 4, spans[1]!.firstChild!, 8),
-      root,
+    const kinds = spanTexts(layerOf(root, 1)).map((node) => {
+      select(node, 0, node, node.length);
+      return capture(root)?.snapshot.kind;
+    });
+    expect(kinds).toEqual(['word', 'phrase', 'sentence', 'passage']);
+  });
+
+  it('normalizes whitespace and invisible characters like webpage selections', () => {
+    const root = buildViewer([{ number: 1, spans: ['First­ line  ', 'second​   line'] }]);
+    const spans = spanTexts(layerOf(root, 1));
+    select(spans[0]!, 0, spans[1]!, spans[1]!.length);
+    expect(capture(root)?.snapshot.text).toBe('First line second line');
+  });
+
+  it('adds no unknown keys (the contract is strict) and no language hint from the reader UI', () => {
+    document.documentElement.lang = 'en';
+    const root = buildViewer([{ number: 1, spans: ['Hello there world'] }]);
+    const node = spanTexts(layerOf(root, 1))[0]!;
+    select(node, 6, node, 11);
+    const snapshot = capture(root)!.snapshot;
+    expect(Object.keys(snapshot).sort()).toEqual(
+      ['contextAfter', 'contextBefore', 'kind', 'page', 'selectionId', 'source', 'text'].sort(),
     );
-    expect(picked?.page).toBe(7);
+    document.documentElement.removeAttribute('lang');
   });
 
-  it('ignores collapsed selections and nothing selected', () => {
-    const root = buildViewer([{ number: 1, spans: ['abc'] }]);
-    const text = root.querySelector('span')!.firstChild!;
-    expect(readPdfSelection(select(text, 1, text, 1), root)).toBeNull();
-    expect(readPdfSelection(null, root)).toBeNull();
+  it('uses a language set by the PDF inside the viewer', () => {
+    const root = buildViewer([{ number: 1, spans: ['Bonjour le monde'] }]);
+    layerOf(root, 1).setAttribute('lang', 'fr');
+    const node = spanTexts(layerOf(root, 1))[0]!;
+    select(node, 0, node, 7);
+    expect(capture(root)?.snapshot.languageHint).toBe('fr');
   });
 
-  it('ignores a selection whose ends are outside the PDF text layers', () => {
-    const root = buildViewer([{ number: 1, spans: ['inside the pdf'] }]);
+  it('reports the page where a cross-page selection starts and gives it no "after" context', () => {
+    const root = buildViewer([
+      { number: 7, spans: ['before seven', 'end of page seven'] },
+      { number: 8, spans: ['start of page eight', 'only on eight'] },
+    ]);
+    const seven = spanTexts(layerOf(root, 7));
+    const eight = spanTexts(layerOf(root, 8));
+    select(seven[1]!, 4, eight[0]!, 8);
+    const captured = capture(root)!;
+    expect(captured.snapshot.page).toBe(7);
+    expect(captured.snapshot.contextAfter).toBeUndefined();
+    expect(captured.snapshot.contextBefore).toBe('before seven end');
+    expect(JSON.stringify(captured.snapshot)).not.toContain('only on eight');
+  });
+
+  it('ignores collapsed selections, nothing selected, and selections outside the viewer', () => {
+    const root = buildViewer([{ number: 1, spans: ['abc def'] }]);
+    const node = spanTexts(layerOf(root, 1))[0]!;
+    select(node, 1, node, 1);
+    expect(capture(root)).toBeNull();
+    document.getSelection()?.removeAllRanges();
+    expect(capture(root)).toBeNull();
+
     const outside = document.createElement('p');
     outside.textContent = 'toolbar text';
     document.body.append(outside);
-    const inside = root.querySelector('span')!.firstChild!;
-    expect(
-      readPdfSelection(select(outside.firstChild!, 0, outside.firstChild!, 7), root),
-    ).toBeNull();
-    // One end inside, one end outside (a drag that ran off the page) is not a PDF selection either.
-    expect(readPdfSelection(select(inside, 0, outside.firstChild!, 7), root)).toBeNull();
+    select(outside.firstChild!, 0, outside.firstChild!, 7);
+    expect(capture(root)).toBeNull();
+    // One end inside, one outside (a drag that ran off the page) is not a PDF selection.
+    select(node, 0, outside.firstChild!, 7);
+    expect(capture(root)).toBeNull();
   });
 
-  it('ignores a selection in a text layer that belongs to another viewer root', () => {
+  it('ignores a selection in a text layer that belongs to another viewer', () => {
     const mine = buildViewer([{ number: 1, spans: ['mine'] }]);
     const other = buildViewer([{ number: 1, spans: ['other'] }]);
-    const text = other.querySelector('span')!.firstChild!;
-    expect(readPdfSelection(select(text, 0, text, 3), mine)).toBeNull();
+    const node = spanTexts(layerOf(other, 1))[0]!;
+    select(node, 0, node, 3);
+    expect(capture(mine)).toBeNull();
   });
 
-  it('cuts text longer than the selection limit and flags it', () => {
+  it('ignores a selection when focus is in an input (the find box)', () => {
+    const root = buildViewer([{ number: 1, spans: ['abc def'] }]);
+    const input = document.createElement('input');
+    document.body.append(input);
+    input.focus();
+    const node = spanTexts(layerOf(root, 1))[0]!;
+    select(node, 0, node, 3);
+    expect(capture(root)).toBeNull();
+  });
+
+  it("ignores a selection inside Clavis's own toolbar", () => {
+    const root = buildViewer([{ number: 1, spans: ['abc def'] }]);
+    const node = spanTexts(layerOf(root, 1))[0]!;
+    markOwnUi(root);
+    select(node, 0, node, 3);
+    expect(capture(root)).toBeNull();
+  });
+
+  it('ignores a selection that is not rendered', () => {
+    const root = buildViewer([{ number: 1, spans: ['abc def'] }]);
+    const node = spanTexts(layerOf(root, 1))[0]!;
+    select(node, 0, node, 3);
+    Object.defineProperty(Range.prototype, 'getClientRects', {
+      configurable: true,
+      writable: true,
+      value: () => [],
+    });
+    expect(capture(root)).toBeNull();
+  });
+
+  it('cuts an over-limit selection, marks it a passage and keeps the full text for "use the first N"', () => {
     const long = 'word '.repeat(LIMITS.maxSelectionChars);
     const root = buildViewer([{ number: 2, spans: [long] }]);
-    const text = root.querySelector('span')!.firstChild!;
-    const picked = readPdfSelection(select(text, 0, text, long.length), root);
-    expect(picked?.truncated).toBe(true);
-    expect(picked!.text.length).toBeLessThanOrEqual(LIMITS.maxSelectionChars);
-    expect(picked!.text.startsWith('word word')).toBe(true);
+    const node = spanTexts(layerOf(root, 2))[0]!;
+    select(node, 0, node, long.length);
+    const captured = capture(root)!;
+    expect(captured.overLimit).toBe(true);
+    expect(captured.snapshot.kind).toBe('passage');
+    expect(captured.snapshot.text.length).toBeLessThanOrEqual(LIMITS.maxSelectionChars);
+    expect(captured.fullText!.length).toBeGreaterThan(LIMITS.maxSelectionChars);
+
+    // The toolbar's trim action keeps the page and the source.
+    const trimmed = trimCaptured(captured);
+    expect(trimmed.snapshot).toMatchObject({ source: 'pdf', page: 2 });
+    expect(trimmed.snapshot.text.length).toBeLessThanOrEqual(LIMITS.maxSelectionChars);
+    expect(trimmed.snapshot.selectionId).not.toBe(captured.snapshot.selectionId);
+    expect(selectionSnapshotSchema.safeParse(trimmed.snapshot).success).toBe(true);
   });
 
-  it('bounds the raw string before normalising a huge selection', () => {
-    // 3 MB of text in 4 spans: normalising everything would be wasted work and memory.
+  it('bounds the raw string before normalizing a huge selection', () => {
     const chunk = 'lorem  ipsum\n'.repeat(250_000); // ~3.25 MB
     const root = buildViewer([{ number: 5, spans: [chunk, chunk, chunk, chunk] }]);
-    const spans = root.querySelectorAll('span');
-    const sel = select(spans[0]!.firstChild!, 0, spans[3]!.firstChild!, chunk.length);
+    const spans = spanTexts(layerOf(root, 5));
+    select(spans[0]!, 0, spans[3]!, chunk.length);
     const spy = vi.spyOn(String.prototype, 'replace');
-    const picked = readPdfSelection(sel, root)!;
+    const captured = capture(root)!;
     const longest = Math.max(...spy.mock.instances.map((s) => String(s).length));
     spy.mockRestore();
     expect(longest).toBeLessThanOrEqual(RAW_SELECTION_CAP);
     expect(RAW_SELECTION_CAP).toBe(LIMITS.maxSelectionChars * 4);
-    expect(picked.truncated).toBe(true);
-    expect(picked.page).toBe(5);
-    expect(picked.text.length).toBeLessThanOrEqual(LIMITS.maxSelectionChars);
-    expect(picked.text.startsWith('lorem ipsum lorem ipsum')).toBe(true);
-  });
-
-  it('does not split a surrogate pair at the raw cap', () => {
-    const emoji = '\u{1F600}';
-    const text = `${'a'.repeat(RAW_SELECTION_CAP - 1)}${emoji}${emoji}`;
-    const root = buildViewer([{ number: 1, spans: [text] }]);
-    const node = root.querySelector('span')!.firstChild!;
-    const picked = readPdfSelection(select(node, 0, node, text.length), root)!;
-    expect(picked.truncated).toBe(true);
-    const last = picked.text.charCodeAt(picked.text.length - 1);
-    expect(last >= 0xd800 && last <= 0xdbff).toBe(false);
+    expect(captured.overLimit).toBe(true);
+    expect(captured.snapshot.page).toBe(5);
+    expect(captured.snapshot.text.length).toBeLessThanOrEqual(LIMITS.maxSelectionChars);
   });
 
   it('does not split a surrogate pair when cutting', () => {
-    const emoji = '\u{1F600}'; // two UTF-16 code units
+    const emoji = '\u{1F600}';
     const long = `${'a'.repeat(LIMITS.maxSelectionChars - 1)}${emoji}${emoji}`;
     const root = buildViewer([{ number: 1, spans: [long] }]);
-    const text = root.querySelector('span')!.firstChild!;
-    const picked = readPdfSelection(select(text, 0, text, long.length), root)!;
-    const last = picked.text.charCodeAt(picked.text.length - 1);
+    const node = spanTexts(layerOf(root, 1))[0]!;
+    select(node, 0, node, long.length);
+    const text = capture(root)!.snapshot.text;
+    const last = text.charCodeAt(text.length - 1);
     expect(last >= 0xd800 && last <= 0xdbff).toBe(false);
   });
-});
 
-describe('toPdfSelectionSnapshot', () => {
-  it('builds a schema-valid pdf snapshot with the page number', () => {
-    const snapshot = toPdfSelectionSnapshot({
-      text: 'A full sentence is here.',
-      page: 12,
-      truncated: false,
-    });
-    expect(snapshot).not.toBeNull();
-    expect(selectionSnapshotSchema.parse(snapshot)).toMatchObject({
-      source: 'pdf',
-      page: 12,
-      kind: 'sentence',
-      text: 'A full sentence is here.',
-    });
-  });
-
-  it('uses the given selection id and rejects an impossible page', () => {
-    const id = '3f2b8c1e-5d4a-4c2b-9e1f-0a1b2c3d4e5f';
-    expect(toPdfSelectionSnapshot({ text: 'x', page: 1, truncated: false }, id)?.selectionId).toBe(
-      id,
-    );
-    expect(toPdfSelectionSnapshot({ text: 'x', page: 0, truncated: false })).toBeNull();
+  it('keeps the range live so the toolbar can follow scrolling, and hides it when collapsed', () => {
+    const root = buildViewer([{ number: 1, spans: ['abc def ghi'] }]);
+    root.classList.add('viewer');
+    const node = spanTexts(layerOf(root, 1))[0]!;
+    select(node, 0, node, 3);
+    const captured = capture(root)!;
+    expect(captured.getRects()).not.toBeNull();
+    captured.range.collapse();
+    expect(captured.getRects()).toBeNull();
   });
 });
 
-describe('classifyKind', () => {
-  it.each([
-    ['Clavis', 'word'],
-    ['quick brown fox', 'phrase'],
-    ['The quick brown fox jumps over the lazy dog.', 'sentence'],
-    ['One sentence here. And a second sentence follows it.', 'passage'],
-  ] as const)('classifies %j as %s', (text, kind) => {
-    expect(classifyKind(text)).toBe(kind);
+describe('textLayerOf / pageOfLayer', () => {
+  it('finds the text layer and page, only inside the given root', () => {
+    const a = buildViewer([{ number: 9, spans: ['x'] }]);
+    const b = buildViewer([{ number: 1, spans: ['y'] }]);
+    const node = spanTexts(layerOf(a, 9))[0]!;
+    expect(textLayerOf(node, a)).toBe(layerOf(a, 9));
+    expect(textLayerOf(node, b)).toBeNull();
+    expect(textLayerOf(document.body, a)).toBeNull();
+    expect(pageOfLayer(layerOf(a, 9))).toBe(9);
+    expect(pageOfLayer(document.createElement('div'))).toBeNull();
+  });
+});
+
+describe('viewerRects (toolbar follows the viewer, hides when scrolled out)', () => {
+  const rangeWithRects = (boxes: Array<[number, number, number, number]>): Range => {
+    const range = document.createRange();
+    range.selectNodeContents(document.body);
+    const list = boxes.map(([left, top, right, bottom]) => ({
+      left,
+      top,
+      right,
+      bottom,
+      width: right - left,
+      height: bottom - top,
+    }));
+    Object.defineProperty(range, 'getClientRects', { value: () => list });
+    return range;
+  };
+  const viewer = (box: [number, number, number, number]): Element => {
+    const el = document.createElement('div');
+    el.getBoundingClientRect = () =>
+      ({
+        left: box[0],
+        top: box[1],
+        right: box[2],
+        bottom: box[3],
+        width: box[2] - box[0],
+        height: box[3] - box[1],
+      }) as DOMRect;
+    return el;
+  };
+
+  it('returns the rects unchanged while the selection is inside the viewer', () => {
+    const rects = viewerRects(rangeWithRects([[100, 200, 300, 220]]), viewer([0, 100, 1000, 700]));
+    expect(rects?.bounds).toEqual({ left: 100, top: 200, right: 300, bottom: 220 });
+  });
+
+  it('is null when the selection is scrolled completely above or below the viewer', () => {
+    const above = viewerRects(rangeWithRects([[100, 20, 300, 40]]), viewer([0, 100, 1000, 700]));
+    const below = viewerRects(rangeWithRects([[100, 900, 300, 920]]), viewer([0, 100, 1000, 700]));
+    expect(above).toBeNull();
+    expect(below).toBeNull();
+  });
+
+  it('clips a line that is only partly visible', () => {
+    const rects = viewerRects(rangeWithRects([[100, 80, 300, 120]]), viewer([0, 100, 1000, 700]));
+    expect(rects?.first).toEqual({ left: 100, top: 100, right: 300, bottom: 120 });
+  });
+
+  it('anchors to the visible part when the first line is scrolled out but a later one is not', () => {
+    const rects = viewerRects(
+      rangeWithRects([
+        [100, 60, 300, 80],
+        [100, 150, 300, 170],
+      ]),
+      viewer([0, 100, 1000, 700]),
+    )!;
+    expect(rects.bounds).toEqual({ left: 100, top: 150, right: 300, bottom: 170 });
+    expect(rects.first).toEqual({ left: 100, top: 150, right: 300, bottom: 170 });
+    expect(rects.last).toEqual({ left: 100, top: 150, right: 300, bottom: 170 });
   });
 });

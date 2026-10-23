@@ -318,7 +318,7 @@ function gatherAfter(range: Range, scope: Element, rawLimit: number): string {
 }
 
 /** Last `limit` characters, starting on a word boundary when text had to be cut. */
-function tail(text: string, limit: number): string {
+export function tail(text: string, limit: number): string {
   if (text.length <= limit) return text;
   const cut = text.slice(text.length - limit);
   const startsMidWord = text.charAt(text.length - limit - 1) !== ' ' && !cut.startsWith(' ');
@@ -328,7 +328,7 @@ function tail(text: string, limit: number): string {
 }
 
 /** First `limit` characters, ending on a word boundary when text had to be cut. */
-function head(text: string, limit: number): string {
+export function head(text: string, limit: number): string {
   if (text.length <= limit) return text;
   const cut = text.slice(0, limit);
   const endsMidWord = text.charAt(limit) !== ' ' && !cut.endsWith(' ');

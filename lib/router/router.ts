@@ -22,8 +22,6 @@ export interface SenderRule {
   content?: boolean;
   /** Extension pages, by exact path. */
   pages?: readonly ExtensionPagePath[];
-  /** The offscreen document. */
-  offscreen?: boolean;
 }
 
 export type ParseResult<T> = { ok: true; message: T } | { ok: false };
@@ -39,7 +37,7 @@ export interface RouteDefinition<T> {
   /** Returns the reply (an object) or `undefined` for none. May be async. */
   handle: (message: T, context: RouteContext) => unknown;
   /**
-   * `false` for fire-and-forget routes (offscreen events): the handler runs but the
+   * `false` for fire-and-forget routes: the handler runs but the
    * channel is closed without a reply. Default `true`.
    */
   replies?: boolean;
@@ -81,8 +79,6 @@ export function senderAllowed(rule: SenderRule, sender: ClassifiedSender): boole
   switch (sender.kind) {
     case 'content':
       return rule.content === true;
-    case 'offscreen':
-      return rule.offscreen === true;
     case 'extension':
       return (
         sender.path !== undefined &&

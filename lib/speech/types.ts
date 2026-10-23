@@ -7,19 +7,11 @@ export interface SpeechVoice {
   name: string;
   /** BCP-47-ish tag as reported by the engine; empty string when the engine gave none. */
   lang: string;
-  /** Network voice: higher latency, and the text leaves the device (requirements §4.3 disclosure). */
+  /** Network voice: higher latency, and the text leaves the device (requirements §4.3, D-22). */
   remote: boolean;
   engine: SpeechEngineId;
   /** chrome.tts only: event types the voice promises to send. Absent means unknown. */
   eventTypes?: readonly string[] | undefined;
-}
-
-/** What one engine reported when surveyed for the Settings voice report (GET_VOICES). */
-export interface EngineSurvey {
-  engine: SpeechEngineId;
-  /** False when the engine could not run at all (no `speechSynthesis`, offscreen document failed). */
-  available: boolean;
-  voices: SpeechVoice[];
 }
 
 /** User-visible lifecycle of one utterance. `speak()` resolving means `started`. */
@@ -76,28 +68,20 @@ export interface EngineSpeakRequest {
   voice?: SpeechVoice | undefined;
 }
 
-/** Engine-agnostic contract implemented by chrome.tts and the offscreen Web Speech engine. */
+/** What the speech service needs from an engine (today only chrome.tts; D-07). Faked in tests. */
 export interface SpeechEngine {
   readonly id: SpeechEngineId;
   /**
-   * May reject; the service treats a rejection as "engine unavailable". May wait (bounded) for a
-   * voice list that loads late. An empty answer is remembered until `invalidate()` or
+   * May reject; the service treats a rejection as "engine unavailable". May wait (bounded) once
+   * for a voice list that loads late. An empty answer is remembered until `invalidate()` or
    * `refresh: true`, so a machine without voices is not made to wait on every request.
    */
   getVoices(options?: { refresh?: boolean }): Promise<SpeechVoice[]>;
-  /** Voices known right now, never waiting and never creating resources. Optional. */
-  peekVoices?(): Promise<SpeechVoice[]>;
-  /** Forget remembered "no voices" answers (the platform's voice list changed). Optional. */
+  /** Forget a remembered "no voices" answer (the platform's voice list changed). Optional. */
   invalidate?(): void;
-  /**
-   * Fresh voices plus whether the engine can run at all, for the Settings report. Releases any
-   * resource it had to create (the offscreen document). Optional: without it `getVoices`
-   * with `refresh` is used.
-   */
-  survey?(): Promise<{ available: boolean; voices: SpeechVoice[] }>;
   /** Resolves when the utterance was dispatched (NOT when audio started). Events go to `sink`. */
   speak(request: EngineSpeakRequest, sink: (event: EngineEvent) => void): Promise<void>;
-  /** Stops current speech. Must not create resources (e.g. an offscreen document). */
+  /** Stops current speech. */
   stop(): Promise<void>;
 }
 
