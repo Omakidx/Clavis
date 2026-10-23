@@ -6,6 +6,7 @@ import type {
   ActionContext,
   CardSurface,
   DismissReason,
+  ListenReport,
   ToolbarActionResult,
   ToolbarHandle,
   ToolbarOptions,
@@ -15,7 +16,7 @@ import { t, type MessageKey } from '../../lib/i18n';
 import { isInsideComposed, modalDialogOf } from './mount';
 import { placeToolbar, type Placement, type Viewport } from './position';
 import css from './toolbar.css?inline';
-import type { ButtonName, ToolbarMode, ToolbarViewProps } from './view';
+import type { ButtonName, ListenViewState, ToolbarMode, ToolbarViewProps } from './view';
 
 /** Renders the shared toolbar tree with one UI library (Preact in production). */
 export interface ViewRenderer {
@@ -69,6 +70,10 @@ function applyStyles(shadow: ShadowRoot, doc: Document): void {
   }
 }
 
+function idleListen(slow: boolean): ListenViewState {
+  return { status: 'idle', slow, message: '', hint: '', note: '' };
+}
+
 function isThenable(value: unknown): value is PromiseLike<void> {
   return typeof (value as PromiseLike<void> | undefined)?.then === 'function';
 }
@@ -95,6 +100,10 @@ export function createToolbar(
   let card: ToolbarViewProps['card'] = null;
   let trimmed: ToolbarViewProps['trimmed'] = null;
   let busy: ToolbarViewProps['busy'] = null;
+  /** Where Listen is, from what its action reported. Reset for every selection. */
+  let listenView: ListenViewState = idleListen(false);
+  /** The user's choice with the Slow toggle for this selection; undefined = the speed in use. */
+  let slowChoice: boolean | undefined;
   let live = '';
   let previousFocus: Element | null = null;
   let visible = false;
@@ -102,15 +111,24 @@ export function createToolbar(
   let releaseTimer: number | undefined;
   let announceTimer: number | undefined;
   let frame = 0;
-  /** Invalidates the settle callback of an action that was superseded or dismissed. */
-  let run = 0;
-  let runAbort: AbortController | null = null;
+  /**
+   * One slot per action, so Listen and Explain never abort each other. `id` invalidates the settle
+   * callback of a run that was superseded or dismissed.
+   */
+  const runs: Record<'listen' | 'explain', { id: number; abort: AbortController | null }> = {
+    listen: { id: 0, abort: null },
+    explain: { id: 0, abort: null },
+  };
 
-  /** Drop the running action: its outcome is ignored and its `signal` is aborted. */
-  function cancelRun(): void {
-    run += 1;
-    runAbort?.abort();
-    runAbort = null;
+  /** Drop the running action(s): the outcome is ignored and the `signal` is aborted. */
+  function cancelRun(name?: 'listen' | 'explain'): void {
+    for (const key of name === undefined ? (['listen', 'explain'] as const) : [name]) {
+      const slot = runs[key];
+      slot.id += 1;
+      const abort = slot.abort;
+      slot.abort = null;
+      abort?.abort();
+    }
   }
 
   const props = (): ToolbarViewProps => ({
@@ -120,6 +138,7 @@ export function createToolbar(
     card,
     trimmed,
     busy,
+    listen: listenView,
     live,
     onAction: handleAction,
   });
@@ -150,9 +169,97 @@ export function createToolbar(
       hide('close');
       return;
     }
+    if (name === 'voice-settings') {
+      actions.openVoiceSettings?.();
+      return;
+    }
+    if (name === 'slow') {
+      listenView = { ...listenView, slow: !listenView.slow };
+      slowChoice = listenView.slow;
+      render();
+      return;
+    }
     if (selection === null) return;
     if (name === 'trim') trim(selection);
-    else perform(name, selection);
+    else if (name === 'listen') pressListen(selection);
+    else perform('explain', selection);
+  }
+
+  /** What a Listen report means for the buttons and the live region (never guessed). */
+  function applyListen(report: ListenReport): void {
+    const slow = 'slow' in report && report.slow !== undefined ? report.slow : listenView.slow;
+    const next = idleListen(slow);
+    let spoken = '';
+    if (report.status === 'starting') {
+      next.status = 'starting';
+      spoken = t('speechStarting');
+    } else if (report.status === 'playing') {
+      next.status = 'playing';
+      // Every playback with an online voice says so (privacy: the text leaves the device).
+      if (report.remote) next.note = t('speechRemoteNote');
+      spoken = [t('speechPlaying'), next.note].filter(Boolean).join(' ');
+    } else if (report.status === 'ended') {
+      next.status = 'ended';
+      if (report.message !== undefined) next.message = spoken = t(report.message);
+    } else if (report.status !== 'idle') {
+      next.status = report.status;
+      next.message = t(report.message);
+      if (report.hint !== undefined) next.hint = t(report.hint);
+      spoken = [next.message, next.hint].filter(Boolean).join(' ');
+    }
+    listenView = next;
+    if (spoken !== '') announce(spoken);
+    render();
+  }
+
+  /** Listen button: Stop while playing, otherwise start (or replay) the selection. */
+  function pressListen(current: CapturedSelection): void {
+    if (listenView.status === 'starting' || listenView.status === 'playing') {
+      // Aborting the run is what stops (or cancels the start of) the audio: the action listens to
+      // its signal and sends TTS_STOP. Cancel works while starting too, so a slow start is never a trap.
+      cancelRun('listen');
+      applyListen({ status: 'idle' });
+      announce(t('speechStopped'));
+      return;
+    }
+    const { snapshot, overLimit } = current;
+    // Another Listen press supersedes the previous utterance; Explain is not touched.
+    cancelRun('listen');
+    const id = runs.listen.id;
+    const control = new AbortController();
+    runs.listen.abort = control;
+    const isCurrent = (): boolean => id === runs.listen.id && visible;
+    let result: ToolbarActionResult;
+    try {
+      result = actions.listen?.({
+        snapshot,
+        overLimit,
+        signal: control.signal,
+        listen: {
+          slow: slowChoice,
+          report: (report) => {
+            if (isCurrent()) applyListen(report);
+          },
+        },
+      });
+    } catch {
+      result = Promise.reject(new Error('action failed'));
+    }
+    if (!isThenable(result)) return;
+    if (listenView.status === 'idle') applyListen({ status: 'starting' });
+    result.then(
+      () => {
+        if (isCurrent() && listenView.status === 'starting') applyListen({ status: 'idle' });
+      },
+      (error: unknown) => {
+        if (!isCurrent()) return;
+        const key = (error as { messageKey?: unknown } | null)?.messageKey;
+        applyListen({
+          status: 'failed',
+          message: (typeof key === 'string' ? key : 'toolbarActionFailed') as MessageKey,
+        });
+      },
+    );
   }
 
   /** "Use the first 2,000 characters": local only, the new snapshot is shown before anything is sent. */
@@ -163,7 +270,9 @@ export function createToolbar(
     mode = 'actions';
     card = null;
     busy = null;
+    // A different text: playback of the old one stops and its state is gone.
     cancelRun();
+    listenView = idleListen(listenView.slow);
     const length = next.snapshot.text.length;
     trimmed = { text: next.snapshot.text, length };
     render();
@@ -178,19 +287,14 @@ export function createToolbar(
   }
 
   /** What an action may use to draw its own card (see `CardSurface`); valid for run `id` only. */
-  function createSurface(
-    name: 'listen' | 'explain',
-    id: number,
-    text: string,
-    keyboard: boolean,
-  ): CardSurface {
-    const current = (): boolean => id === run && visible;
+  function createSurface(id: number, text: string, keyboard: boolean): CardSurface {
+    const current = (): boolean => id === runs.explain.id && visible;
     return {
       keyboard,
       open() {
         if (!current() || panelParent === null) return null;
         if (card?.slot !== true) {
-          card = { action: name, text, note: '', slot: true };
+          card = { action: 'explain', text, note: '', slot: true };
           render();
         }
         return slotElement();
@@ -201,28 +305,28 @@ export function createToolbar(
       close() {
         if (!current()) return;
         const hadFocus = (shadow?.activeElement ?? null) !== null;
-        cancelRun();
+        cancelRun('explain');
         busy = null;
         card = null;
         render();
         // The focused control is about to disappear: keep keyboard users on the toolbar.
         if (hadFocus) {
           buttons()
-            .find((button) => button.getAttribute('data-action') === name)
+            .find((button) => button.getAttribute('data-action') === 'explain')
             ?.focus();
         }
       },
     };
   }
 
-  function perform(name: 'listen' | 'explain', current: CapturedSelection): void {
+  function perform(name: 'explain', current: CapturedSelection): void {
     // Uses the snapshot captured at selection end, not the live (maybe collapsed) selection.
     const { snapshot, overLimit } = current;
-    // Pressing another button (or this one again) supersedes whatever is still running.
-    cancelRun();
-    const id = run;
+    // Pressing Explain again supersedes the previous explain run; Listen keeps playing.
+    cancelRun('explain');
+    const id = runs.explain.id;
     const control = new AbortController();
-    runAbort = control;
+    runs.explain.abort = control;
     const text = snapshot.text.slice(0, CARD_TEXT_MAX_CHARS);
     const keyboard = (shadow?.activeElement ?? null) !== null;
     // The state line stays until an action that draws its own card replaces it (`surface.open()`).
@@ -233,7 +337,7 @@ export function createToolbar(
         snapshot,
         overLimit,
         signal: control.signal,
-        surface: createSurface(name, id, text, keyboard),
+        surface: createSurface(id, text, keyboard),
       });
     } catch {
       result = Promise.reject(new Error('action failed'));
@@ -248,7 +352,7 @@ export function createToolbar(
     render();
     announce(t('toolbarWorking'));
     const settle = (note: string, spoken: string): void => {
-      if (id !== run || !visible) return;
+      if (id !== runs.explain.id || !visible) return;
       busy = null;
       // A card the action drew itself keeps its own states; only the state line is replaced.
       if (card?.slot !== true) card = { action: name, text, note };
@@ -519,6 +623,8 @@ export function createToolbar(
     card = null;
     trimmed = null;
     busy = null;
+    slowChoice = undefined;
+    listenView = idleListen(false);
     live = '';
     notice = '';
     cancelRun();

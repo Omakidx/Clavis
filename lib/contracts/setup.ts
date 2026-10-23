@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { TTS_RATES } from '../config/constants';
 import { languageTagSchema, modelIdSchema } from './primitives';
 import { keyStorageSchema } from './key-storage';
+import { voiceNameSchema } from './speech';
 
 // Phase 3 contracts: preferences, onboarding state, key/AI/site-access status.
 // Shared by the background (owner of storage) and the extension pages (onboarding,
@@ -40,6 +41,8 @@ export const preferencesSchema = z.strictObject({
   tooltipBehavior: tooltipBehaviorSchema,
   ttsRate: ttsRateSchema,
   ttsLang: languageTagSchema.optional(),
+  /** Preferred voice name (FR-025); absent = best match for ttsLang / the selection. */
+  ttsVoice: voiceNameSchema.optional(),
   /** Absent = use the default model chosen in D-09. */
   model: modelIdSchema.optional(),
   disabledSites: z.array(hostnameSchema).max(MAX_DISABLED_SITES),
@@ -62,6 +65,7 @@ export const preferencesPatchSchema = z
     tooltipBehavior: tooltipBehaviorSchema.optional(),
     ttsRate: ttsRateSchema.optional(),
     ttsLang: languageTagSchema.nullable().optional(),
+    ttsVoice: voiceNameSchema.nullable().optional(),
     model: modelIdSchema.nullable().optional(),
     disabledSites: z.array(hostnameSchema).max(MAX_DISABLED_SITES).optional(),
   })

@@ -74,7 +74,10 @@ export async function request<S extends z.ZodType>(
   if (!parsed.success) return { ok: false, error: describeError('BAD_REPLY') };
   const envelope = parsed.data as MessageReply<z.infer<S>>;
   if (envelope.ok) return { ok: true, data: envelope.data };
-  return { ok: false, error: describeError(envelope.error.code, envelope.error.retryAfterMs) };
+  return {
+    ok: false,
+    error: describeError(envelope.error.code, envelope.error.retryAfterMs, envelope.error.reason),
+  };
 }
 
 /** For callers that need a `ClientError` without a request (client-side validation, tests). */

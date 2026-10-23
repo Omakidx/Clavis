@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { OFFSCREEN_PAGE_PATH } from '../../../lib/speech/constants';
+import { OFFSCREEN_PAGE_PATH, SPEECH_TIMING } from '../../../lib/speech/constants';
 import { createOffscreenHost, type OffscreenEnvironment } from '../../../lib/speech/offscreen-host';
 
 const PAGE_URL = `chrome-extension://abc${OFFSCREEN_PAGE_PATH}`;
@@ -140,7 +140,7 @@ describe('createOffscreenHost: close and send', () => {
     const env = makeEnv();
     env.runtime.sendMessage.mockRejectedValue(new Error('Receiving end does not exist.'));
     await expect(createOffscreenHost(env).send({})).rejects.toThrow('Receiving end');
-    expect(env.runtime.sendMessage).toHaveBeenCalledTimes(4);
+    expect(env.runtime.sendMessage).toHaveBeenCalledTimes(SPEECH_TIMING.offscreenSendRetries + 1);
 
     env.runtime.sendMessage.mockReset();
     env.runtime.sendMessage.mockRejectedValue(new Error('Extension context invalidated.'));

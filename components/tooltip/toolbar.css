@@ -14,8 +14,8 @@
   display: none !important;
 }
 
-/* No transition or animation anywhere in this toolbar, so prefers-reduced-motion has nothing to
-   reduce; if one is ever added, wrap it in @media (prefers-reduced-motion: no-preference). */
+/* The only motion is the spinner of a Listen that is starting; it rotates only when the user has
+   not asked for reduced motion (otherwise it is a static ring). */
 
 /* Colours are variables so dark mode and high contrast only re-declare them. */
 .panel {
@@ -94,6 +94,42 @@
 
 .button[data-state='working'] {
   cursor: progress;
+}
+
+/* A starting Listen can be cancelled, so it is a normal clickable button. */
+.button[data-action='listen'][data-state='working'] {
+  cursor: pointer;
+}
+
+/* Stop (Listen is playing) and the Slow toggle when it is on. A border keeps "on" visible without colour. */
+.button[data-state='playing'],
+.button[aria-pressed='true'] {
+  background: var(--hover);
+  border-color: currentColor;
+}
+
+.spinner {
+  display: inline-block;
+  box-sizing: border-box;
+  width: 0.9em;
+  height: 0.9em;
+  margin-inline-end: 6px;
+  vertical-align: -0.1em;
+  border: 2px solid currentColor;
+  border-inline-end-color: transparent;
+  border-radius: 50%;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .spinner {
+    animation: clavis-spin 0.8s linear infinite;
+  }
+}
+
+@keyframes clavis-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .button:focus-visible,
@@ -179,7 +215,9 @@
     box-shadow: none;
   }
   .button:hover,
-  .button[data-state='working'] {
+  .button[data-state='working'],
+  .button[data-state='playing'],
+  .button[aria-pressed='true'] {
     background: Highlight;
     color: HighlightText;
   }

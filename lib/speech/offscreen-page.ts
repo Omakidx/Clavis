@@ -41,12 +41,17 @@ export interface OffscreenPageDeps {
       addListener(
         listener: (
           message: unknown,
-          sender: { id?: string | undefined; tab?: unknown },
+          sender: { id?: string | undefined; tab?: unknown; url?: string | undefined },
           sendResponse: (response: unknown) => void,
         ) => boolean | undefined,
       ): void;
     };
   };
+  /**
+   * Url of the extension's service worker script (`runtime.getURL(manifest.background.service_worker)`).
+   * Commands are accepted only from a sender with exactly this url; undefined means "accept none".
+   */
+  workerUrl: string | undefined;
   /** Undefined when the page has no Web Speech support. */
   synth: SynthLike | undefined;
   createUtterance(text: string): SynthUtteranceLike;
@@ -59,8 +64,9 @@ export interface OffscreenPageDeps {
 
 /**
  * Offscreen document logic (D-07). Runs `speechSynthesis` on command from the
- * background and relays start/end/error events back. Trusts only messages from
- * this extension's own non-tab contexts (the service worker), never content scripts.
+ * background and relays start/end/error events back. Trusts only the service worker: the sender
+ * must be this extension, have no tab and have the worker script's url, so neither a content
+ * script nor another extension page (popup, options in a tab) can drive it (Phase 3 review INFO-9).
  */
 export function registerOffscreenSpeech(deps: OffscreenPageDeps): void {
   const { runtime, synth } = deps;
@@ -137,11 +143,17 @@ export function registerOffscreenSpeech(deps: OffscreenPageDeps): void {
     return {
       ok: true,
       supported: synth !== undefined,
-      voices: voices.map((voice) => ({
-        name: voice.name,
-        lang: voice.lang,
-        remote: !voice.localService,
-      })),
+      // Only voices that can be addressed by name through the contracts, and a bounded list.
+      voices: voices
+        .filter(
+          (voice) => voice.name.length >= 1 && voice.name.length <= 128 && voice.lang.length <= 64,
+        )
+        .slice(0, 2_000)
+        .map((voice) => ({
+          name: voice.name,
+          lang: voice.lang,
+          remote: !voice.localService,
+        })),
     };
   }
 
@@ -150,18 +162,22 @@ export function registerOffscreenSpeech(deps: OffscreenPageDeps): void {
   ): Promise<OffscreenAck> {
     if (synth === undefined) return { ok: false, detail: 'speechSynthesis is not available.' };
     const voices = await loadVoices();
-    const selection = selectVoice(voices.map(toVoice), command.lang);
-    if (!selection.ok) return { ok: false, detail: `No usable voice (${selection.reason}).` };
+    let chosen: SynthVoiceLike | undefined;
+    if (command.voiceName !== undefined) {
+      // The background chose a voice by name: use exactly it, never a stand-in.
+      chosen = voices.find((voice) => voice.name === command.voiceName);
+      if (chosen === undefined)
+        return { ok: false, detail: 'The requested voice is not installed.' };
+    } else {
+      const selection = selectVoice(voices.map(toVoice), command.lang);
+      if (!selection.ok) return { ok: false, detail: `No usable voice (${selection.reason}).` };
+    }
 
     clearTimeout(idleTimer);
     synth.cancel();
     const utterance = deps.createUtterance(command.text);
     if (command.lang !== undefined) utterance.lang = command.lang;
     utterance.rate = command.rate;
-    const chosen =
-      command.voiceName === undefined
-        ? undefined
-        : voices.find((voice) => voice.name === command.voiceName);
     if (chosen !== undefined) utterance.voice = chosen;
 
     const requestId = command.requestId;
@@ -186,8 +202,16 @@ export function registerOffscreenSpeech(deps: OffscreenPageDeps): void {
     ) {
       return undefined;
     }
-    // Content scripts share the extension id; only the worker (no tab) may command us.
-    if (sender.id !== runtime.id || sender.tab !== undefined) return undefined;
+    // Content scripts and every other extension page share the extension id; only the service
+    // worker may command us: no tab, and the worker script's own url.
+    if (
+      sender.id !== runtime.id ||
+      sender.tab !== undefined ||
+      deps.workerUrl === undefined ||
+      sender.url !== deps.workerUrl
+    ) {
+      return undefined;
+    }
 
     const parsed = offscreenCommandSchema.safeParse(raw);
     if (!parsed.success) {

@@ -16,6 +16,6 @@ No Critical, High or Medium findings. All Phase 2 follow-ups that were due in Ph
 | INFO-4 | Info | `CLEAR_ALL_DATA` not serialised with key writes. | **Fixed:** routed through the key store's queue. |
 | INFO-5/6/10 | Info | Copy: disabling applies on next page load; exact-host matching; IPv4 hosts couldn't be disabled; removing a key in Clavis doesn't revoke it at Groq. | **Fixed:** copy updated; IPv4 literals allowed. |
 | INFO-7 | Info | Privacy policy URL is a placeholder. | **Phase 10.** |
-| INFO-8/9 | Info | Spike-only `SPEECH_DIAGNOSE` route still live; offscreen listener accepts any tab-less extension sender. | **Phase 6.** |
+| INFO-8/9 | Info | Spike-only `SPEECH_DIAGNOSE` route still live; offscreen listener accepts any tab-less extension sender. | **Fixed in Phase 6:** `SPEECH_DIAGNOSE` removed (replaced by `GET_VOICES` for Settings); the offscreen page accepts commands only from the service worker's URL. |
 | Gap | — | A compromised reader page can read the key (it is a trusted extension context). | **Later:** consider running the PDF viewer as a sandboxed page. |
 | Gap | — | Not verified: storage access level persisting across browser restart; whether Chrome's password manager offers to save the key on extension pages. | **Phase 9** (profile-restart E2E; manual headed check). |

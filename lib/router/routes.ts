@@ -12,7 +12,6 @@ import {
   type OffscreenEventMessage,
   offscreenEventSchema,
   offscreenIdleSchema,
-  speechDiagnoseSchema,
 } from '../speech/messages';
 import { rejectedSpeakReply, type SpeechHandlers } from '../speech/background';
 import type { createAiHandlers } from './handlers/ai';
@@ -155,7 +154,11 @@ export function buildRoutes(services: RouteServices): Route[] {
     publicRoute(
       'TTS_SPEAK',
       (message, { sender }) =>
-        speech.speak(message, { tabId: sender.tabId, frameId: sender.frameId }),
+        speech.speak(message, {
+          tabId: sender.tabId,
+          frameId: sender.frameId,
+          documentId: sender.documentId,
+        }),
       { reject: (raw, why) => (why === 'shape' ? rejectedSpeakReply(raw) : invalidRequest(raw)) },
     ),
     publicRoute('TTS_STOP', (message, { sender }) =>
@@ -197,6 +200,8 @@ export function buildRoutes(services: RouteServices): Route[] {
     privilegedRoute('GET_SITE_ACCESS_STATUS', SETTINGS_SENDERS, () =>
       settings.getSiteAccessStatus(),
     ),
+    // Which voices this device has, per engine (Settings voice chooser; D-07 check).
+    privilegedRoute('GET_VOICES', SETTINGS_SENDERS, () => speech.getVoices()),
 
     // ---- internal: site access (Spike B messages, plain objects by design) ------
     defineRoute<InjectTabMessage>({
@@ -211,13 +216,6 @@ export function buildRoutes(services: RouteServices): Route[] {
     }),
 
     // ---- internal: speech ----------------------------------------------------
-    defineRoute({
-      type: 'SPEECH_DIAGNOSE',
-      // Spike-only diagnostics (removed before release, Phase 6).
-      allow: { pages: [popup, options, onboarding] },
-      parse: parseWith((raw) => speechDiagnoseSchema.safeParse(raw)),
-      handle: () => speech.diagnose(),
-    }),
     defineRoute<OffscreenEventMessage>({
       type: 'SPEECH_OFFSCREEN_EVENT',
       allow: { offscreen: true },

@@ -81,9 +81,12 @@ test.describe('practice page', () => {
     await tb(frame).waitShown();
     await tb(frame).click('listen');
     // CI and this Linux dev machine have no voices (docs/decisions/spike-d-voices.md): either is correct.
-    await expect(page.locator('main')).toContainText(/Reading aloud|no voice is available/, {
-      timeout: 15_000,
-    });
+    await expect(page.locator('main')).toContainText(
+      /Reading aloud|isn.t available on this device/,
+      {
+        timeout: 15_000,
+      },
+    );
   });
 
   test('the keyboard path opens the toolbar for the current selection, and Escape closes it', async ({

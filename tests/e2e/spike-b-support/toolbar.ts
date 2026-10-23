@@ -19,7 +19,7 @@ interface DomNode {
   documentURL?: string;
 }
 
-export type ActionName = 'listen' | 'explain' | 'trim' | 'close';
+export type ActionName = 'listen' | 'slow' | 'explain' | 'trim' | 'close';
 
 /** Selectors inside the closed root. Stable contract of the production toolbar (components/tooltip/view.ts). */
 export const SEL = {

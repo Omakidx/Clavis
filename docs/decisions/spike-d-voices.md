@@ -54,7 +54,7 @@ Rules that make it honest (FR-023, architecture §7):
 4. Called `chrome.tts.speak` and `speechSynthesis.speak` raw, with no voices, to record how each fails on its own.
 5. Exercised the offscreen lifecycle: create on demand, reuse, close, recreate, and the real idle-timer close.
 
-Spec: `tests/e2e/spike-d-speech.spec.ts`. The matrix is printed on every run (`SPIKE-D VOICE MATRIX`) and attached to the report as `voice-matrix.json`.
+Spec (spike, since replaced by `tests/e2e/p6-speech-*.spec.ts` in Phase 6): `tests/e2e/spike-d-speech.spec.ts`. The matrix was printed on every run (`SPIKE-D VOICE MATRIX`) and attached to the report as `voice-matrix.json`.
 
 ## Observed voice matrix
 
@@ -100,33 +100,16 @@ Conclusions from the matrix:
 
 ## Manual verification for the maintainer (real audio, branded Chrome)
 
-Nobody has heard audio from this code yet. Steps:
+> **Updated in Phase 6:** the spike-only `SPEECH_DIAGNOSE` command was removed. The D-07 check is now done in **Settings → Voice**, which shows the voices each engine found.
 
-1. `WXT_OUT_DIR=.output-spike-d npx wxt build`, then open `chrome://extensions`, enable Developer mode, **Load unpacked**, choose `.output-spike-d/chrome-mv3`.
-2. Open the extension popup (click the toolbar icon), right-click it, **Inspect**, and use that console. (A tab-hosted copy at `chrome-extension://<id>/popup.html` works too.)
-3. Record what exists:
+1. `npm run build`, then open `chrome://extensions`, enable Developer mode, **Load unpacked**, choose `.output/chrome-mv3`.
+2. Open **Settings → Voice** (popup → Settings, or right-click the toolbar icon → Options). Note the counts for **Chrome voices** and **Fallback voices**, and which engine Listen will use. **The key comparison for D-07: does the fallback list any usable voice that Chrome's voices don't?**
+3. Pick a voice and press **Test voice**: you should hear it, and the button should change to Stop while it plays.
+4. On a web page (with website access on), select a word, press **Listen**; then a full sentence; then toggle **Slow** and listen again. Pressing Listen again while playing should stop the first playback.
+5. Optional, to test the positive path on Linux (**you run this**): `sudo apt install speech-dispatcher espeak-ng`, **fully quit and restart Chrome**, reopen Settings → Voice and repeat steps 2–4. Then remove them (`sudo apt remove speech-dispatcher espeak-ng`, restart Chrome) and confirm Listen shows "Voice isn't available on this device" with the Linux hint instead of a playing state (D-14: with and without speech-dispatcher).
+6. Report back: per OS you can reach, the voice counts per engine and whether audio was audible.
 
-   ```js
-   chrome.runtime.sendMessage({ v: 1, type: 'SPEECH_DIAGNOSE' }).then((r) => console.log(JSON.stringify(r, null, 2)));
-   ```
-
-   Note `capability.engine`, `probes` (voice count per engine) and `offscreenApi`. **The key comparison: does the offscreen engine list voices that `chrome.tts` does not?**
-4. Listen for state pushes, then speak a word and a sentence, normal and slow:
-
-   ```js
-   chrome.runtime.onMessage.addListener((m) => m?.type === 'TTS_EVENT' && console.log('event', m));
-   const say = (text, rate = 1, lang) =>
-     chrome.runtime.sendMessage({ v: 1, type: 'TTS_SPEAK', requestId: crypto.randomUUID(), text, rate, ...(lang ? { lang } : {}) }).then(console.log);
-   say('bank');
-   say('The river bank was steep, so we walked along the water slowly; it was a quiet afternoon.');
-   say('bank', 0.75);
-   say('bank', 1, 'en-GB');
-   ```
-
-   Expect: a reply `{ok:true, data:{engine, voiceName, state:'started'}}` **and you hear the speech**, then a `TTS_EVENT` with `state:'ended'`. Call `say(...)` twice quickly: the first must stop and report `cancelled`, only the second is heard. Stop with `chrome.runtime.sendMessage({v:1,type:'TTS_STOP'}).then(console.log)`.
-5. Compare with the service worker console (`chrome://extensions` -> Inspect service worker): `await chrome.tts.getVoices()`.
-6. Optional, to test the positive `chrome.tts` path on Linux (**you run this; the agent did not**): `sudo apt install speech-dispatcher espeak-ng`, **fully quit and restart Chrome**, reload the extension and repeat steps 3 to 5. Then also remove them (`sudo apt remove speech-dispatcher espeak-ng`, restart Chrome) and repeat once more to confirm the no-voice message appears instead of a playing state (D-14: with and without speech-dispatcher).
-7. Report back: per OS you can reach, the `SPEECH_DIAGNOSE` voice counts per engine and whether audio was audible.
+Console alternative (options page console): `chrome.runtime.sendMessage({v:1,type:'GET_VOICES'}).then(r=>console.log(JSON.stringify(r,null,2)))`.
 
 Reader page option (not implemented, no edits to `entrypoints/reader`): extension pages have `speechSynthesis` directly, so the reader can reuse `registerOffscreenSpeech`'s voice logic as a "direct Web Speech" engine inside its own `SpeechService([ChromeTtsEngine, DirectWebSpeechEngine])` and skip the offscreen document entirely. Measured here: a reader-style extension page reports 0 voices and `synthesis-failed` on this machine, exactly like the offscreen document.
 

@@ -3,7 +3,7 @@
 **Status:** Implementation-ready specification (v1 baseline)  
 **Version:** 1.1-draft · **Last reviewed:** 2026-10-22  
 **Platform:** Google Chrome, Manifest V3, desktop first  
-**Product owner decisions:** Groq only for v1; user provides key; no mandatory accounts or first-party backend; custom PDF.js reader; native pronunciation for words **and** sentences. Further resolved decisions D-01 … D-21 are in [§11](#11-product-decisions).
+**Product owner decisions:** Groq only for v1; user provides key; no mandatory accounts or first-party backend; custom PDF.js reader; native pronunciation for words **and** sentences. Further resolved decisions D-01 … D-22 are in [§11](#11-product-decisions).
 
 ## 1. Problem, audience and success criteria
 
@@ -256,7 +256,8 @@ This is the approved user-facing wording. Implementation may adjust layout and f
 | Selected visible text | Explanation/pronunciation | Content script/reader -> privileged request for AI | **Only for Explain** to Groq |
 | Small adjacent context | Disambiguation | Content script/reader -> privileged AI request | **Only for Explain** to Groq |
 | User Groq API key | Authorize user's Groq calls | Trusted extension contexts only | To Groq over HTTPS only |
-| Voice locale/rate | Playback preference | Local extension settings | No |
+| Voice locale/rate/voice choice | Playback preference | Local extension settings | No |
+| Selected text for **Listen** | Pronunciation | Background → speech engine | **No** with on-device voices (the default, D-22); to the voice provider only if the user explicitly chose an *online* voice in Settings |
 | Local PDF bytes | PDF rendering | Reader tab + PDF.js worker | No |
 | Webpage access (optional, user-granted) | Show toolbar at selection | Runtime-registered content script on granted http/https sites | Page data goes to Groq only on action |
 | Current-tab access (`activeTab`) | Explain via context menu / toolbar icon when site access is declined | One-time injection into the current tab after a user gesture | Page data goes to Groq only on action |
@@ -369,6 +370,7 @@ The team can test **Linux only** by hand. Other platforms get automated coverage
 | D-19 | **No Tailwind for v1; plain CSS with shared design tokens** | Global resets (as in Tailwind's preflight) shift the PDF.js text layer (Spike C finding 3); extension pages are simple forms that don't need a utility framework | Tech stack §1, §6; shared classes are namespaced `clavis-*` |
 | D-20 | **Observer budget raised from 15 KB to 18 KB gzip** | The 15 KB figure protected the 150 ms first-toolbar target; measured p95 is 58.5 ms (1× CPU) / 133.9 ms (4×) on a loaded machine. Fitting into 15 KB meant dropping pinch-zoom placement | `scripts/size-budgets.json`; tech stack §6 |
 | D-21 | **Per-tab AI rate limit raised from 10 to 20 requests per minute** | One selection can use up to four requests (core + three lazy tabs), so 10/min throttled ordinary reading; webpages can't trigger requests (trusted clicks only, Phase 2 HIGH-1), so the limit now mainly guards cost | `AI_RATE_LIMIT` in lib/config; architecture §9 rule 9 |
+| D-22 | **Listen uses on-device voices only by default**; an online voice (e.g. Chrome's Google network voices in the Web Speech fallback) is used only when the user explicitly chooses it in Settings → Voice, where it is labelled *online* with a note, and the toolbar marks each online playback | Keeps the approved disclosure ("Listen uses the voices on your computer") true by default; the Phase 6 code review found the fallback can expose network voices, especially on Linux | lib/speech voice resolution; Settings → Voice; privacy policy; §6 inventory |
 | D-16 | **Disclosure copy approved** as written in [§4.1](#approved-disclosure-copy-fr-002-fr-009-fr-071) | Defines exactly what users see before anything is sent to Groq | Onboarding, first Explain, settings |
 
 ### Still open

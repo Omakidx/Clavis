@@ -31,10 +31,9 @@ afterEach(() => cleanup());
 describe('preferences section (FR-006)', () => {
   it('shows the stored values', async () => {
     setup({
-      preferences: { readingLevel: 'advanced', ttsRate: 0.75, tooltipBehavior: 'on-demand' },
+      preferences: { readingLevel: 'advanced', tooltipBehavior: 'on-demand' },
     });
     expect(await screen.findByRole('radio', { name: /Advanced/ })).toBeChecked();
-    expect(screen.getByRole('radio', { name: 'Slow' })).toBeChecked();
     expect(screen.getByRole('radio', { name: /Only when I ask/ })).toBeChecked();
     expect(screen.getByLabelText('Explanation language')).toHaveValue('en');
   });
@@ -55,27 +54,17 @@ describe('preferences section (FR-006)', () => {
     });
   });
 
-  it('sends only the changed field and clears the voice language with null', async () => {
-    const user = setup({ preferences: { ttsLang: 'fr' } });
-    const voice = (await screen.findByLabelText('Voice language')) as HTMLSelectElement;
-    expect(voice.value).toBe('fr');
-    await user.selectOptions(voice, '');
-    await waitFor(() => expect(backend.state.preferences.ttsLang).toBeUndefined());
-    expect(backend.calls.filter((c) => c.type === 'UPDATE_PREFERENCES').at(-1)).toMatchObject({
-      patch: { ttsLang: null },
-    });
+  it('leaves the voice language and playback speed to the Voice section', async () => {
+    setup();
+    await screen.findByRole('radio', { name: /Advanced/ });
+    expect(screen.queryByLabelText('Voice language')).toBeNull();
+    expect(screen.queryByRole('radio', { name: 'Slow' })).toBeNull();
   });
 
   it('keeps a saved language that is not in the list selectable', async () => {
     setup({ preferences: { explanationLanguage: 'sw' } });
     const select = (await screen.findByLabelText('Explanation language')) as HTMLSelectElement;
     expect(select.value).toBe('sw');
-  });
-
-  it('shows a custom playback speed without overwriting it', async () => {
-    setup({ preferences: { ttsRate: 1.5 } });
-    expect(await screen.findByRole('radio', { name: /Custom speed \(1.5×\)/ })).toBeChecked();
-    expect(backend.calls.some((c) => c.type === 'UPDATE_PREFERENCES')).toBe(false);
   });
 
   it('Reset to defaults restores them and says so', async () => {

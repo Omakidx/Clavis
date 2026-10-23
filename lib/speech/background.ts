@@ -3,53 +3,57 @@ import { MESSAGE_VERSION } from '../config/constants';
 import {
   idSchema,
   parsePublicMessage,
+  voiceNameSchema,
   type ErrorCode,
+  type ErrorReason,
   type MessageIssue,
   type MessageReply,
+  type Preferences,
   type PublicMessage,
+  type SpeakResult,
+  type StopResult,
+  type TtsEventMessage,
+  type VoiceInfo,
+  type VoicesReport,
 } from '../contracts';
 import { t } from '../i18n';
+import { failure as codedFailure } from '../router/replies';
 import { logger } from '../security/logger';
 import { ChromeTtsEngine } from './engines/chrome-tts';
 import { OffscreenSpeechEngine } from './engines/offscreen';
-import { type OffscreenEventMessage, type TtsEventMessage } from './messages';
+import { type OffscreenEventMessage } from './messages';
 import { createOffscreenHost } from './offscreen-host';
 import { SpeechService } from './service';
 import {
   SpeechError,
-  type SpeakResult,
-  type SpeechCapability,
+  type EngineSurvey,
+  type SpeechEngineId,
   type SpeechMessageKey,
   type SpeechStateEvent,
+  type SpeechVoice,
 } from './types';
+import { hasUsableVoice, resolveLanguage, toLanguageTag } from './voice-selection';
 
-/** `data` of a successful TTS_SPEAK reply: audio has started (never "queued"). */
-export interface TtsSpeakReplyData extends Omit<SpeakResult, 'requestId'> {
-  state: 'started';
-}
-export interface TtsStopReplyData {
-  /** Whether a tracked utterance was actually cancelled. */
-  stopped: boolean;
-}
-/** Spike-only diagnostics for the voice matrix (extension pages only). */
-export interface SpeechDiagnoseReplyData {
-  capability: SpeechCapability;
-  offscreenApi: { getContexts: boolean; hasDocument: boolean; matchClients: boolean };
-  userAgent: string;
-}
+export type TtsSpeakReplyData = SpeakResult;
+export type TtsStopReplyData = StopResult;
 
-/** Where to push state events for one request: the page/frame that asked to speak. */
-interface PushTarget {
+type Platform = VoicesReport['platform'];
+
+/** Where to push state events for one request: the page/frame/document that asked. */
+export interface PushTarget {
   tabId?: number | undefined;
   frameId?: number | undefined;
+  documentId?: string | undefined;
 }
 
 export interface SpeechHandlerDeps {
   service: SpeechService;
   offscreenEngine: Pick<OffscreenSpeechEngine, 'handlePageEvent' | 'handlePageIdle'>;
   push(target: PushTarget, message: TtsEventMessage): Promise<unknown>;
-  offscreenApi?: SpeechDiagnoseReplyData['offscreenApi'];
-  userAgent?: string;
+  /** The speech preferences. A failing read behaves like "no preferences". */
+  preferences(): Promise<Pick<Preferences, 'ttsLang' | 'ttsVoice'>>;
+  /** `runtime.getPlatformInfo().os` mapped to the report's platform names. */
+  platform(): Promise<Platform>;
 }
 
 /** Where a speech request came from. Supplied by the router from the classified sender. */
@@ -57,6 +61,8 @@ export interface SpeechSender {
   /** Absent for tab-less extension pages (the popup). */
   tabId?: number | undefined;
   frameId?: number | undefined;
+  /** Chrome's id of the sender's document; preferred over `frameId` when pushing events. */
+  documentId?: string | undefined;
 }
 
 type TtsSpeakMessage = Extract<PublicMessage, { type: 'TTS_SPEAK' }>;
@@ -107,14 +113,100 @@ export function rejectedSpeakReply(raw: unknown): MessageReply<never> {
 }
 
 /**
- * Speech handlers for the message router (Phase 3). The router owns sender checks and
- * schema validation; these receive validated messages and the sender's tab.
+ * Reason for "the only voices for this language are network voices" (D-22). The contract has no
+ * dedicated reason yet; until `'online-only'` is added to errorReasonSchema it is the closest
+ * truthful one. Switch this constant when the contract gains it.
+ */
+const ONLINE_ONLY_REASON: ErrorReason = 'online-only';
+
+/** Largest voice lists the report carries (voicesReportSchema). */
+const MAX_REPORTED_VOICES = 500;
+
+/**
+ * Voices as the Settings chooser may offer them: only voices TTS_SPEAK can address by name and
+ * that could prove they started, one per name, at most `MAX_REPORTED_VOICES`.
+ */
+export function toVoiceInfos(voices: readonly SpeechVoice[]): VoiceInfo[] {
+  const seen = new Set<string>();
+  const out: VoiceInfo[] = [];
+  for (const voice of voices) {
+    if (out.length >= MAX_REPORTED_VOICES) break;
+    if (!hasUsableVoice([voice]) || seen.has(voice.name)) continue;
+    if (!voiceNameSchema.safeParse(voice.name).success) continue;
+    seen.add(voice.name);
+    const lang = toLanguageTag(voice.lang);
+    out.push({
+      name: voice.name,
+      ...(lang === undefined ? {} : { lang }),
+      engine: voice.engine,
+      remote: voice.remote,
+    });
+  }
+  return out;
+}
+
+/** Map `runtime.getPlatformInfo().os`. */
+export function toPlatform(os: string | undefined): Platform {
+  switch (os) {
+    case 'linux':
+    case 'mac':
+    case 'win':
+    case 'cros':
+    case 'android':
+      return os;
+    default:
+      return 'other';
+  }
+}
+
+/**
+ * Speech handlers for the message router. The router owns sender checks and schema validation;
+ * these receive validated messages and the sender's location.
  *
- * Replies are always envelopes: `started` only once audio has actually started.
+ * Replies are always envelopes: `started` only once audio has actually started, and terminal
+ * states (`ended`, `cancelled`, `error`) are pushed to exactly the document that asked.
  */
 export function createSpeechHandlers(deps: SpeechHandlerDeps) {
   const { service } = deps;
   const targets = new Map<string, PushTarget>();
+  /** Bumped by every speak(), so a request that was overtaken while reading preferences yields. */
+  let latestSpeak = 0;
+  /** Requests accepted but not yet handed to the service (reading preferences). */
+  const preparing = new Set<string>();
+  /** Preparing requests a Stop already cancelled; checked right before the service is called. */
+  const stoppedEarly = new Set<string>();
+  let platformCache: Promise<Platform> | undefined;
+
+  const platform = (): Promise<Platform> => {
+    platformCache ??= deps.platform().catch((): Platform => 'other');
+    return platformCache;
+  };
+
+  async function readPreferences(): Promise<Pick<Preferences, 'ttsLang' | 'ttsVoice'>> {
+    try {
+      return await deps.preferences();
+    } catch {
+      return {};
+    }
+  }
+
+  /** The machine-readable reason a NO_VOICE carries, so the UI can give the right advice. */
+  async function reasonFor(error: SpeechError): Promise<ErrorReason | undefined> {
+    if (error.code !== 'NO_VOICE') return undefined;
+    switch (error.noVoice) {
+      // No engine has any voice at all: on Linux that is the speech-dispatcher case.
+      case 'no-voices':
+        return (await platform()) === 'linux' ? 'no-voice-linux' : undefined;
+      case 'no-language-match':
+        return 'no-voice-language';
+      case 'online-only':
+        return ONLINE_ONLY_REASON;
+      case 'start-failed':
+        return 'start-failed';
+      default:
+        return undefined;
+    }
+  }
 
   // Push terminal states to whoever asked. `started` is the TTS_SPEAK reply itself.
   service.onState((event: SpeechStateEvent) => {
@@ -134,33 +226,88 @@ export function createSpeechHandlers(deps: SpeechHandlerDeps) {
       });
   });
 
+  async function failedSpeak(error: unknown, requestId: string): Promise<MessageReply<never>> {
+    if (error instanceof SpeechError) {
+      const reason = await reasonFor(error);
+      if (reason !== undefined) return codedFailure(error.code, { requestId, reason });
+      return failure(error.code, error.messageKey, error.message, requestId);
+    }
+    logger.error('speech_unexpected_failure', { requestId });
+    return failure('NO_VOICE', 'speechStartFailed', 'Speech failed.', requestId);
+  }
+
   return {
     async speak(
       message: TtsSpeakMessage,
       sender: SpeechSender,
     ): Promise<MessageReply<TtsSpeakReplyData>> {
-      const { requestId, text, lang, rate } = message;
-      targets.set(requestId, { tabId: sender.tabId, frameId: sender.frameId });
+      const { requestId, text, rate } = message;
+      const turn = ++latestSpeak;
+      targets.set(requestId, {
+        tabId: sender.tabId,
+        frameId: sender.frameId,
+        documentId: sender.documentId,
+      });
+      preparing.add(requestId);
       try {
-        const result = await service.speak({ requestId, text, lang, rate });
-        const { requestId: _omit, ...rest } = result;
-        return { ok: true, requestId, data: { ...rest, state: 'started' } };
-      } catch (error) {
-        targets.delete(requestId);
-        if (error instanceof SpeechError) {
-          return failure(error.code, error.messageKey, error.message, requestId);
+        const preferences = await readPreferences();
+        const stopped = stoppedEarly.delete(requestId);
+        preparing.delete(requestId);
+        if (stopped) {
+          // A Stop for this request arrived before the service knew about it: no audio.
+          throw new SpeechError(
+            'REQUEST_CANCELLED',
+            'Stopped before it started.',
+            'speechCancelled',
+          );
         }
-        logger.error('speech_unexpected_failure', { requestId });
-        return failure('NO_VOICE', 'speechStartFailed', 'Speech failed.', requestId);
+        if (turn !== latestSpeak) {
+          // A newer request arrived while preferences were being read: it replaces this one.
+          throw new SpeechError(
+            'REQUEST_CANCELLED',
+            'Superseded by a newer request.',
+            'speechCancelled',
+          );
+        }
+        const result = await service.speak({
+          requestId,
+          text,
+          lang: resolveLanguage(message.lang, preferences.ttsLang),
+          rate,
+          voiceName: message.voiceName,
+          preferredVoice: preferences.ttsVoice,
+        });
+        const lang = toLanguageTag(result.lang);
+        const voiceName = voiceNameSchema.safeParse(result.voiceName).success
+          ? result.voiceName
+          : undefined;
+        return {
+          ok: true,
+          requestId,
+          data: {
+            state: 'started',
+            engine: result.engine,
+            ...(voiceName === undefined ? {} : { voiceName }),
+            ...(lang === undefined ? {} : { lang }),
+            remote: result.remote,
+          },
+        };
+      } catch (error) {
+        preparing.delete(requestId);
+        stoppedEarly.delete(requestId);
+        targets.delete(requestId);
+        return failedSpeak(error, requestId);
       }
     },
 
     /**
      * Stop speech. A tab (content script or reader) may only stop ITS OWN utterance, with or
-     * without a requestId (Phase 2 review: an id-less stop from any tab used to stop all
-     * speech). Tab-less extension pages (the popup) are global controls and stop anything.
-     * With nothing tracked at all (the worker restarted mid-utterance) an id-less stop still
-     * reaches the engines, because chrome.tts keeps speaking untracked.
+     * without a requestId (Phase 2 review: an id-less stop from any tab used to stop all speech;
+     * ownership is that of the utterance actually being spoken). Tab-less extension pages (the
+     * popup) are global controls and stop anything. A request that is still being prepared (reading
+     * preferences, looking up voices) is stoppable too, so a Stop never loses the race against its
+     * audio. With nothing tracked at all (the worker restarted mid-utterance) a stop, with or
+     * without an id, still reaches the engines, because chrome.tts keeps speaking untracked.
      */
     async stop(
       message: TtsStopMessage,
@@ -172,28 +319,61 @@ export function createSpeechHandlers(deps: SpeechHandlerDeps) {
         ...(requestId === undefined ? {} : { requestId }),
         data: { stopped },
       });
-      if (sender.tabId !== undefined) {
-        const owns = (target: PushTarget | undefined): boolean => target?.tabId === sender.tabId;
-        if (requestId !== undefined) {
-          if (!owns(targets.get(requestId))) return reply(false);
-        } else if (targets.size > 0 && ![...targets.values()].some(owns)) {
-          return reply(false);
+      const owns = (target: PushTarget | undefined): boolean =>
+        sender.tabId === undefined || target?.tabId === sender.tabId;
+
+      // Requests the service has not been told about yet.
+      let cancelledEarly = false;
+      for (const id of preparing) {
+        if ((requestId === undefined || requestId === id) && owns(targets.get(id))) {
+          stoppedEarly.add(id);
+          cancelledEarly = true;
         }
       }
-      return reply(await service.stop(requestId));
+
+      const tracked = service.trackedRequestId;
+      if (tracked !== undefined) {
+        if ((requestId === undefined || requestId === tracked) && owns(targets.get(tracked))) {
+          return reply((await service.stop(requestId)) || cancelledEarly);
+        }
+        return reply(cancelledEarly);
+      }
+      // Nothing is tracked. Unless a request is being prepared, this is speech the restarted
+      // worker lost track of: stop the engines.
+      if (targets.size === 0 && preparing.size === 0) {
+        await service.stop();
+        return reply(false);
+      }
+      return reply(cancelledEarly);
     },
 
-    async diagnose(): Promise<MessageReply<SpeechDiagnoseReplyData>> {
+    /**
+     * GET_VOICES (Settings voice chooser, FR-025, and the D-07 check): what each engine can speak
+     * with, freshly probed. The offscreen document is created for the probe only and closed again.
+     */
+    async getVoices(): Promise<MessageReply<VoicesReport>> {
+      const [os, survey] = await Promise.all([platform(), service.survey()]);
+      const byEngine = (id: SpeechEngineId): EngineSurvey | undefined =>
+        survey.find((entry) => entry.engine === id);
+      const chrome = byEngine('chrome-tts');
+      const offscreen = byEngine('offscreen-web-speech');
+      const chromeVoices = toVoiceInfos(chrome?.voices ?? []);
+      const offscreenVoices = toVoiceInfos(offscreen?.voices ?? []);
+      const defaultEngine =
+        chromeVoices.length > 0
+          ? 'chrome-tts'
+          : offscreen?.available === true && offscreenVoices.length > 0
+            ? 'offscreen-web-speech'
+            : 'none';
       return {
         ok: true,
         data: {
-          capability: await service.getCapability({ probeAll: true }),
-          offscreenApi: deps.offscreenApi ?? {
-            getContexts: false,
-            hasDocument: false,
-            matchClients: false,
+          platform: os,
+          defaultEngine,
+          engines: {
+            chromeTts: { voices: chromeVoices },
+            offscreen: { available: offscreen?.available === true, voices: offscreenVoices },
           },
-          userAgent: deps.userAgent ?? '',
         },
       };
     },
@@ -210,37 +390,66 @@ export function createSpeechHandlers(deps: SpeechHandlerDeps) {
 
 export type SpeechHandlers = ReturnType<typeof createSpeechHandlers>;
 
+/** The browser's UI language, used only to prefer a matching voice when a request names no language. */
+function uiLanguage(): string | undefined {
+  try {
+    return toLanguageTag(browser.i18n.getUILanguage());
+  } catch {
+    return undefined;
+  }
+}
+
+export interface CreateSpeechDeps {
+  /** Reads the saved preferences (`ttsLang`, `ttsVoice`). */
+  preferences: SpeechHandlerDeps['preferences'];
+}
+
 /**
- * Build the speech stack for the service worker. Registers NO listener: its messages
- * (TTS_SPEAK, TTS_STOP, SPEECH_DIAGNOSE, the offscreen events) are routes in the single
- * message router (lib/router), which checks senders and validates shapes.
+ * Build the speech stack for the service worker. Registers NO message listener: its messages
+ * (TTS_SPEAK, TTS_STOP, GET_VOICES, the offscreen events) are routes in the single message router
+ * (lib/router), which checks senders and validates shapes.
  *
- * Phase 6 design notes (Spike D):
- * - The service lives in the worker's memory. If the worker is torn down mid
- *   utterance, chrome.tts keeps speaking but tracking is lost.
- * - State events are pushed with tabs.sendMessage (frame-targeted) to the tab
- *   that asked, or runtime.sendMessage for tab-less extension pages (popup).
+ * - The service lives in the worker's memory. If the worker is torn down mid utterance,
+ *   chrome.tts keeps speaking but tracking is lost (an id-less TTS_STOP still stops it).
+ * - State events are pushed with tabs.sendMessage, targeted at the asking DOCUMENT (falling back
+ *   to its frame), or runtime.sendMessage for tab-less extension pages (popup). Never text.
+ * - `tts.onVoicesChanged` forgets remembered "no voices" answers (speech-dispatcher installed).
  */
-export function createSpeech(): SpeechHandlers {
+export function createSpeech(deps: CreateSpeechDeps): SpeechHandlers {
   const offscreenEngine = new OffscreenSpeechEngine({ host: createOffscreenHost() });
-  const service = new SpeechService({ engines: [new ChromeTtsEngine(), offscreenEngine] });
+  const service = new SpeechService({
+    engines: [new ChromeTtsEngine(), offscreenEngine],
+    defaultLanguage: uiLanguage(),
+    watchVoiceChanges: (listener) => {
+      // Chrome 124+. Boot must survive a missing or unimplemented event (older builds, test doubles).
+      try {
+        (
+          browser.tts as { onVoicesChanged?: { addListener(callback: () => void): void } }
+        ).onVoicesChanged?.addListener(listener);
+      } catch {
+        logger.warn('tts_voices_changed_unavailable');
+      }
+    },
+  });
 
   return createSpeechHandlers({
     service,
     offscreenEngine,
-    offscreenApi: {
-      getContexts: typeof browser.runtime.getContexts === 'function',
-      hasDocument: typeof browser.offscreen?.hasDocument === 'function',
-      matchClients: typeof (globalThis as { clients?: unknown }).clients === 'object',
-    },
-    userAgent: typeof navigator === 'undefined' ? '' : navigator.userAgent,
+    preferences: deps.preferences,
+    platform: async () => toPlatform((await browser.runtime.getPlatformInfo()).os),
     push: (target, message) =>
       target.tabId === undefined
         ? (browser.runtime.sendMessage(message) as Promise<unknown>)
         : (browser.tabs.sendMessage(
             target.tabId,
             message,
-            target.frameId === undefined ? {} : { frameId: target.frameId },
+            // A document id names exactly one document (it changes on navigation), so an event
+            // never reaches a page that replaced the asker; the frame id is only the fallback.
+            target.documentId !== undefined
+              ? { documentId: target.documentId }
+              : target.frameId === undefined
+                ? {}
+                : { frameId: target.frameId },
           ) as Promise<unknown>),
   });
 }

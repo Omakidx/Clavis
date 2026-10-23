@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { browser } from 'wxt/browser';
 import { createExplainCard } from '../../components/explanation';
 import { Button, LiveStatus } from '../../components/common/ui';
 import { Page } from '../../components/common/Page';
@@ -10,11 +11,10 @@ import {
   createSelectionController,
   type SelectionController,
 } from '../../lib/selection/controller';
-import type { RunContext } from '../../lib/selection/ui-api';
-import { api } from '../../lib/ui-client/api';
+import { createListenController } from '../../lib/selection/listen';
 import { Article } from './Article';
 import { ResultPanel } from './ResultPanel';
-import { FALLBACK_PREFS, runListen, type PracticePrefs, type PracticeState } from './actions';
+import { practiceStateFor, type PracticeState } from './actions';
 import './practice.css';
 
 /**
@@ -26,7 +26,8 @@ import './practice.css';
  * Explain uses the same explanation card as a web page (components/explanation): it is imported
  * here directly (an extension page has no isolated-world loading step) and draws in the toolbar
  * through the same `CardSurface`, so the demo behaves like the real thing, including the
- * "Connect Groq" state without a key. Only Listen reports in the result panel below.
+ * "Connect Groq" state without a key. Listen is the same code as on a web page
+ * (lib/selection/listen.ts): the toolbar shows its states, and the result panel below mirrors them.
  */
 const FRAME_DOC =
   '<!doctype html><html lang="en"><head><meta charset="utf-8"></head><body></body></html>';
@@ -37,38 +38,24 @@ export function App() {
   const [state, setState] = useState<PracticeState>({ kind: 'idle' });
   const [hint, setHint] = useState<string | null>(null);
   const controller = useRef<SelectionController | null>(null);
-  const prefs = useRef<PracticePrefs>(FALLBACK_PREFS);
-  /** Only the newest action may update the panel; an older, slower reply is dropped. */
-  const latest = useRef(0);
-  const lastListen = useRef<RunContext | null>(null);
 
-  // The practice page works without any backend answer: defaults apply until preferences arrive.
+  // Listen is the same controller as the content script's. The background reports TTS_EVENT to
+  // this page with tabs.sendMessage (targeted at this document, like a web page's frame).
+  const speech = useMemo(
+    () =>
+      createListenController({
+        onReport: (report, context) => setState(practiceStateFor(report, context.snapshot.text)),
+      }),
+    [],
+  );
   useEffect(() => {
-    let alive = true;
-    void api.getPublicSettings().then((result) => {
-      if (alive && result.ok) {
-        prefs.current = {
-          explanationLanguage: result.data.explanationLanguage,
-          ttsRate: result.data.ttsRate,
-          ttsLang: result.data.ttsLang,
-        };
-      }
-    });
-    return () => {
-      alive = false;
+    const onMessage = (message: unknown, sender: { id?: string } | undefined) => {
+      if (sender?.id === browser.runtime.id) speech.handleEvent(message);
+      return undefined;
     };
-  }, []);
-
-  const listen = useCallback(async (context: RunContext) => {
-    lastListen.current = context;
-    const id = ++latest.current;
-    const { snapshot } = context;
-    setHint(null);
-    setState({ kind: 'working', action: 'listen', text: snapshot.text });
-    const next = await runListen(snapshot, prefs.current);
-    // Superseded, replaced or dismissed while it ran: the toolbar aborted the signal.
-    if (id === latest.current && !context.signal.aborted) setState(next);
-  }, []);
+    browser.runtime.onMessage.addListener(onMessage);
+    return () => browser.runtime.onMessage.removeListener(onMessage);
+  }, [speech]);
 
   const frameReady = frameDoc !== null;
   useEffect(() => {
@@ -81,7 +68,8 @@ export function App() {
       loadToolbar: (options) =>
         Promise.resolve(createToolbar(createPreactRenderer(), options, doc)),
       actions: {
-        listen: (context) => void listen(context),
+        listen: speech.listen,
+        openVoiceSettings: speech.openVoiceSettings,
         explain: (context) => card.present(context),
         trim: () => card.dismiss(),
         dismiss: (context) => card.dismiss(context.snapshot.selectionId),
@@ -93,7 +81,7 @@ export function App() {
       card.destroy();
       controller.current = null;
     };
-  }, [frameDoc, listen]);
+  }, [frameDoc, speech]);
 
   // Size the frame to its article so the page, not the frame, scrolls.
   useEffect(() => {
@@ -149,14 +137,7 @@ export function App() {
         <LiveStatus message={hint} />
       </div>
 
-      <ResultPanel
-        state={state}
-        onRetry={() => {
-          const again = lastListen.current;
-          // A retry is a new run: the old signal was aborted with the toolbar's dismissal.
-          if (again) void listen({ ...again, signal: new AbortController().signal });
-        }}
-      />
+      <ResultPanel state={state} onOpenVoiceSettings={speech.openVoiceSettings} />
     </Page>
   );
 }

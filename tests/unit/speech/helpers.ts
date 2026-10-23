@@ -24,7 +24,15 @@ export class FakeEngine implements SpeechEngine {
   speakError: Error | undefined;
   /** When true, speak() automatically reports `started` on the next microtask. */
   autoStart = true;
+  /** When set, the engine offers `peekVoices` (voices known without waiting). */
+  peek: SpeechVoice[] | undefined;
+  /** When set, the engine offers `survey`. */
+  surveyResult: { available: boolean; voices: SpeechVoice[] } | undefined;
+  /** Milliseconds `getVoices` takes (fake timers), to model slow late-loading engines. */
+  getVoicesDelayMs = 0;
+  invalidateCalls = 0;
   readonly getVoicesCalls: number[] = [];
+  readonly refreshCalls: boolean[] = [];
   readonly speakCalls: EngineSpeakRequest[] = [];
   stopCalls = 0;
   private readonly sinks: ((event: EngineEvent) => void)[] = [];
@@ -36,10 +44,31 @@ export class FakeEngine implements SpeechEngine {
     this.voices = voices;
   }
 
-  getVoices(): Promise<SpeechVoice[]> {
+  getVoices(options: { refresh?: boolean } = {}): Promise<SpeechVoice[]> {
     this.getVoicesCalls.push(Date.now());
-    return this.getVoicesError ? Promise.reject(this.getVoicesError) : Promise.resolve(this.voices);
+    this.refreshCalls.push(options.refresh === true);
+    const outcome = this.getVoicesError
+      ? Promise.reject(this.getVoicesError)
+      : Promise.resolve(this.voices);
+    if (this.getVoicesDelayMs === 0) return outcome;
+    return new Promise((resolve, reject) => {
+      setTimeout(() => {
+        outcome.then(resolve, reject);
+      }, this.getVoicesDelayMs);
+    });
   }
+
+  peekVoices = (): Promise<SpeechVoice[]> =>
+    this.getVoicesError
+      ? Promise.reject(this.getVoicesError)
+      : Promise.resolve(this.peek ?? this.voices);
+
+  invalidate = (): void => {
+    this.invalidateCalls++;
+  };
+
+  survey = (): Promise<{ available: boolean; voices: SpeechVoice[] }> =>
+    Promise.resolve(this.surveyResult ?? { available: true, voices: this.voices });
 
   speak(request: EngineSpeakRequest, sink: (event: EngineEvent) => void): Promise<void> {
     this.speakCalls.push(request);

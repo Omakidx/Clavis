@@ -119,9 +119,10 @@ test('a page that pre-defines likely tags and patches attachShadow/createElement
   try {
     await dblclickText(page, page, 'visitor');
     await tb(page).waitShown();
-    await tb(page).click('listen');
+    // Explain (not Listen) shows a card since Phase 6: Listen reports in its own status line.
+    await tb(page).click('explain');
     await tb(page).waitShown(SEL.card);
-    expect(await tb(page).attr(SEL.card, 'data-action')).toBe('listen');
+    expect(await tb(page).attr(SEL.card, 'data-action')).toBe('explain');
 
     const log = await readLog(page);
     // The extension's own world has its own prototypes: the page's patches never ran for it.

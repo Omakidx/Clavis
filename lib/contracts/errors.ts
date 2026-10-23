@@ -34,7 +34,24 @@ export type ErrorCode = z.infer<typeof errorCodeSchema>;
  *   (requirements §4.1 firstSendBody) was never given, NOT because the key is missing. The
  *   caller resends the same AI_EXPLAIN with `acknowledgeDisclosure: true` after a trusted click.
  */
-export const errorReasonSchema = z.enum(['disclosure']);
+/**
+ * Optional machine-readable detail for an error code:
+ * - `disclosure` (with SETUP_REQUIRED): the one-time first-send prompt must be shown.
+ * - `no-voice-linux` (with NO_VOICE): no speech engine on Linux; the UI suggests installing
+ *   speech-dispatcher and a voice (e.g. espeak-ng) and restarting Chrome.
+ * - `no-voice-language` / `start-failed` (with NO_VOICE): see below; no install hint.
+ */
+export const errorReasonSchema = z.enum([
+  'disclosure',
+  'no-voice-linux',
+  // With NO_VOICE: voices exist, but none for this language (never substituted, FR-024).
+  'no-voice-language',
+  // With NO_VOICE: a voice was found but did not start (engine glitch, online voice offline).
+  'start-failed',
+  // With NO_VOICE: only online voices exist for this language; by default Listen uses
+  // on-device voices only (D-22), so the user must choose an online voice in Settings.
+  'online-only',
+]);
 export type ErrorReason = z.infer<typeof errorReasonSchema>;
 
 /** Error envelope returned to callers. Never carries keys, headers or raw provider bodies. */

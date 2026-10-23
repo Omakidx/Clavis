@@ -3,19 +3,34 @@ import { fakeBrowser } from 'wxt/testing/fake-browser';
 import {
   createSpeechHandlers,
   rejectedSpeakReply,
+  toPlatform,
+  toVoiceInfos,
+  type PushTarget,
   type SpeechSender,
 } from '../../../lib/speech/background';
 import { SpeechService } from '../../../lib/speech/service';
-import type { TtsEventMessage } from '../../../lib/speech/messages';
+import type { TtsEventMessage } from '../../../lib/contracts';
+import { voicesReportSchema } from '../../../lib/contracts';
 import { FakeEngine, ID_A, ID_B, voice } from './helpers';
 
-function setup(chromeVoices = [voice('chrome-tts', 'en-US')]) {
-  const chrome = new FakeEngine('chrome-tts', chromeVoices);
-  const offscreenFake = new FakeEngine('offscreen-web-speech', []);
+interface SetupOptions {
+  chromeVoices?: ReturnType<typeof voice>[];
+  offscreenVoices?: ReturnType<typeof voice>[];
+  preferences?: { ttsLang?: string; ttsVoice?: string };
+  os?: 'linux' | 'mac' | 'win' | 'cros' | 'android' | 'other';
+}
+
+function setup(options: SetupOptions = {}) {
+  const chrome = new FakeEngine(
+    'chrome-tts',
+    options.chromeVoices ?? [voice('chrome-tts', 'en-US')],
+  );
+  const offscreenFake = new FakeEngine('offscreen-web-speech', options.offscreenVoices ?? []);
   const service = new SpeechService({ engines: [chrome, offscreenFake], startTimeoutMs: 1_000 });
   const handlePageEvent = vi.fn();
   const handlePageIdle = vi.fn();
-  const pushed: { target: object; message: TtsEventMessage }[] = [];
+  const pushed: { target: PushTarget; message: TtsEventMessage }[] = [];
+  const preferences = vi.fn(() => Promise.resolve(options.preferences ?? {}));
   const handlers = createSpeechHandlers({
     service,
     offscreenEngine: { handlePageEvent, handlePageIdle },
@@ -23,10 +38,19 @@ function setup(chromeVoices = [voice('chrome-tts', 'en-US')]) {
       pushed.push({ target, message });
       return Promise.resolve();
     },
-    offscreenApi: { getContexts: true, hasDocument: true, matchClients: true },
-    userAgent: 'test',
+    preferences,
+    platform: () => Promise.resolve(options.os ?? 'mac'),
   });
-  return { chrome, service, handlers, handlePageEvent, handlePageIdle, pushed };
+  return {
+    chrome,
+    offscreen: offscreenFake,
+    service,
+    handlers,
+    handlePageEvent,
+    handlePageIdle,
+    pushed,
+    preferences,
+  };
 }
 
 const SELF: SpeechSender = { tabId: 7, frameId: 2 };
@@ -62,7 +86,7 @@ describe('speech handlers', () => {
   });
 
   it('replies NO_VOICE (never ok) when no engine has a voice', async () => {
-    const { handlers } = setup([]);
+    const { handlers } = setup({ chromeVoices: [] });
     const reply = (await handlers.speak(speakMsg(), SELF)) as {
       ok: boolean;
       requestId: string;
@@ -158,6 +182,113 @@ describe('speech handlers', () => {
       await handlers.stop(stopMsg(), { tabId: 3 });
       expect(chrome.stopCalls).toBe(1);
     });
+
+    it('also reaches the engines for a stop WITH an id the restarted worker does not know (M1)', async () => {
+      const { handlers, chrome } = setup();
+      expect(await handlers.stop(stopMsg(ID_A), { tabId: 3 })).toEqual({
+        ok: true,
+        requestId: ID_A,
+        data: { stopped: false },
+      });
+      expect(chrome.stopCalls).toBe(1);
+    });
+
+    it('does not stop speech of another tab when another request is tracked (stale id)', async () => {
+      const { handlers, chrome } = setup();
+      await handlers.speak(speakMsg({ requestId: ID_A }), { tabId: 1, frameId: 0 });
+      await handlers.stop(stopMsg(ID_B), { tabId: 3 });
+      expect(chrome.stopCalls).toBe(0);
+    });
+
+    it('an id-less stop checks ownership of the utterance being spoken, not of any tracked one (L4)', async () => {
+      const { handlers, chrome, pushed } = setup();
+      await handlers.speak(speakMsg({ requestId: ID_A }), { tabId: 1, frameId: 0 });
+      // Tab 2 asks too; its request supersedes tab 1's, so tab 1 no longer owns what plays.
+      await handlers.speak(speakMsg({ requestId: ID_B }), { tabId: 2, frameId: 0 });
+      expect(pushed.map((p) => p.message.state)).toEqual(['cancelled']);
+      expect(await handlers.stop(stopMsg(), { tabId: 1 })).toMatchObject({
+        data: { stopped: false },
+      });
+      expect(chrome.stopCalls).toBe(1); // only the supersede
+      expect(await handlers.stop(stopMsg(), { tabId: 2 })).toMatchObject({
+        data: { stopped: true },
+      });
+    });
+  });
+
+  describe('a Stop never loses the race against the audio it stops (H1)', () => {
+    it('stop during the preferences read: the request is cancelled and no audio starts', async () => {
+      const { handlers, chrome, preferences } = setup();
+      let release: (() => void) | undefined;
+      preferences.mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            release = () => resolve({});
+          }),
+      );
+      const speaking = handlers.speak(speakMsg({ requestId: ID_A }), SELF);
+      expect(await handlers.stop(stopMsg(ID_A), SELF)).toMatchObject({ data: { stopped: true } });
+      release?.();
+      expect(await speaking).toMatchObject({
+        ok: false,
+        requestId: ID_A,
+        error: { code: 'REQUEST_CANCELLED' },
+      });
+      await vi.advanceTimersByTimeAsync(2_000);
+      expect(chrome.speakCalls).toHaveLength(0);
+    });
+
+    it("an id-less stop cancels the sender's own preparing request, not another tab's", async () => {
+      const { handlers, chrome, preferences } = setup();
+      const releases: (() => void)[] = [];
+      preferences.mockImplementation(
+        () =>
+          new Promise((resolve) => {
+            releases.push(() => resolve({}));
+          }),
+      );
+      const own = handlers.speak(speakMsg({ requestId: ID_A }), { tabId: 1, frameId: 0 });
+      expect(await handlers.stop(stopMsg(), { tabId: 2 })).toMatchObject({
+        data: { stopped: false },
+      });
+      expect(await handlers.stop(stopMsg(), { tabId: 1 })).toMatchObject({
+        data: { stopped: true },
+      });
+      for (const release of releases) release();
+      expect(await own).toMatchObject({ ok: false, error: { code: 'REQUEST_CANCELLED' } });
+      expect(chrome.speakCalls).toHaveLength(0);
+    });
+
+    it('stop while the voices are still being looked up: no audio starts afterwards', async () => {
+      const { handlers, chrome } = setup({ chromeVoices: [] });
+      chrome.peek = [];
+      chrome.getVoicesDelayMs = 1_500;
+      chrome.voices = [voice('chrome-tts', 'en-US')];
+      const speaking = handlers.speak(speakMsg({ requestId: ID_A, lang: 'en' }), SELF);
+      await vi.advanceTimersByTimeAsync(200);
+      expect(await handlers.stop(stopMsg(ID_A), SELF)).toMatchObject({ data: { stopped: true } });
+      await vi.advanceTimersByTimeAsync(3_000);
+      expect(await speaking).toMatchObject({ ok: false, error: { code: 'REQUEST_CANCELLED' } });
+      expect(chrome.speakCalls).toHaveLength(0);
+    });
+
+    it('another tab cannot stop a request that is still being prepared', async () => {
+      const { handlers, chrome, preferences } = setup();
+      let release: (() => void) | undefined;
+      preferences.mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            release = () => resolve({});
+          }),
+      );
+      const speaking = handlers.speak(speakMsg({ requestId: ID_A }), { tabId: 1, frameId: 0 });
+      expect(await handlers.stop(stopMsg(ID_A), { tabId: 2 })).toMatchObject({
+        data: { stopped: false },
+      });
+      release?.();
+      expect(await speaking).toMatchObject({ ok: true });
+      expect(chrome.speakCalls).toHaveLength(1);
+    });
   });
 
   it('pushes terminal states (not started) to the tab and frame that asked', async () => {
@@ -199,13 +330,347 @@ describe('speech handlers', () => {
     expect(handlePageIdle).toHaveBeenCalledTimes(1);
   });
 
-  it('serves diagnostics', async () => {
-    const { handlers } = setup();
-    const reply = await handlers.diagnose();
-    expect(reply.ok).toBe(true);
-    if (reply.ok) {
-      expect(reply.data.capability.engine).toBe('chrome-tts');
-      expect(reply.data.userAgent).toBe('test');
-    }
+  describe('voice and language choice from preferences', () => {
+    it('speaks with the message language, else the saved language, and refines a bare language', async () => {
+      const gb = voice('chrome-tts', 'en-GB', { name: 'Daniel' });
+      const us = voice('chrome-tts', 'en-US', { name: 'Alex' });
+      const fr = voice('chrome-tts', 'fr-FR', { name: 'Amelie' });
+      const { handlers, chrome } = setup({
+        chromeVoices: [us, gb, fr],
+        preferences: { ttsLang: 'en-GB' },
+      });
+      await handlers.speak(speakMsg({ requestId: ID_A }), SELF);
+      expect(chrome.speakCalls.at(-1)?.voice?.name).toBe('Daniel');
+      // A detected "en" is refined by the preferred British English.
+      await handlers.speak(speakMsg({ requestId: ID_B, lang: 'en' }), SELF);
+      expect(chrome.speakCalls.at(-1)?.voice?.name).toBe('Daniel');
+      // A different language in the message wins over the preference.
+      await handlers.speak(speakMsg({ requestId: ID_A, lang: 'fr' }), SELF);
+      expect(chrome.speakCalls.at(-1)?.voice?.name).toBe('Amelie');
+    });
+
+    it('uses the saved voice, and says which voice spoke when it disappeared', async () => {
+      const a = voice('chrome-tts', 'en-US', { name: 'Alex' });
+      const d = voice('chrome-tts', 'en-GB', { name: 'Daniel' });
+      const present = setup({ chromeVoices: [a, d], preferences: { ttsVoice: 'Daniel' } });
+      expect(await present.handlers.speak(speakMsg({ lang: 'en' }), SELF)).toMatchObject({
+        data: { voiceName: 'Daniel', lang: 'en-GB' },
+      });
+      const missing = setup({ chromeVoices: [a], preferences: { ttsVoice: 'Daniel' } });
+      expect(await missing.handlers.speak(speakMsg({ lang: 'en' }), SELF)).toMatchObject({
+        ok: true,
+        data: { voiceName: 'Alex' },
+      });
+    });
+
+    it('an explicit voiceName beats the saved voice; a missing one is NO_VOICE, not a stand-in', async () => {
+      const a = voice('chrome-tts', 'en-US', { name: 'Alex' });
+      const d = voice('chrome-tts', 'en-GB', { name: 'Daniel' });
+      const { handlers, chrome } = setup({
+        chromeVoices: [a, d],
+        preferences: { ttsVoice: 'Daniel' },
+      });
+      expect(await handlers.speak(speakMsg({ voiceName: 'Alex' }), SELF)).toMatchObject({
+        data: { voiceName: 'Alex' },
+      });
+      const reply = await handlers.speak(speakMsg({ requestId: ID_B, voiceName: 'Nobody' }), SELF);
+      expect(reply).toMatchObject({ ok: false, error: { code: 'NO_VOICE' } });
+      expect(chrome.speakCalls).toHaveLength(1);
+    });
+
+    it('uses a network voice only when the user chose it, and reports it as remote', async () => {
+      const net = voice('chrome-tts', 'en-US', { name: 'Net', remote: true });
+      const explicit = setup({ chromeVoices: [net] });
+      expect(await explicit.handlers.speak(speakMsg({ voiceName: 'Net' }), SELF)).toMatchObject({
+        data: { voiceName: 'Net', remote: true },
+      });
+      const saved = setup({ chromeVoices: [net], preferences: { ttsVoice: 'Net' } });
+      expect(await saved.handlers.speak(speakMsg({ lang: 'en' }), SELF)).toMatchObject({
+        data: { voiceName: 'Net', remote: true },
+      });
+    });
+
+    it('never picks a network voice on its own (D-22): on-device voice, or NO_VOICE', async () => {
+      const local = voice('chrome-tts', 'en-US', { name: 'Local' });
+      const net = voice('chrome-tts', 'en-US', { name: 'Net', remote: true });
+      for (const lang of ['en', undefined]) {
+        const both = setup({ chromeVoices: [net, local] });
+        expect(await both.handlers.speak(speakMsg({ lang }), SELF)).toMatchObject({
+          data: { voiceName: 'Local', remote: false },
+        });
+        const onlyNet = setup({ chromeVoices: [net] });
+        const reply = await onlyNet.handlers.speak(speakMsg({ lang }), SELF);
+        expect(reply).toMatchObject({ ok: false, error: { code: 'NO_VOICE' } });
+        expect(onlyNet.chrome.speakCalls).toHaveLength(0);
+      }
+    });
+
+    it('without any language an on-device voice speaks, never an unknown default', async () => {
+      const local = voice('chrome-tts', 'de-DE', { name: 'Local' });
+      const { handlers, chrome } = setup({ chromeVoices: [local] });
+      expect(await handlers.speak(speakMsg(), SELF)).toMatchObject({
+        data: { voiceName: 'Local', remote: false },
+      });
+      expect(chrome.speakCalls[0]?.voice?.name).toBe('Local');
+    });
+
+    it('reads no preference it cannot read: a failing store behaves like no preferences', async () => {
+      const { handlers, preferences } = setup();
+      preferences.mockRejectedValueOnce(new Error('storage down'));
+      expect(await handlers.speak(speakMsg(), SELF)).toMatchObject({ ok: true });
+    });
+
+    it('sanitises what the engine reported: a language tag that is not a tag is omitted', async () => {
+      const { handlers } = setup({
+        chromeVoices: [voice('chrome-tts', 'english (united states)', { name: 'Odd' })],
+      });
+      const reply = (await handlers.speak(speakMsg({ voiceName: 'Odd' }), SELF)) as {
+        data: Record<string, unknown>;
+      };
+      expect(reply.data).not.toHaveProperty('lang');
+      expect(reply.data['voiceName']).toBe('Odd');
+    });
+
+    it('lets a newer request win when it overtakes one still reading preferences', async () => {
+      const { handlers, chrome, preferences } = setup();
+      let releaseFirst: (() => void) | undefined;
+      preferences.mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            releaseFirst = () => resolve({});
+          }),
+      );
+      const first = handlers.speak(speakMsg({ requestId: ID_A }), SELF);
+      const second = await handlers.speak(speakMsg({ requestId: ID_B }), SELF);
+      expect(second).toMatchObject({ ok: true, requestId: ID_B });
+      releaseFirst?.();
+      expect(await first).toMatchObject({
+        ok: false,
+        requestId: ID_A,
+        error: { code: 'REQUEST_CANCELLED' },
+      });
+      expect(chrome.speakCalls.map((c) => c.requestId)).toEqual([ID_B]);
+    });
+  });
+
+  describe('NO_VOICE and the Linux reason', () => {
+    it('adds reason no-voice-linux on Linux when no engine has any voice', async () => {
+      const { handlers } = setup({ chromeVoices: [], os: 'linux' });
+      const reply = (await handlers.speak(speakMsg(), SELF)) as {
+        ok: boolean;
+        requestId: string;
+        error: { code: string; reason?: string; message: string };
+      };
+      expect(reply.ok).toBe(false);
+      expect(reply.requestId).toBe(ID_A);
+      expect(reply.error).toMatchObject({ code: 'NO_VOICE', reason: 'no-voice-linux' });
+      expect(reply).not.toHaveProperty('data');
+    });
+
+    it('has no reason on other systems when there is no voice at all', async () => {
+      for (const os of ['mac', 'win', 'cros', 'other'] as const) {
+        const { handlers } = setup({ chromeVoices: [], os });
+        const reply = await handlers.speak(speakMsg(), SELF);
+        expect(reply).toMatchObject({ error: { code: 'NO_VOICE' } });
+        expect(reply).not.toHaveProperty('error.reason');
+      }
+    });
+
+    it('says no-voice-language when voices exist but none speak the language (any OS)', async () => {
+      for (const os of ['linux', 'mac'] as const) {
+        const { handlers } = setup({ os });
+        expect(await handlers.speak(speakMsg({ lang: 'fr' }), SELF)).toMatchObject({
+          ok: false,
+          error: { code: 'NO_VOICE', reason: 'no-voice-language' },
+        });
+      }
+    });
+
+    it('says start-failed when a voice was found but never started', async () => {
+      const { handlers, chrome } = setup({ os: 'linux' });
+      chrome.autoStart = false;
+      const pending = handlers.speak(speakMsg({ lang: 'en' }), SELF);
+      await vi.advanceTimersByTimeAsync(1_100);
+      expect(await pending).toMatchObject({
+        ok: false,
+        error: { code: 'NO_VOICE', reason: 'start-failed' },
+      });
+    });
+
+    it('reports network-only voices as online-only (D-22: on-device voices by default)', async () => {
+      const { handlers } = setup({
+        chromeVoices: [voice('chrome-tts', 'en-US', { name: 'Net', remote: true })],
+      });
+      expect(await handlers.speak(speakMsg({ lang: 'en' }), SELF)).toMatchObject({
+        error: { code: 'NO_VOICE', reason: 'online-only' },
+      });
+    });
+
+    it('treats an unreadable platform as "other" (no Linux hint), without failing', async () => {
+      const chrome = new FakeEngine('chrome-tts', []);
+      const handlers = createSpeechHandlers({
+        service: new SpeechService({ engines: [chrome] }),
+        offscreenEngine: { handlePageEvent: vi.fn(), handlePageIdle: vi.fn() },
+        push: () => Promise.resolve(),
+        preferences: () => Promise.resolve({}),
+        platform: () => Promise.reject(new Error('no platform')),
+      });
+      const reply = await handlers.speak(speakMsg(), SELF);
+      expect(reply).toMatchObject({ ok: false, error: { code: 'NO_VOICE' } });
+      expect(reply).not.toHaveProperty('error.reason');
+    });
+  });
+
+  describe('events go to exactly the asking document', () => {
+    it('targets the sender document, frame and tab', async () => {
+      const { handlers, chrome, pushed } = setup();
+      await handlers.speak(speakMsg(), { tabId: 7, frameId: 2, documentId: 'DOC-1' });
+      chrome.emit({ state: 'ended' });
+      expect(pushed.map((p) => p.target)).toEqual([{ tabId: 7, frameId: 2, documentId: 'DOC-1' }]);
+    });
+
+    it('a tab-less page gets a push without a tab (runtime.sendMessage)', async () => {
+      const { handlers, chrome, pushed } = setup();
+      await handlers.speak(speakMsg(), {});
+      chrome.emit({ state: 'error', detail: 'synthesis-failed' });
+      expect(pushed).toEqual([
+        {
+          target: { tabId: undefined, frameId: undefined, documentId: undefined },
+          message: { v: 1, type: 'TTS_EVENT', requestId: ID_A, state: 'error' },
+        },
+      ]);
+    });
+
+    it('never puts text, voice or detail in an event, and sends each request one terminal event', async () => {
+      const { handlers, chrome, pushed } = setup();
+      await handlers.speak(speakMsg({ text: 'secret sentence' }), SELF);
+      chrome.emit({ state: 'ended' });
+      chrome.emit({ state: 'ended' });
+      expect(pushed).toHaveLength(1);
+      expect(JSON.stringify(pushed[0]?.message)).not.toContain('secret');
+      expect(Object.keys(pushed[0]?.message ?? {}).sort()).toEqual([
+        'requestId',
+        'state',
+        'type',
+        'v',
+      ]);
+    });
+
+    it('a request superseded before it started gets no event: its reply is the cancellation', async () => {
+      const { handlers, chrome, pushed } = setup();
+      chrome.autoStart = false;
+      const first = handlers.speak(speakMsg({ requestId: ID_A }), { tabId: 1, frameId: 0 });
+      await vi.advanceTimersByTimeAsync(0);
+      chrome.autoStart = true;
+      const second = await handlers.speak(speakMsg({ requestId: ID_B }), { tabId: 2, frameId: 0 });
+      expect(second).toMatchObject({ ok: true });
+      expect(await first).toMatchObject({ ok: false, error: { code: 'REQUEST_CANCELLED' } });
+      expect(pushed).toEqual([]);
+    });
+
+    it('a failing push (page gone) does not break later events', async () => {
+      const { chrome, service } = setup();
+      const push = vi.fn().mockRejectedValue(new Error('no receiver'));
+      const handlers = createSpeechHandlers({
+        service,
+        offscreenEngine: { handlePageEvent: vi.fn(), handlePageIdle: vi.fn() },
+        push,
+        preferences: () => Promise.resolve({}),
+        platform: () => Promise.resolve('mac'),
+      });
+      await handlers.speak(speakMsg(), SELF);
+      chrome.emit({ state: 'ended' });
+      await vi.advanceTimersByTimeAsync(0);
+      expect(push).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('GET_VOICES report', () => {
+    it('reports platform, default engine and both engines with their voices', async () => {
+      const { handlers } = setup({
+        os: 'win',
+        chromeVoices: [voice('chrome-tts', 'en_US', { name: 'Zira' })],
+        offscreenVoices: [voice('offscreen-web-speech', 'de-DE', { name: 'Hedda', remote: true })],
+      });
+      expect(await handlers.getVoices()).toEqual({
+        ok: true,
+        data: {
+          platform: 'win',
+          defaultEngine: 'chrome-tts',
+          engines: {
+            chromeTts: {
+              voices: [{ name: 'Zira', lang: 'en-US', engine: 'chrome-tts', remote: false }],
+            },
+            offscreen: {
+              available: true,
+              voices: [
+                { name: 'Hedda', lang: 'de-DE', engine: 'offscreen-web-speech', remote: true },
+              ],
+            },
+          },
+        },
+      });
+    });
+
+    it('is voicesReportSchema-shaped on this Linux machine: no voices, offscreen available', async () => {
+      const { handlers } = setup({ chromeVoices: [], os: 'linux' });
+      const reply = await handlers.getVoices();
+      expect(voicesReportSchema.parse((reply as { data: unknown }).data)).toEqual({
+        platform: 'linux',
+        defaultEngine: 'none',
+        engines: { chromeTts: { voices: [] }, offscreen: { available: true, voices: [] } },
+      });
+    });
+
+    it('defaults to the offscreen engine only when chrome.tts has none and it can run', async () => {
+      const off = [voice('offscreen-web-speech', 'en-US')];
+      const usable = setup({ chromeVoices: [], offscreenVoices: off });
+      expect(await usable.handlers.getVoices()).toMatchObject({
+        data: { defaultEngine: 'offscreen-web-speech' },
+      });
+      const broken = setup({ chromeVoices: [], offscreenVoices: off });
+      broken.offscreen.surveyResult = { available: false, voices: off };
+      expect(await broken.handlers.getVoices()).toMatchObject({
+        data: { defaultEngine: 'none', engines: { offscreen: { available: false } } },
+      });
+    });
+
+    it('asks for a fresh survey every time (re-probe, speech-dispatcher installed)', async () => {
+      const { handlers, chrome } = setup({ chromeVoices: [] });
+      await handlers.getVoices();
+      expect(chrome.invalidateCalls).toBe(1);
+      chrome.voices = [voice('chrome-tts', 'en-US')];
+      expect(await handlers.getVoices()).toMatchObject({ data: { defaultEngine: 'chrome-tts' } });
+      expect(chrome.invalidateCalls).toBe(2);
+    });
+  });
+});
+
+describe('toVoiceInfos', () => {
+  it('keeps one usable, addressable voice per name and bounds the list', () => {
+    const many = Array.from({ length: 600 }, (_, i) =>
+      voice('chrome-tts', 'en-US', { name: `v${i}` }),
+    );
+    expect(toVoiceInfos(many)).toHaveLength(500);
+    const mixed = [
+      voice('chrome-tts', 'en-US', { name: 'A' }),
+      voice('chrome-tts', 'en-US', { name: 'A' }),
+      voice('chrome-tts', 'en-US', { name: '' }),
+      voice('chrome-tts', 'en-US', { name: 'x'.repeat(129) }),
+      // Lists its events without `start`: could never prove audio began.
+      voice('chrome-tts', 'en-US', { name: 'Mute', eventTypes: ['end'] }),
+      voice('chrome-tts', '', { name: 'NoLang' }),
+    ];
+    expect(toVoiceInfos(mixed)).toEqual([
+      { name: 'A', lang: 'en-US', engine: 'chrome-tts', remote: false },
+      { name: 'NoLang', engine: 'chrome-tts', remote: false },
+    ]);
+  });
+});
+
+describe('toPlatform', () => {
+  it('maps the browser os names', () => {
+    for (const os of ['linux', 'mac', 'win', 'cros', 'android']) expect(toPlatform(os)).toBe(os);
+    for (const os of ['openbsd', 'fuchsia', '', undefined]) expect(toPlatform(os)).toBe('other');
   });
 });

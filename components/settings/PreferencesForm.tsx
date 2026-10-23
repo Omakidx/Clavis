@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { TTS_RATES } from '../../lib/config/constants';
 import type {
   KeyStatus,
   Preferences,
@@ -11,6 +10,7 @@ import { t } from '../../lib/i18n';
 import type { ClientResult } from '../../lib/ui-client/request';
 import { RadioGroup, SelectField } from './fields';
 import { languageOptions } from './languages';
+import { SpeedField, VoiceLanguageField } from './VoiceFields';
 import { ModelField } from './ModelField';
 import { useSaveStatus } from './use-save-status';
 
@@ -21,9 +21,12 @@ interface PreferencesFormProps {
   /** Include the model chooser (onboarding shows it with the other preferences). */
   keyStatus?: KeyStatus | null | undefined;
   includeModel?: boolean;
+  /**
+   * Include the voice language and playback speed (default). Settings shows them in its Voice
+   * section instead, next to the voice chooser.
+   */
+  includeVoice?: boolean;
 }
-
-const AUTO_VOICE = '';
 
 /**
  * FR-006 preference fields, shared by the onboarding wizard and Settings: explanation language,
@@ -36,6 +39,7 @@ export function PreferencesForm({
   save,
   keyStatus = null,
   includeModel = false,
+  includeVoice = true,
 }: PreferencesFormProps) {
   const { run, notice } = useSaveStatus(save);
   const [pending, setPending] = useState<PreferencesPatch | null>(null);
@@ -56,9 +60,6 @@ export function PreferencesForm({
     ttsLang: pending?.ttsLang === undefined ? preferences.ttsLang : (pending.ttsLang ?? undefined),
     model: pending?.model === undefined ? preferences.model : (pending.model ?? undefined),
   };
-  const rate = view.ttsRate;
-  const customRate = rate !== TTS_RATES.normal && rate !== TTS_RATES.slow;
-  const speed = rate === TTS_RATES.normal ? 'normal' : rate === TTS_RATES.slow ? 'slow' : 'custom';
 
   return (
     <div className="clavis-stack">
@@ -75,19 +76,9 @@ export function PreferencesForm({
         ))}
       </SelectField>
 
-      <SelectField
-        label={t('prefVoiceLanguage')}
-        hint={t('prefVoiceLanguageHint')}
-        value={view.ttsLang ?? AUTO_VOICE}
-        onChange={(value) => void change({ ttsLang: value === AUTO_VOICE ? null : value })}
-      >
-        <option value={AUTO_VOICE}>{t('prefVoiceLanguageAuto')}</option>
-        {languageOptions(view.ttsLang).map((option) => (
-          <option key={option.tag} value={option.tag}>
-            {option.label}
-          </option>
-        ))}
-      </SelectField>
+      {includeVoice ? (
+        <VoiceLanguageField value={view.ttsLang} onChange={(ttsLang) => void change({ ttsLang })} />
+      ) : null}
 
       <RadioGroup<ReadingLevel>
         legend={t('prefLevel')}
@@ -100,28 +91,9 @@ export function PreferencesForm({
         ]}
       />
 
-      <RadioGroup<'normal' | 'slow' | 'custom'>
-        legend={t('prefSpeed')}
-        value={speed}
-        onChange={(next) => {
-          if (next === 'custom') return;
-          const ttsRate = next === 'slow' ? TTS_RATES.slow : TTS_RATES.normal;
-          void change({ ttsRate });
-        }}
-        options={[
-          { value: 'normal', label: t('prefSpeedNormal') },
-          { value: 'slow', label: t('prefSpeedSlow') },
-          ...(customRate
-            ? [
-                {
-                  value: 'custom' as const,
-                  label: t('prefSpeedCustom', String(rate)),
-                  disabled: true,
-                },
-              ]
-            : []),
-        ]}
-      />
+      {includeVoice ? (
+        <SpeedField rate={view.ttsRate} onChange={(ttsRate) => void change({ ttsRate })} />
+      ) : null}
 
       <RadioGroup<TooltipBehavior>
         legend={t('prefTooltip')}

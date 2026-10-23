@@ -33,6 +33,7 @@ const privileged = {
   ACCEPT_DISCLOSURE: { ...base, type: 'ACCEPT_DISCLOSURE' },
   UPDATE_ONBOARDING: { ...base, type: 'UPDATE_ONBOARDING', completed: true },
   GET_SITE_ACCESS_STATUS: { ...base, type: 'GET_SITE_ACCESS_STATUS' },
+  GET_VOICES: { ...base, type: 'GET_VOICES' },
   CLEAR_ALL_DATA: { ...base, type: 'CLEAR_ALL_DATA' },
 };
 

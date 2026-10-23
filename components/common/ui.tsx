@@ -87,6 +87,7 @@ export function ErrorNotice({ error, onRetry, onOpenSettings }: ErrorNoticeProps
   return (
     <div role="alert" className="clavis-notice clavis-notice--danger" data-error-code={error.code}>
       <p>{error.message}</p>
+      {error.hint ? <p className="clavis-hint">{error.hint}</p> : null}
       {action ? <div className="clavis-actions">{action}</div> : null}
     </div>
   );

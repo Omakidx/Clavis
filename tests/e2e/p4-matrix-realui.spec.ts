@@ -104,6 +104,8 @@ test('keyboard shortcut Alt+Shift+E shows the toolbar and puts focus on Listen; 
   expect(await expectShown(page, 6000), 'toolbar after the shortcut').toBe(true);
   await expect.poll(() => toolbar(page).focusedAction()).toBe('listen');
   xdotool('key', 'Right');
+  await expect.poll(() => toolbar(page).focusedAction()).toBe('slow');
+  xdotool('key', 'Right');
   await expect.poll(() => toolbar(page).focusedAction()).toBe('explain');
   xdotool('key', 'Return');
   await toolbar(page).waitShown(SEL.card);

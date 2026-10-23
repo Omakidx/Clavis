@@ -8,16 +8,16 @@
     "description": "Short extension description shown on the extensions page. Chrome limits this to 132 characters."
   },
   "speechNoVoice": {
-    "message": "Clavis can't read this aloud because no voice is available on this computer. Install a text-to-speech voice for your system, restart Chrome and try again.",
-    "description": "Error shown when Listen is pressed but neither the browser's text-to-speech nor the fallback has any voice (FR-023). Listen is the name of a toolbar button. Spike D draft copy; Phase 6 refines it per operating system."
+    "message": "Voice isn't available on this device.",
+    "description": "Message shown when Listen is pressed but neither the browser's text-to-speech nor the fallback has any voice (FR-023). Listen is the name of a toolbar button. Followed by a hint that depends on the operating system."
   },
   "speechNoVoiceForLanguage": {
-    "message": "None of the voices on this computer match the chosen language, so Clavis won't read this aloud with the wrong accent.",
-    "description": "Error shown when voices exist but none speak the requested language (FR-024), instead of silently using a mismatched voice."
+    "message": "No voice on this device speaks this language, so Clavis won't read it with the wrong accent.",
+    "description": "Message shown when voices exist but none speak the language of the selected text (FR-024); Clavis never substitutes a mismatched voice. Followed by a Voice settings button."
   },
   "speechStartFailed": {
-    "message": "This computer has a voice, but it did not start speaking. Check your system sound and speech settings, then try again.",
-    "description": "Error shown when a voice was found but never produced audio within the start timeout (FR-023); avoids a fake playing state."
+    "message": "The voice didn't start. Check your sound and speech settings, then try again.",
+    "description": "Message shown when a voice was found but never produced audio (FR-023); avoids a fake playing state. No install hint: a voice exists."
   },
   "speechInvalidRequest": {
     "message": "Clavis can't read this text aloud. Select a shorter piece of text and try again.",
@@ -1556,5 +1556,166 @@
   "cardLoadAgain": {
     "message": "Load",
     "description": "Button in an explanation card tab that was not loaded: asks for it again."
+  },
+  "speechNoVoiceLinuxHint": {
+    "message": "Install speech-dispatcher and a voice such as espeak-ng, then restart Chrome.",
+    "description": "Hint under the \"no voice\" message on Linux, where Chrome has no text-to-speech voice until a speech engine is installed (FR-023). speech-dispatcher and espeak-ng are software package names; do not translate them."
+  },
+  "speechNoVoiceHint": {
+    "message": "Install a text-to-speech voice in your system settings, then restart Chrome.",
+    "description": "Hint under the \"no voice\" message on systems other than Linux (FR-023)."
+  },
+  "speechStarting": {
+    "message": "Starting playback…",
+    "description": "Screen reader announcement when Listen was pressed and audio has not started yet."
+  },
+  "speechPlaying": {
+    "message": "Playing.",
+    "description": "Screen reader announcement when Listen audio started."
+  },
+  "speechStopped": {
+    "message": "Stopped.",
+    "description": "Screen reader announcement after the user pressed Stop on Listen."
+  },
+  "speechStop": {
+    "message": "Stop",
+    "description": "Label of the toolbar Listen button while audio is playing; pressing it stops the audio."
+  },
+  "speechReplay": {
+    "message": "Replay",
+    "description": "Label of the toolbar Listen button after the audio finished; pressing it reads the same text again."
+  },
+  "speechSlow": {
+    "message": "Slow",
+    "description": "Label of the toolbar toggle that makes Listen read at a slower speed (pressed = slow). Applies to the next playback."
+  },
+  "speechRemoteNote": {
+    "message": "This voice sends the text to an online service.",
+    "description": "Small note shown once when the voice used by Listen synthesises speech online, so the text leaves the device (privacy)."
+  },
+  "speechPlaybackError": {
+    "message": "Playback stopped unexpectedly. Press Replay to try again.",
+    "description": "Message under the toolbar when the voice reported an error while reading aloud. Replay is the label of a toolbar button."
+  },
+  "speechVoiceSettings": {
+    "message": "Voice settings",
+    "description": "Button in the toolbar message about a missing voice; opens the Voice section of Settings."
+  },
+  "speechTimedOut": {
+    "message": "The voice did not start in time. Press Listen to try again.",
+    "description": "Message when Listen waited several seconds and no audio started (FR-023). Listen is the name of a toolbar button."
+  },
+  "voiceTitle": {
+    "message": "Voice",
+    "description": "Heading of the Voice section in Settings, where the user picks a voice for Listen and sees which voices exist on this device."
+  },
+  "voiceIntro": {
+    "message": "Listen reads selected text aloud with the voices on this computer. Nothing is sent to Groq.",
+    "description": "Intro under the Voice heading in Settings. Listen is the name of a toolbar button."
+  },
+  "voiceDevice": {
+    "message": "Voices found on this device",
+    "description": "Heading above the per-engine voice counts in Settings."
+  },
+  "voiceEngineChrome": {
+    "message": "Chrome voices",
+    "description": "Name of the voice group provided by the browser's own text-to-speech."
+  },
+  "voiceEngineFallback": {
+    "message": "Fallback voices",
+    "description": "Name of the voice group provided by the secondary speech engine, used only when Chrome has no voice."
+  },
+  "voiceCount": {
+    "message": "$ENGINE$: $COUNT$",
+    "description": "One line of the voice counts in Settings. $ENGINE$ is a group name such as Chrome voices, $COUNT$ is a number.",
+    "placeholders": { "ENGINE": { "content": "$1" }, "COUNT": { "content": "$2" } }
+  },
+  "voiceFallbackOff": {
+    "message": "Fallback voices: not in use",
+    "description": "Voice count line when the fallback speech engine is not available on this device."
+  },
+  "voiceEmpty": {
+    "message": "No voices found on this device",
+    "description": "Heading of the empty state in the Voice section when no text-to-speech voice exists."
+  },
+  "voiceChooser": {
+    "message": "Voice",
+    "description": "Label of the drop-down that chooses which voice Listen uses."
+  },
+  "voiceAutomatic": {
+    "message": "Automatic (best match)",
+    "description": "Option in the voice drop-down: Clavis picks the best voice for the language."
+  },
+  "voiceChooserHint": {
+    "message": "Automatic picks the best voice on this device for the language of the text.",
+    "description": "Hint under the voice drop-down."
+  },
+  "voiceLanguageFilter": {
+    "message": "Show voices for",
+    "description": "Label of the drop-down that filters the voice list by language."
+  },
+  "voiceAllLanguages": {
+    "message": "All languages",
+    "description": "Option that shows voices of every language."
+  },
+  "voiceOption": {
+    "message": "$NAME$ ($LANG$)",
+    "description": "One voice in the drop-down. $NAME$ is the voice name, $LANG$ a language code such as en-US.",
+    "placeholders": { "NAME": { "content": "$1" }, "LANG": { "content": "$2" } }
+  },
+  "voiceOptionOnline": {
+    "message": "$NAME$ ($LANG$) (online)",
+    "description": "One voice in the drop-down that speaks through an online service. $NAME$ is the voice name, $LANG$ a language code.",
+    "placeholders": { "NAME": { "content": "$1" }, "LANG": { "content": "$2" } }
+  },
+  "voiceSavedMissing": {
+    "message": "$NAME$ (not installed)",
+    "description": "Shown for a saved voice that is no longer on this device. $NAME$ is the voice name.",
+    "placeholders": { "NAME": { "content": "$1" } }
+  },
+  "voiceTest": {
+    "message": "Test voice",
+    "description": "Button in Settings that reads a short sample with the chosen voice."
+  },
+  "voiceTestSample": {
+    "message": "Hello, this is how Clavis sounds.",
+    "description": "Sample sentence read aloud by the Test voice button."
+  },
+  "voiceTestStarting": {
+    "message": "Starting the test…",
+    "description": "Status while the voice test has not started yet."
+  },
+  "voiceTestPlaying": {
+    "message": "Playing the test sentence.",
+    "description": "Status while the voice test is playing."
+  },
+  "voiceTestDone": {
+    "message": "Test finished.",
+    "description": "Status after the voice test finished."
+  },
+  "voiceDefaultEngine": {
+    "message": "Listen will use: $ENGINE$",
+    "description": "Status line in Settings. $ENGINE$ is a group name such as Chrome voices.",
+    "placeholders": { "ENGINE": { "content": "$1" } }
+  },
+  "listenDone": {
+    "message": "Finished reading aloud.",
+    "description": "Status in the practice page's result area after Listen finished the selected text."
+  },
+  "speechCancel": {
+    "message": "Cancel",
+    "description": "Label of the toolbar Listen button while audio is still starting; pressing it cancels the start."
+  },
+  "voiceOnlineNote": {
+    "message": "This voice is an online service: when you press Listen, the selected text is sent to that service to be spoken.",
+    "description": "Persistent privacy note under the voice drop-down in Settings when the chosen voice speaks through an online service. Listen is the name of a toolbar button."
+  },
+  "voiceOnlineTag": {
+    "message": "(online)",
+    "description": "Tag after the name of a voice that speaks through an online service, shown in the voice drop-down when the voice has no language code."
+  },
+  "speechOnlineOnly": {
+    "message": "Only online voices are available for this language. To use one, choose it in Voice settings.",
+    "description": "Message when Listen found voices for the language but all are online services, which Clavis only uses when the user chooses one explicitly (privacy). Followed by a Voice settings button."
   }
 }

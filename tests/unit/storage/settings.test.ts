@@ -85,6 +85,27 @@ describe('applyPreferencesPatch', () => {
   });
 });
 
+describe('ttsVoice preference (FR-025)', () => {
+  it('is saved, read back, cleared by null and reset with the other preferences', async () => {
+    const { store } = setup();
+    expect((await store.updatePreferences({ ttsVoice: 'Google UK English Female' })).ttsVoice).toBe(
+      'Google UK English Female',
+    );
+    expect((await store.getPreferences()).ttsVoice).toBe('Google UK English Female');
+    expect('ttsVoice' in (await store.updatePreferences({ ttsVoice: null }))).toBe(false);
+    await store.updatePreferences({ ttsVoice: 'Alex' });
+    expect(await store.resetPreferences()).toEqual(DEFAULT_PREFERENCES);
+  });
+
+  it('a corrupt stored voice resets only itself', () => {
+    const repaired = parsePreferences(
+      wrapRecord({ ...DEFAULT_PREFERENCES, ttsRate: 1.5, ttsVoice: 'x'.repeat(500) }),
+    );
+    expect(repaired.ttsRate).toBe(1.5);
+    expect('ttsVoice' in repaired).toBe(false);
+  });
+});
+
 describe('settings store', () => {
   it('reads defaults from empty storage without writing anything', async () => {
     const { area, store } = setup();

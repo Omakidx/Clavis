@@ -10,13 +10,15 @@ import { frameOffset, pageOf, type Box, type Surface } from './page';
  * Observable contract relied on (all inside the closed root):
  *   [data-clavis="panel"][data-kind=word|phrase|sentence|passage]
  *   [data-clavis="toolbar"] with role=toolbar and an accessible name
- *   button[data-action=listen|explain]
+ *   button[data-action=listen|slow|explain] (Slow is an aria-pressed toggle)
+ *   [data-clavis="listen-status"][data-status] the Listen report line (Listen opens no card)
  *   [data-clavis="card"] / [data-clavis="card-text"]: the captured text after an action
  */
 export { SEL };
 export const toolbar = (surface: Surface): ToolbarProbe => tb(surface);
 
-export type Action = ActionName;
+/** Phase 6 added the Slow toggle; the shared helper's `ActionName` does not list it yet. */
+export type Action = ActionName | 'slow';
 
 export async function readKind(surface: Surface): Promise<string | null | undefined> {
   return toolbar(surface).attr(SEL.panel, 'data-kind');
@@ -74,8 +76,33 @@ export async function clickButtonNamed(
 }
 
 /** Real click on a toolbar button (Listen, Explain, and the too-long state's trim action). */
-export async function clickAction(surface: Surface, action: ActionName): Promise<void> {
-  await toolbar(surface).click(action);
+export async function clickAction(surface: Surface, action: Action): Promise<void> {
+  await toolbar(surface).click(action as ActionName);
+}
+
+/** Selector of a toolbar button by its data-action (Listen, Slow, Explain, trim, close). */
+export const actionSelector = (action: Action): string => SEL.action(action as ActionName);
+
+export const LISTEN_STATUS = '[data-clavis="listen-status"]';
+
+/** The Listen report line (Phase 6): its `data-status` and visible text, or undefined when absent. */
+export async function readListenStatus(
+  surface: Surface,
+  timeoutMs = 3000,
+): Promise<{ status: string | null; text: string } | undefined> {
+  const probe = toolbar(surface);
+  const deadline = Date.now() + timeoutMs;
+  for (;;) {
+    const value = await probe
+      .evalIn<{ status: string | null; text: string }>(
+        LISTEN_STATUS,
+        `function () { return { status: this.getAttribute('data-status'), text: (this.textContent || '').trim() }; }`,
+      )
+      .catch(() => undefined);
+    if (value !== undefined && value.text !== '') return value;
+    if (Date.now() > deadline) return undefined;
+    await new Promise((resolve) => setTimeout(resolve, 60));
+  }
 }
 
 /** `data-mode` of the panel: actions | too-long | notice (null when the build has no such attribute). */

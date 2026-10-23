@@ -92,6 +92,7 @@ export const SETTINGS_MESSAGES: Record<string, unknown> = {
   ACCEPT_DISCLOSURE: { v: 1, type: 'ACCEPT_DISCLOSURE' },
   UPDATE_ONBOARDING: { v: 1, type: 'UPDATE_ONBOARDING', completed: true },
   GET_SITE_ACCESS_STATUS: { v: 1, type: 'GET_SITE_ACCESS_STATUS' },
+  GET_VOICES: { v: 1, type: 'GET_VOICES' },
 };
 
 export const PRIVILEGED_MESSAGES = { ...KEY_MESSAGES, ...SETTINGS_MESSAGES };
@@ -174,6 +175,8 @@ export function createHarness(options: HarnessOptions = {}) {
     service: speechService,
     offscreenEngine: { handlePageEvent: vi.fn(), handlePageIdle: vi.fn() },
     push: () => Promise.resolve(),
+    preferences: () => settingsStore.getPreferences(),
+    platform: () => Promise.resolve('linux'),
   });
   const injection = {
     scripting: { executeScript: vi.fn(() => Promise.resolve([{ frameId: 0 }])) },

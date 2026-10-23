@@ -8,9 +8,13 @@ import {
 } from '../../../lib/speech/offscreen-page';
 import { ID_A } from './helpers';
 
+const WORKER_URL = 'chrome-extension://ext/background.js';
 type Listener = Parameters<OffscreenPageDeps['runtime']['onMessage']['addListener']>[0];
 
-function makePage(initialVoices: SynthVoiceLike[], opts: { synth?: boolean } = {}) {
+function makePage(
+  initialVoices: SynthVoiceLike[],
+  opts: { synth?: boolean; workerUrl?: string | undefined } = {},
+) {
   let voices = initialVoices;
   const voiceListeners = new Set<() => void>();
   const spoken: SynthUtteranceLike[] = [];
@@ -38,6 +42,7 @@ function makePage(initialVoices: SynthVoiceLike[], opts: { synth?: boolean } = {
       },
       onMessage: { addListener: (l) => (listener = l) },
     },
+    workerUrl: 'workerUrl' in opts ? opts.workerUrl : WORKER_URL,
     synth: opts.synth === false ? undefined : synth,
     createUtterance: (text) => ({
       text,
@@ -52,7 +57,10 @@ function makePage(initialVoices: SynthVoiceLike[], opts: { synth?: boolean } = {
     idleNotifyMs: 10_000,
   });
 
-  async function command(message: unknown, sender: { id?: string; tab?: unknown } = { id: 'ext' }) {
+  async function command(
+    message: unknown,
+    sender: { id?: string; tab?: unknown; url?: string } = { id: 'ext', url: WORKER_URL },
+  ) {
     let reply: unknown;
     const done = new Promise<void>((resolve) => {
       const keepOpen = listener?.(message, sender, (r) => {
@@ -198,11 +206,59 @@ describe('offscreen page', () => {
     expect(page.synth.cancel).toHaveBeenCalled();
   });
 
-  it('only obeys the service worker: ignores content scripts (tab) and other extensions', async () => {
+  it('only obeys the service worker: no tab, this extension and the worker script url (INFO-9)', async () => {
     const page = makePage([EN]);
-    expect(await (await page.command(GET, { id: 'ext', tab: { id: 1 } })).settle()).toBeUndefined();
-    expect(await (await page.command(GET, { id: 'other' })).settle()).toBeUndefined();
+    const refused: { id?: string; tab?: unknown; url?: string }[] = [
+      // A content script (tab) that borrowed the extension id.
+      { id: 'ext', tab: { id: 1 }, url: 'https://evil.example/' },
+      // Another extension.
+      { id: 'other', url: WORKER_URL },
+      // Our own tab-less popup, and our own pages in a tab: not the worker.
+      { id: 'ext', url: 'chrome-extension://ext/popup.html' },
+      { id: 'ext', tab: { id: 2 }, url: 'chrome-extension://ext/options.html' },
+      { id: 'ext', url: 'chrome-extension://ext/offscreen.html' },
+      // The worker's url but with a tab, or no url at all.
+      { id: 'ext', tab: { id: 3 }, url: WORKER_URL },
+      { id: 'ext' },
+      { id: 'ext', url: `${WORKER_URL}?x=1` },
+    ];
+    for (const sender of refused) {
+      expect(await (await page.command(GET, sender)).settle()).toBeUndefined();
+      expect(await (await page.command(speakCmd(), sender)).settle()).toBeUndefined();
+    }
     expect(page.spoken).toHaveLength(0);
+    // The worker itself is heard.
+    expect(await (await page.command(GET)).settle()).toMatchObject({ ok: true });
+  });
+
+  it('fails closed when the worker url is unknown', async () => {
+    const page = makePage([EN], { workerUrl: undefined });
+    expect(await (await page.command(GET)).settle()).toBeUndefined();
+  });
+
+  it('speaks the voice it was told by name, and refuses (no stand-in) when it is missing', async () => {
+    const page = makePage([EN, FR]);
+    expect(
+      await (await page.command(speakCmd({ voiceName: 'Remote', lang: 'fr-FR' }))).settle(),
+    ).toEqual({
+      ok: true,
+    });
+    expect(page.spoken[0]?.voice?.name).toBe('Remote');
+    const missing = await (await page.command(speakCmd({ voiceName: 'Gone' }))).settle();
+    expect(missing).toMatchObject({ ok: false });
+    expect(page.spoken).toHaveLength(1);
+  });
+
+  it('reports only voices that can be addressed by name, and a bounded list', async () => {
+    const odd: SynthVoiceLike[] = [
+      { name: '', lang: 'en', localService: true },
+      { name: 'x'.repeat(129), lang: 'en', localService: true },
+      EN,
+    ];
+    const page = makePage(odd);
+    expect(await (await page.command(GET)).settle()).toMatchObject({
+      voices: [{ name: 'Local', lang: 'en-US', remote: false }],
+    });
   });
 
   it('ignores messages that are not addressed to it, and rejects malformed commands', async () => {

@@ -1,9 +1,9 @@
 # Execution phases — Clavis
 
-**Document status:** v1 end-to-end implementation playbook (rev. 1.1 — decisions D-01 … D-21)  
+**Document status:** v1 end-to-end implementation playbook (rev. 1.1 — decisions D-01 … D-22)  
 **Baseline:** 2026-10-22 · **Goal:** deliver a privacy-conscious, production-ready Chrome MV3 extension with Groq BYOK, word/sentence pronunciation, contextual explanations, and a custom PDF reader.
 
-> Use this as the project's **build checklist and milestone tracker**. Feature IDs correspond to [requirements.md](requirements.md); implementation boundaries are in [architecture.md](architecture.md); approved tools are in [tech-stack.md](tech-stack.md). Product decisions D-01 … D-21 are in [requirements.md §11](requirements.md#11-product-decisions).
+> Use this as the project's **build checklist and milestone tracker**. Feature IDs correspond to [requirements.md](requirements.md); implementation boundaries are in [architecture.md](architecture.md); approved tools are in [tech-stack.md](tech-stack.md). Product decisions D-01 … D-22 are in [requirements.md §11](requirements.md#11-product-decisions).
 
 ## 0. Delivery philosophy and estimates
 
@@ -35,13 +35,13 @@ flowchart TD
 
 | Phase | Approx. effort | Exit gate |
 | --- | --- | --- |
-| 0 — Specification & risks | Done 2026-10-22 | Scope frozen, decisions D-01 … D-21 logged |
+| 0 — Specification & risks | Done 2026-10-22 | Scope frozen, decisions D-01 … D-22 logged |
 | 1 — Scaffold & CI | Done 2026-10-22 | Unpacked extension loads; lint/test/build pipeline works |
 | 2 — Feasibility spikes | Engineering done 2026-10-22; awaiting user runs | Groq call + model comparison, permission flow + toolbar latency, PDF viewer text layer and TTS capability proven |
 | 3 — Onboarding & BYOK | Done 2026-10-22 | Site access, valid/invalid keys, trusted storage and settings covered |
 | 4 — Web highlight toolbar | Done 2026-10-22 | Reliable selection/position/dismiss/keyboard behavior on both injection paths |
 | 5 — AI explanation | Done 2026-10-23 | Core request + Must tabs function with typed responses |
-| 6 — Listen/TTS | 1–3 days | Word + sentence playback with usable no-voice fallback |
+| 6 — Listen/TTS | Done 2026-10-23 | Word + sentence playback with usable no-voice fallback |
 | 7 — Custom PDF reader | 3–5 days | Local PDF in viewer components + text selection + reader controls |
 | 8 — Unified UX | 2–4 days | Web/PDF consistent; side panel, copy, Should tabs if on schedule |
 | 9 — Hardening and QA | 3–6 days | Acceptance matrix, privacy and performance gates pass |
@@ -68,7 +68,7 @@ Effort counts are overlapping planning estimates, not additive deadlines; use th
 - [x] Select the target Chrome versions/OS testing matrix — Linux by hand, Windows/macOS automated, minimum Chrome tentatively 116, later set to 147 by D-18 ([platform matrix](requirements.md#platform-matrix-d-14), D-14).
 - [x] Record legal/privacy decisions and remaining open items — MIT license (D-13, `LICENSE` added), privacy policy on GitHub Pages with a [draft](privacy-policy.md) (D-15); publisher, support email and logo deferred to Phase 10 ([still open](requirements.md#still-open)).
 
-**Deliverables (done 2026-10-22):** approved scope and decisions D-01 … D-21 ([requirements.md §11](requirements.md#11-product-decisions)); ADRs A-001 … A-013 ([architecture.md §1](architecture.md#1-architectural-decisions-adrs)); requirement checklist, prioritized backlog and risk register ([backlog.md](backlog.md)); privacy policy draft ([privacy-policy.md](privacy-policy.md)).  
+**Deliverables (done 2026-10-22):** approved scope and decisions D-01 … D-22 ([requirements.md §11](requirements.md#11-product-decisions)); ADRs A-001 … A-013 ([architecture.md §1](architecture.md#1-architectural-decisions-adrs)); requirement checklist, prioritized backlog and risk register ([backlog.md](backlog.md)); privacy policy draft ([privacy-policy.md](privacy-policy.md)).  
 **Gate:** No launch-time features are ambiguous or promised beyond demonstrated browser capabilities. **Passed** — remaining unknowns are either Phase 2 spike outputs with defined decision criteria or Phase 10 publishing details.
 
 ## Phase 1 — Repository, WXT scaffold and developer tooling
@@ -251,16 +251,26 @@ Effort counts are overlapping planning estimates, not additive deadlines; use th
 
 **Tasks**
 
-- [ ] Implement `SpeechService` API: `getVoices`, `speak`, `stop`, `replay`, rate and locale.
-- [ ] Wire **Listen** from webpage tooltip to background TTS handler without an AI request.
-- [ ] Wire **Listen** from reader text selection to the same handler.
-- [ ] Verify single-word, phrase and full-sentence playback including punctuation.
-- [ ] Offer Normal and Slow speeds, Stop/Replay; update playing state from actual events.
-- [ ] Support best-effort American/British voices when installed; never fake unavailable accent availability.
-- [ ] Detect empty voice list and playback errors on Linux/other platforms; show helpful fallbacks.
-- [ ] If Spike D adopted it, implement the offscreen-document `speechSynthesis` fallback for webpage selections and direct `speechSynthesis` in the reader, behind `SpeechService` (D-07).
-- [ ] Test rapid selection and repeated clicks, cancellation and extension navigation.
-- [ ] Confirm audio playback is usable without a Groq key on supported voice engines.
+- [x] `SpeechService` in production: preference-aware voice resolution (explicit voice exact, saved voice only if it speaks the language, best match; never a cross-language stand-in), reply only after real start, per-request events to exactly the asking document.
+- [x] **Listen** on the webpage toolbar sends only the selected text (never context) to the background; no AI request.
+- [ ] **Listen** in the PDF reader — Phase 7 (the reader has no toolbar yet).
+- [x] Word and full-sentence playback through the same path (unit + scripted-engine E2E; audible check is the user's, D-14).
+- [x] Normal/Slow, Stop/Replay; state driven by actual engine events; 6 s start backstop; Listen and Explain independent (an open explanation survives Listen).
+- [x] Best-effort voices by language; no accent is offered unless installed (Settings voice chooser lists only real voices, FR-025).
+- [x] No-voice detection with an actionable message; Linux-specific hint (`reason: 'no-voice-linux'`); first no-voice answer ~1.6 s (was ~3 s).
+- [x] Offscreen `speechSynthesis` fallback kept behind `SpeechService` (D-07 still pending the user's check); offscreen page accepts commands only from the worker.
+- [x] Rapid repeats and superseding (cancelled events), dismiss/selection change stop playback.
+- [x] Works without a Groq key.
+- [x] Settings → Voice: per-engine voice counts, chooser, Test voice, empty state — replaces the spike's `SPEECH_DIAGNOSE` (removed).
+- [x] On-device voices only by default; online voices only when explicitly chosen and labelled (D-22).
+- [x] Code review findings fixed: Stop during start no longer lost, orphaned speech stoppable after a worker restart, distinct copy for no voice / no voice for this language / voice didn't start, one overall start deadline below the UI backstop.
+
+**Phase 6 follow-ups:**
+
+- D-07: the user's check in Settings → Voice decides whether the offscreen fallback and the `offscreen` permission stay.
+- Phase 7: Listen in the PDF reader via the same `ToolbarActions.listen`.
+- Observer budget: 17.7 of 18 KB — trim toolbar copy/CSS before adding anything to the always-loaded script.
+- Optional: per-case no-voice copy (no voice for this language / voice never started) would need another error `reason`.
 
 **Deliverables:** Shared pronunciation control; accurate voice capability states.  
 **Gate:** FR-020–024 pass for all tested supported systems; no-voice scenario is graceful.

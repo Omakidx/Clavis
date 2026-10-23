@@ -215,6 +215,9 @@ test('keyboard shortcut (proposed command): works without site access, and focus
   await tb(page).waitShown();
   // Keyboard users land on the first action, then can activate it without a mouse.
   await expect.poll(() => tb(page).focusedAction()).toBe('listen');
+  // Phase 6 order: Listen → Slow → Explain.
+  xdotool('key', 'Right');
+  await expect.poll(() => tb(page).focusedAction()).toBe('slow');
   xdotool('key', 'Right');
   await expect.poll(() => tb(page).focusedAction()).toBe('explain');
   xdotool('key', 'Return');

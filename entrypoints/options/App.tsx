@@ -5,6 +5,7 @@ import { HelpSection } from '../../components/settings/HelpSection';
 import { ModelSection } from '../../components/settings/ModelSection';
 import { PreferencesSection } from '../../components/settings/PreferencesSection';
 import { PrivacySection } from '../../components/settings/PrivacySection';
+import { VoiceSection } from '../../components/settings/VoiceSection';
 import { SiteAccessSection } from '../../components/settings/SiteAccessSection';
 import { t } from '../../lib/i18n';
 import { useKeyStatus } from '../../lib/ui-client/use-key-status';
@@ -14,6 +15,7 @@ const SECTIONS = [
   { id: 'section-key', label: 'keyTitle' },
   { id: 'section-model', label: 'modelTitle' },
   { id: 'section-preferences', label: 'prefsTitle' },
+  { id: 'section-voice', label: 'voiceTitle' },
   { id: 'section-site-access', label: 'siteTitle' },
   { id: 'section-privacy', label: 'privacyTitle' },
   { id: 'section-help', label: 'helpTitle' },
@@ -45,6 +47,7 @@ export function App() {
       <ApiKeySection keys={keys} />
       <ModelSection settings={settings} keys={keys} />
       <PreferencesSection settings={settings} />
+      <VoiceSection settings={settings} />
       <SiteAccessSection settings={settings} />
       <PrivacySection onCleared={afterClear} />
       <HelpSection />

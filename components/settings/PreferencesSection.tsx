@@ -21,7 +21,11 @@ export function PreferencesSection({ settings }: PreferencesSectionProps) {
       <ResourceGate resource={settings.resource}>
         {(snapshot) => (
           <>
-            <PreferencesForm preferences={snapshot.preferences} save={settings.save} />
+            <PreferencesForm
+              preferences={snapshot.preferences}
+              save={settings.save}
+              includeVoice={false}
+            />
             <div className="clavis-actions">
               <Button onClick={() => void reset.run()}>{t('prefReset')}</Button>
             </div>

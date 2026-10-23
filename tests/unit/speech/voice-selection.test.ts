@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { normalizeLang, selectVoice } from '../../../lib/speech/voice-selection';
+import {
+  findNamedVoice,
+  hasUsableVoice,
+  normalizeLang,
+  resolveLanguage,
+  sameLanguage,
+  selectVoice,
+  toLanguageTag,
+} from '../../../lib/speech/voice-selection';
 import { voice } from './helpers';
 
 describe('normalizeLang', () => {
@@ -67,5 +75,58 @@ describe('selectVoice', () => {
       ok: false,
       reason: 'no-language-match',
     });
+  });
+});
+
+describe('resolveLanguage', () => {
+  it('uses the message language, else the saved language', () => {
+    expect(resolveLanguage('fr', 'en-GB')).toBe('fr');
+    expect(resolveLanguage(undefined, 'en-GB')).toBe('en-GB');
+    expect(resolveLanguage('de-DE', undefined)).toBe('de-DE');
+    expect(resolveLanguage(undefined, undefined)).toBeUndefined();
+  });
+
+  it('lets a regional preference refine a bare language of the same language only', () => {
+    expect(resolveLanguage('en', 'en-GB')).toBe('en-GB');
+    expect(resolveLanguage('EN', 'en_GB')).toBe('en_GB');
+    expect(resolveLanguage('en-US', 'en-GB')).toBe('en-US');
+    expect(resolveLanguage('fr', 'en-GB')).toBe('fr');
+    expect(resolveLanguage('en', 'en')).toBe('en');
+  });
+});
+
+describe('sameLanguage', () => {
+  it('compares the primary language and ignores the region', () => {
+    expect(sameLanguage('en-GB', 'en_US')).toBe(true);
+    expect(sameLanguage('en', 'fr')).toBe(false);
+    expect(sameLanguage('', 'en')).toBe(false);
+    expect(sameLanguage(undefined, undefined)).toBe(false);
+  });
+});
+
+describe('findNamedVoice and hasUsableVoice', () => {
+  const a = voice('chrome-tts', 'en-US', { name: 'Alex' });
+  const mute = voice('chrome-tts', 'en-US', { name: 'Mute', eventTypes: ['end'] });
+
+  it('finds an exact, case-sensitive name that could prove it started', () => {
+    expect(findNamedVoice([a, mute], 'Alex')).toBe(a);
+    expect(findNamedVoice([a, mute], 'alex')).toBeUndefined();
+    expect(findNamedVoice([a, mute], 'Mute')).toBeUndefined();
+  });
+
+  it('knows whether any voice is usable', () => {
+    expect(hasUsableVoice([])).toBe(false);
+    expect(hasUsableVoice([mute])).toBe(false);
+    expect(hasUsableVoice([mute, a])).toBe(true);
+  });
+});
+
+describe('toLanguageTag', () => {
+  it('normalises engine tags and drops what is not a tag', () => {
+    expect(toLanguageTag('en_US')).toBe('en-US');
+    expect(toLanguageTag(' fr-FR ')).toBe('fr-FR');
+    expect(toLanguageTag('')).toBeUndefined();
+    expect(toLanguageTag('english (united states)')).toBeUndefined();
+    expect(toLanguageTag(undefined)).toBeUndefined();
   });
 });

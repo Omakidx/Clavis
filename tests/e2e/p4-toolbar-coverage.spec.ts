@@ -57,8 +57,9 @@ test.describe('open shadow roots (web components)', () => {
       const word = await dblclickDeep(page, 'lighthouse');
       await tb(page).waitShown();
       expect(expectNear(await tb(page).box(), word, viewportOf(page))).toEqual([]);
-      await tb(page).click('listen');
-      expect(await tb(page).text(SEL.cardText)).toBe('lighthouse');
+      // Explain (not Listen) shows the captured text since Phase 6: Listen has no card.
+      await tb(page).click('explain');
+      await expect.poll(() => tb(page).text(SEL.cardText)).toBe('lighthouse');
     } finally {
       await dispose();
     }
@@ -116,8 +117,9 @@ test.describe('open shadow roots (web components)', () => {
     try {
       await dblclickText(page, page, 'anchor');
       await tb(page).waitShown();
-      await tb(page).click('listen');
-      expect(await tb(page).text(SEL.cardText)).toBe('anchor');
+      // Explain (not Listen) shows the captured text since Phase 6: Listen has no card.
+      await tb(page).click('explain');
+      await expect.poll(() => tb(page).text(SEL.cardText)).toBe('anchor');
     } finally {
       await dispose();
     }
@@ -218,6 +220,9 @@ test.describe('keyboard entry and frames Clavis cannot enter', () => {
       await tb(page).waitShown();
       expect(await tb(page).focusedAction()).toBe('listen');
 
+      // Since Phase 6 the order is Listen, Slow, Explain.
+      await page.keyboard.press('ArrowRight');
+      await expect.poll(() => tb(page).focusedAction()).toBe('slow');
       await page.keyboard.press('ArrowRight');
       await expect.poll(() => tb(page).focusedAction()).toBe('explain');
       await page.keyboard.press('Escape');
@@ -468,8 +473,8 @@ test.describe('writing modes and layout', () => {
       });
       await releaseShift(page);
       await tb(page).waitShown();
-      await tb(page).click('listen');
-      expect(await tb(page).text(SEL.cardText)).toBe('jumps over');
+      await tb(page).click('explain');
+      await expect.poll(() => tb(page).text(SEL.cardText)).toBe('jumps over');
     } finally {
       await dispose();
     }

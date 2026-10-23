@@ -307,6 +307,13 @@ describe('preferences step (FR-006, FR-005)', () => {
     await waitFor(() => expect(backend.state.preferences.explanationLanguage).toBe('es'));
   });
 
+  it('shows the voice chooser compactly, or says there are no voices on this device', async () => {
+    const { user } = setup();
+    await toPreferences(user);
+    expect(await screen.findByText(text('voiceEmpty'))).toBeVisible();
+    expect(screen.getByText(text('speechNoVoiceLinuxHint'))).toBeVisible();
+  });
+
   it('explains the empty model list instead of inventing models when no key is connected', async () => {
     const { user } = setup();
     await toPreferences(user);

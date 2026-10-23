@@ -369,11 +369,41 @@ describe('internal routes keep their own reply shapes', () => {
     expect(h.injection.scripting.executeScript).toHaveBeenCalledTimes(1);
   });
 
-  it('SPEECH_DIAGNOSE: popup/options/onboarding only', async () => {
+  it('SPEECH_DIAGNOSE is gone (Phase 3 review INFO-8): unowned, no reply, for every sender', async () => {
     const h = createHarness();
-    const message = { v: 1, type: 'SPEECH_DIAGNOSE' };
-    expect(await h.call(message, popupSender())).toMatchObject({ ok: true });
-    for (const sender of [contentSender(), pageSender('/reader.html'), offscreenSender()]) {
+    for (const sender of [
+      popupSender(),
+      pageSender('/options.html'),
+      pageSender('/onboarding.html'),
+      contentSender(),
+      offscreenSender(),
+    ]) {
+      const { claimed, reply } = h.send({ v: 1, type: 'SPEECH_DIAGNOSE' }, sender);
+      expect(claimed).toBeUndefined();
+      expect(await reply).toBeUndefined();
+    }
+    expect(h.routes.map((route) => route.type)).not.toContain('SPEECH_DIAGNOSE');
+  });
+
+  it('GET_VOICES: options, onboarding and popup only', async () => {
+    const h = createHarness();
+    const message = { v: 1, type: 'GET_VOICES' };
+    for (const sender of [
+      popupSender(),
+      pageSender('/options.html'),
+      pageSender('/onboarding.html'),
+    ]) {
+      expect(await h.call(message, sender)).toMatchObject({
+        ok: true,
+        data: { platform: 'linux', defaultEngine: 'chrome-tts' },
+      });
+    }
+    for (const sender of [
+      contentSender(),
+      pageSender('/reader.html'),
+      pageSender('/practice.html'),
+      offscreenSender(),
+    ]) {
       expect(await h.call(message, sender)).toMatchObject(INVALID);
     }
   });

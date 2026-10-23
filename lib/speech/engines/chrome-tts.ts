@@ -55,7 +55,8 @@ export class ChromeTtsEngine implements SpeechEngine {
   readonly id = 'chrome-tts' as const;
 
   // After one full wait that still found nothing, an empty list is treated as final so that
-  // later requests on a machine without voices are not delayed again.
+  // later requests on a machine without voices are not delayed again. Cleared by `invalidate()`
+  // (onVoicesChanged, or Settings asking for a fresh report).
   private waitedForEmptyList = false;
 
   constructor(
@@ -63,15 +64,8 @@ export class ChromeTtsEngine implements SpeechEngine {
     private readonly voicesChangedWaitMs: number = SPEECH_TIMING.voicesLoadTimeoutMs,
   ) {}
 
-  async getVoices(): Promise<SpeechVoice[]> {
-    let voices = await this.tts.getVoices();
-    // Chromium on Linux loads speech-dispatcher voices asynchronously, so the very first
-    // query can be empty even though voices exist a moment later (onVoicesChanged, Chrome 124+).
-    if (voices.length === 0 && !this.waitedForEmptyList && this.tts.onVoicesChanged) {
-      await this.waitForVoicesChanged(this.tts.onVoicesChanged);
-      voices = await this.tts.getVoices();
-      this.waitedForEmptyList = voices.length === 0;
-    }
+  private async query(): Promise<SpeechVoice[]> {
+    const voices = await this.tts.getVoices();
     return voices.map((voice) => ({
       name: voice.voiceName ?? '',
       lang: voice.lang ?? '',
@@ -79,6 +73,28 @@ export class ChromeTtsEngine implements SpeechEngine {
       engine: this.id,
       eventTypes: voice.eventTypes,
     }));
+  }
+
+  /** What chrome.tts knows right now; never waits. */
+  peekVoices(): Promise<SpeechVoice[]> {
+    return this.query();
+  }
+
+  invalidate(): void {
+    this.waitedForEmptyList = false;
+  }
+
+  async getVoices(options: { refresh?: boolean } = {}): Promise<SpeechVoice[]> {
+    if (options.refresh === true) this.invalidate();
+    let voices = await this.query();
+    // Chromium on Linux loads speech-dispatcher voices asynchronously, so the very first
+    // query can be empty even though voices exist a moment later (onVoicesChanged, Chrome 124+).
+    if (voices.length === 0 && !this.waitedForEmptyList && this.tts.onVoicesChanged) {
+      await this.waitForVoicesChanged(this.tts.onVoicesChanged);
+      voices = await this.query();
+      this.waitedForEmptyList = voices.length === 0;
+    }
+    return voices;
   }
 
   private waitForVoicesChanged(event: NonNullable<TtsApi['onVoicesChanged']>): Promise<void> {

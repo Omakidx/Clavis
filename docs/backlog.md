@@ -19,7 +19,7 @@ Work in this order. Phases 3, 4 and 7 can overlap once Phase 2 closes; see the d
 | 7 | Onboarding, disclosure, site access, key lifecycle, settings | 3 | 8 | Done |
 | 8 | Selection observer + toolbar on both injection paths | 4 | 8, 9 | Done |
 | 9 | Core Explain + Must tabs (roots, related words, simplify) | 5 | 11 | Done |
-| 10 | Listen / `SpeechService` | 6 | 11 | Not started |
+| 10 | Listen / `SpeechService` | 6 | 11 | Done (audible check pending, D-07/D-14) |
 | 11 | PDF reader | 7 | 11 | Not started |
 | 12 | Unified UX, side panel, copy; Should tabs if on schedule | 8 | 13 | Not started |
 | 13 | QA, security, performance, privacy verification | 9 | 14 | Not started |
@@ -48,11 +48,11 @@ Work in this order. Phases 3, 4 and 7 can overlap once Phase 2 closes; see the d
 | FR-016 | Accessibility of toolbar | 4 | Done |
 | FR-017 | No transmission on highlight | 4 | Done |
 | FR-018 | Context menu / toolbar icon without site access | 4 | Done |
-| FR-020 | Speak selected word | 6 | Not started |
-| FR-021 | Speak selected sentence | 6 | Not started |
-| FR-022 | Normal/slow, Stop, Replay | 6 | Not started |
-| FR-023 | No-voice detection and message | 6 | Not started |
-| FR-024 | Speak only selected text | 6 | Not started |
+| FR-020 | Speak selected word | 6 | Done |
+| FR-021 | Speak selected sentence | 6 | Done |
+| FR-022 | Normal/slow, Stop, Replay | 6 | Done |
+| FR-023 | No-voice detection and message | 6 | Done |
+| FR-024 | Speak only selected text | 6 | Done |
 | FR-030 | Core explanation (one request) | 5 | Done |
 | FR-031 | Definition (in core) | 5 | Done |
 | FR-032 | Examples (in core) | 5 | Done |
@@ -86,7 +86,7 @@ Work in this order. Phases 3, 4 and 7 can overlap once Phase 2 closes; see the d
 | --- | --- | --- | --- |
 | FR-008 | Rerun tutorial from Settings | 8 | Done (rerun tutorial in Settings) |
 | FR-019 | Copy answer | 8 | Done (copy in the card) |
-| FR-025 | Voice chooser | 6 | Not started |
+| FR-025 | Voice chooser | 6 | Done (Settings → Voice) |
 | FR-036 | Grammar tab | 8 | Not started |
 | FR-037 | Translate tab | 8 | Not started |
 | FR-042 | Side panel for long answers | 8 | Not started |

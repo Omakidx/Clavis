@@ -1,20 +1,18 @@
 import { z } from 'zod';
 import { LIMITS, MESSAGE_VERSION } from '../config/constants';
-import { idSchema, languageTagSchema, ttsRateSchema } from '../contracts';
+import { idSchema, languageTagSchema, ttsRateSchema, voiceNameSchema } from '../contracts';
 
 /**
- * Spike D INTERNAL message schemas: background <-> offscreen document, plus the
- * state event the background pushes to the page that asked to speak. They are
- * deliberately NOT part of lib/contracts' public union (content scripts must
- * never be able to address the offscreen document). Proposed for promotion to
- * lib/contracts in Phase 6; see docs/decisions/spike-d-voices.md.
+ * INTERNAL message schemas: background <-> offscreen document only. They are deliberately NOT part
+ * of lib/contracts (content scripts must never be able to address the offscreen document). The
+ * public speech shapes (TTS_EVENT, reply data, voices report) live in lib/contracts/speech.ts.
  */
 
 const v = z.literal(MESSAGE_VERSION);
 const target = z.literal('offscreen');
 
 const text = z.string().min(1).max(LIMITS.maxSelectionChars);
-const voiceName = z.string().min(1).max(256);
+const voiceName = voiceNameSchema;
 
 // ---- background -> offscreen (commands) ------------------------------------
 
@@ -85,21 +83,3 @@ export const offscreenAckSchema = z.strictObject({
   detail: z.string().max(200).optional(),
 });
 export type OffscreenAck = z.infer<typeof offscreenAckSchema>;
-
-// ---- background -> requesting page (state push) ------------------------------
-
-/**
- * Pushed to the tab/page that sent TTS_SPEAK. `started` is already the reply to
- * TTS_SPEAK, so only terminal states are pushed.
- */
-export const ttsEventMessageSchema = z.strictObject({
-  v,
-  type: z.literal('TTS_EVENT'),
-  requestId: idSchema,
-  state: z.enum(['ended', 'cancelled', 'error']),
-});
-export type TtsEventMessage = z.infer<typeof ttsEventMessageSchema>;
-
-// ---- extension-page-only diagnostics (spike) ----------------------------------
-
-export const speechDiagnoseSchema = z.strictObject({ v, type: z.literal('SPEECH_DIAGNOSE') });

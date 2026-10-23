@@ -4,6 +4,7 @@ import { errorEnvelopeSchema } from './errors';
 import { explainRequestSchema } from './explain';
 import { idSchema, languageTagSchema } from './primitives';
 import { keyStorageSchema } from './key-storage';
+import { voiceNameSchema } from './speech';
 import { preferencesPatchSchema, siteAccessChoiceSchema, ttsRateSchema } from './setup';
 
 const v = z.literal(MESSAGE_VERSION);
@@ -38,7 +39,7 @@ export const loadExplainCardMessageSchema = z.strictObject({
 export const openSettingsMessageSchema = z.strictObject({
   v,
   type: z.literal('OPEN_SETTINGS'),
-  section: z.enum(['key', 'model', 'privacy']).optional(),
+  section: z.enum(['key', 'model', 'privacy', 'voice']).optional(),
 });
 
 export const aiCancelMessageSchema = z.strictObject({
@@ -54,6 +55,8 @@ export const ttsSpeakMessageSchema = z.strictObject({
   text: z.string().trim().min(1).max(LIMITS.maxSelectionChars),
   lang: languageTagSchema.optional(),
   rate: ttsRateSchema,
+  /** Speak with this exact voice (Settings "Test voice"); otherwise the preference or best match. */
+  voiceName: voiceNameSchema.optional(),
 });
 
 export const ttsStopMessageSchema = z.strictObject({
@@ -162,6 +165,12 @@ export const updateOnboardingMessageSchema = z
     'Nothing to update',
   );
 
+/** Voices available per engine on this device (Settings voice chooser, FR-025; D-07 check). */
+export const getVoicesMessageSchema = z.strictObject({
+  v,
+  type: z.literal('GET_VOICES'),
+});
+
 export const getSiteAccessStatusMessageSchema = z.strictObject({
   v,
   type: z.literal('GET_SITE_ACCESS_STATUS'),
@@ -184,6 +193,7 @@ export const privilegedMessageSchema = z.discriminatedUnion('type', [
   acceptDisclosureMessageSchema,
   updateOnboardingMessageSchema,
   getSiteAccessStatusMessageSchema,
+  getVoicesMessageSchema,
   clearAllDataMessageSchema,
 ]);
 

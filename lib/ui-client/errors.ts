@@ -1,4 +1,4 @@
-import type { ErrorCode } from '../contracts/errors';
+import type { ErrorCode, ErrorReason } from '../contracts/errors';
 import { t, type MessageKey } from '../i18n';
 
 /**
@@ -20,6 +20,8 @@ export interface ClientError {
   message: string;
   action: ErrorAction;
   retryAfterMs?: number;
+  /** Extra, localized advice shown under `message` (for example how to install a voice). */
+  hint?: string;
 }
 
 interface Mapping {
@@ -49,8 +51,14 @@ const MAPPING = {
 } as const satisfies Record<ClientErrorCode, Mapping>;
 
 /** Map a code (and an optional provider retry delay) to localized, actionable text. */
-export function describeError(code: ClientErrorCode, retryAfterMs?: number): ClientError {
-  const mapping: Mapping = MAPPING[code] ?? { key: 'errGeneric', action: 'retry' };
+export function describeError(
+  code: ClientErrorCode,
+  retryAfterMs?: number,
+  reason?: ErrorReason,
+): ClientError {
+  const voice = code === 'NO_VOICE' ? noVoice(reason) : undefined;
+  const mapping: Mapping = voice?.mapping ??
+    MAPPING[code] ?? { key: 'errGeneric', action: 'retry' };
   const seconds = retryAfterMs === undefined ? 0 : Math.ceil(retryAfterMs / 1000);
   const message =
     code === 'RATE_LIMITED' && seconds > 0
@@ -61,5 +69,23 @@ export function describeError(code: ClientErrorCode, retryAfterMs?: number): Cli
     message,
     action: mapping.action,
     ...(retryAfterMs === undefined ? {} : { retryAfterMs }),
+    ...(voice?.hint === undefined ? {} : { hint: t(voice.hint) }),
+  };
+}
+
+/**
+ * NO_VOICE means different things, told apart by `reason` (an unknown or missing one gets the
+ * generic copy): no engine on Linux, no voice at all, no voice for the language, or a voice that
+ * did not start. Only the first two suggest installing something.
+ */
+function noVoice(reason: ErrorReason | undefined): { mapping: Mapping; hint?: MessageKey } {
+  if (reason === 'start-failed') return { mapping: { key: 'speechStartFailed', action: 'retry' } };
+  if (reason === 'no-voice-language') {
+    return { mapping: { key: 'speechNoVoiceForLanguage', action: 'none' } };
+  }
+  if (reason === 'online-only') return { mapping: { key: 'speechOnlineOnly', action: 'none' } };
+  return {
+    mapping: { key: 'speechNoVoice', action: 'none' },
+    hint: reason === 'no-voice-linux' ? 'speechNoVoiceLinuxHint' : 'speechNoVoiceHint',
   };
 }

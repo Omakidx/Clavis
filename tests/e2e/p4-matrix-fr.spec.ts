@@ -31,6 +31,8 @@ import {
   buttonNames,
   clickAction,
   readCardText,
+  readListenStatus,
+  actionSelector,
   readKind,
   readMode,
   rootText,
@@ -896,8 +898,8 @@ async function focusedCardControl(page: Page, name: string): Promise<boolean> {
 }
 
 // --------------------------------------------------------------------------------------------
-test.describe('FR-013 Listen and Explain, by mouse and by keyboard', () => {
-  test('both actions are visible together and named Listen and Explain', async () => {
+test.describe('FR-013 Listen, Slow and Explain, by mouse and by keyboard', () => {
+  test('Listen, Slow and Explain are visible together with their names', async () => {
     await withFixture('plain-baseline', async ({ page }) => {
       await selectText(
         page,
@@ -906,14 +908,15 @@ test.describe('FR-013 Listen and Explain, by mouse and by keyboard', () => {
         'dblclick',
       );
       expect(await expectShown(page)).toBe(true);
-      expect(await buttonNames(page)).toEqual(['Listen', 'Explain']);
-      for (const action of ['listen', 'explain'] as const) {
-        expect(await toolbar(page).isShown(SEL.action(action)), action).toBe(true);
+      expect(await buttonNames(page)).toEqual(['Listen', 'Slow', 'Explain']);
+      for (const action of ['listen', 'slow', 'explain'] as const) {
+        expect(await toolbar(page).isShown(actionSelector(action)), action).toBe(true);
       }
+      expect(await toolbar(page).attr(actionSelector('slow'), 'aria-pressed')).toBe('false');
     });
   });
 
-  test('mouse: each button can be pressed and acts on the captured selection', async () => {
+  test('mouse: each control can be pressed and acts on the captured selection', async () => {
     await withFixture('plain-baseline', async ({ page }) => {
       await selectText(
         page,
@@ -922,9 +925,20 @@ test.describe('FR-013 Listen and Explain, by mouse and by keyboard', () => {
         'dblclick',
       );
       expect(await expectShown(page)).toBe(true);
+      // Listen opens no card: it reports on its own status line (this machine has no voices).
       await clickAction(page, 'listen');
-      expect(await toolbar(page).attr(SEL.card, 'data-action')).toBe('listen');
-      expect(await readCardText(page)).toBe('bank');
+      const status = await readListenStatus(page);
+      expect(status, 'Listen reports its state').toBeDefined();
+      expect(['starting', 'playing', 'ended', 'unavailable']).toContain(status?.status);
+      expect(
+        await toolbar(page).isShown(SEL.card),
+        'Listen does not open the explanation card',
+      ).toBe(false);
+      // Slow is a toggle.
+      await clickAction(page, 'slow');
+      expect(await toolbar(page).attr(actionSelector('slow'), 'aria-pressed')).toBe('true');
+      await clickAction(page, 'slow');
+      expect(await toolbar(page).attr(actionSelector('slow'), 'aria-pressed')).toBe('false');
       await clickAction(page, 'explain');
       await waitFor(
         async () => (await toolbar(page).attr(SEL.card, 'data-action')) === 'explain',
@@ -936,7 +950,7 @@ test.describe('FR-013 Listen and Explain, by mouse and by keyboard', () => {
     });
   });
 
-  test('keyboard: the command path puts focus on Listen; arrows reach Explain; Enter and Space activate', async () => {
+  test('keyboard: the command path puts focus on Listen; arrows reach Slow then Explain; Enter and Space activate', async () => {
     await withFixture('plain-baseline', async ({ page }) => {
       await selectText(
         page,
@@ -949,7 +963,13 @@ test.describe('FR-013 Listen and Explain, by mouse and by keyboard', () => {
       expect(reply?.shown).toBe(true);
       expect(await toolbar(page).focusedAction(), 'focus moved into the toolbar').toBe('listen');
       await page.keyboard.press('ArrowRight');
-      expect(await toolbar(page).focusedAction()).toBe('explain');
+      expect(await toolbar(page).focusedAction(), 'Listen, then Slow').toBe('slow');
+      await page.keyboard.press('Space');
+      expect(await toolbar(page).attr(actionSelector('slow'), 'aria-pressed')).toBe('true');
+      await page.keyboard.press('Space');
+      expect(await toolbar(page).attr(actionSelector('slow'), 'aria-pressed')).toBe('false');
+      await page.keyboard.press('ArrowRight');
+      expect(await toolbar(page).focusedAction(), 'then Explain').toBe('explain');
       await page.keyboard.press('Enter');
       // Phase 5: a keyboard-started Explain moves focus INTO the card.
       await waitFor(
@@ -970,12 +990,13 @@ test.describe('FR-013 Listen and Explain, by mouse and by keyboard', () => {
       await waitFor(async () => (await toolbar(page).focusedAction()) === 'explain', 2000, 40);
       expect(await toolbar(page).focusedAction(), 'Close returns focus to Explain').toBe('explain');
       expect(await toolbar(page).isShown(SEL.card), 'the card is gone').toBe(false);
-      // The toolbar keyboard model still works: ArrowLeft to Listen, Space activates it.
+      // The toolbar keyboard model still works: ArrowLeft twice to Listen, Space activates it.
+      await page.keyboard.press('ArrowLeft');
+      expect(await toolbar(page).focusedAction()).toBe('slow');
       await page.keyboard.press('ArrowLeft');
       expect(await toolbar(page).focusedAction()).toBe('listen');
       await page.keyboard.press('Space');
-      expect(await toolbar(page).attr(SEL.card, 'data-action')).toBe('listen');
-      expect(await readCardText(page)).toBe('bank');
+      expect(await readListenStatus(page), 'Listen reports through the keyboard too').toBeDefined();
       // Escape dismisses everything.
       await page.keyboard.press('Escape');
       expect(await expectHidden(page), 'Escape closes the toolbar and the card').toBe(true);
@@ -1185,7 +1206,7 @@ test.describe('FR-016 accessibility: roles, labels, focus, motion, automated che
       );
       expect(info?.role).toBe('toolbar');
       expect((info?.label ?? '').length).toBeGreaterThan(3);
-      expect(info?.buttons.map((b) => b.name)).toEqual(['Listen', 'Explain']);
+      expect(info?.buttons.map((b) => b.name)).toEqual(['Listen', 'Slow', 'Explain']);
       await clickAction(page, 'explain');
       const status = await toolbar(page).evalIn<string | null>(
         SEL.card,
@@ -1242,7 +1263,14 @@ test.describe('FR-016 accessibility: roles, labels, focus, motion, automated che
       expect(reply?.shown).toBe(true);
       expect(await toolbar(page).focusedAction()).toBe('listen');
       await page.keyboard.press('ArrowRight');
+      await page.keyboard.press('ArrowRight');
+      expect(await toolbar(page).focusedAction()).toBe('explain');
       await page.keyboard.press('Enter');
+      await waitFor(
+        async () => (await toolbar(page).attr(SEL.card, 'data-action')) === 'explain',
+        3000,
+        40,
+      );
       expect(await toolbar(page).attr(SEL.card, 'data-action')).toBe('explain');
       await page.keyboard.press('Escape');
       expect(await expectHidden(page), 'Escape closes it from inside').toBe(true);
@@ -1264,9 +1292,14 @@ test.describe('FR-016 accessibility: roles, labels, focus, motion, automated che
       expect(await expectShown(page)).toBe(true);
       await openViaCommand(harness.ext.serviceWorker, page);
       expect(await toolbar(page).focusedAction()).toBe('listen');
-      await page.keyboard.press('Tab');
-      await page.keyboard.press('Tab');
+      // Listen, Slow and Explain are each a tab stop; one more Tab leaves the toolbar.
+      let presses = 0;
+      while ((await toolbar(page).focusedAction()) !== null && presses < 6) {
+        await page.keyboard.press('Tab');
+        presses++;
+      }
       expect(await toolbar(page).focusedAction(), 'focus has left the toolbar buttons').toBeNull();
+      expect(presses, 'Tab passes through the three buttons and moves on').toBeLessThanOrEqual(4);
     });
   });
 
@@ -1312,8 +1345,8 @@ test.describe('FR-016 accessibility: roles, labels, focus, motion, automated che
         'dblclick',
       );
       expect(await expectShown(page)).toBe(true);
-      for (const action of ['listen', 'explain'] as const) {
-        const box = await toolbar(page).box(SEL.action(action));
+      for (const action of ['listen', 'slow', 'explain'] as const) {
+        const box = await toolbar(page).box(actionSelector(action));
         expect(box.width, `${action} width`).toBeGreaterThanOrEqual(24);
         expect(box.height, `${action} height`).toBeGreaterThanOrEqual(24);
       }
@@ -1438,7 +1471,7 @@ test.describe('Selection constraints: 2,000 characters, "Selection too long", tr
       // Nothing was sent: the trimmed text is shown first, the user still has to act.
       expect(harness.groqRequests.length).toBe(requestsBefore);
       expect(await readMode(page), 'the actions come back for the trimmed text').toBe('actions');
-      expect(await buttonNames(page)).toEqual(['Listen', 'Explain']);
+      expect(await buttonNames(page)).toEqual(['Listen', 'Slow', 'Explain']);
       await clickAction(page, 'explain');
       expect((await readCardText(page)) ?? '').toBe(trimmed.slice(0, 200));
     });

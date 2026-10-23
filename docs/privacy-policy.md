@@ -11,7 +11,7 @@ Clavis is a Chrome extension that helps you understand and pronounce text you se
 
 - Clavis has **no server of its own**. The publisher does not receive, store or sell your data.
 - Nothing you read is sent anywhere until you click **Explain**. Then the selected text and a small amount of nearby text go to **Groq**, the AI provider, using **your own** Groq API key.
-- **Listen** uses the voices on your computer and sends nothing to Groq.
+- **Listen** uses the voices on your computer and sends nothing to Groq. It uses an online voice only if you explicitly choose one in Settings.
 - PDFs you open in Clavis are read inside your browser and never uploaded.
 - Your settings and API key are stored only in your Chrome profile, and you can delete them at any time.
 
@@ -21,7 +21,7 @@ Clavis is a Chrome extension that helps you understand and pronounce text you se
 | --- | --- | --- |
 | Text you select on a website or in a PDF | When you select it | Stays on your device. Used to show the Clavis toolbar. |
 | Selected text, up to 1,000 characters of surrounding text, and your chosen explanation language | Only when you click **Explain** or open an explanation tab | Sent over HTTPS to Groq with your API key, to generate the explanation. |
-| Selected text for **Listen** | When you click **Listen** | Passed to the speech engine on your computer (Chrome's text-to-speech or your system voices). Not sent to Groq. Your operating system's speech engine may have its own data practices. |
+| Selected text for **Listen** | When you click **Listen** | Passed to a speech engine on your computer (Chrome's text-to-speech or your system voices). Not sent to Groq. By default Clavis uses only on-device voices. If you explicitly choose a voice marked *online* in Settings → Voice, the selected text is sent to that voice's provider (for example Google) to be spoken, under that provider's terms. Your operating system's speech engine may have its own data practices. |
 | Your Groq API key | When you enter it | Stored in Chrome's extension storage on your device, either until you remove it or only for the current browser session, as you choose. Sent only to Groq. |
 | PDF files you open | When you open them | Read in your browser's memory and released when you close the reader. Never uploaded. |
 | Settings (language, voice, speed, model, sites where Clavis is disabled) | When you change them | Stored in Chrome's extension storage on your device. Not synced. |

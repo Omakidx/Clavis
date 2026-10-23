@@ -54,7 +54,9 @@ function shadow(): ShadowRoot {
 function panel(): HTMLElement {
   return shadow().querySelector('[data-clavis="panel"]') as HTMLElement;
 }
-function button(action: 'listen' | 'explain' | 'trim' | 'close'): HTMLButtonElement {
+function button(
+  action: 'listen' | 'explain' | 'trim' | 'close' | 'slow' | 'voice-settings',
+): HTMLButtonElement {
   return shadow().querySelector(`button[data-action="${action}"]`) as HTMLButtonElement;
 }
 function capture(text: string): CapturedSelection {
@@ -246,6 +248,8 @@ describe('toolbar shell', () => {
       shadow().activeElement?.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true }));
     };
     press('ArrowRight');
+    expect(shadow().activeElement).toBe(button('slow'));
+    press('ArrowRight');
     expect(shadow().activeElement).toBe(button('explain'));
     press('ArrowRight');
     expect(shadow().activeElement).toBe(button('listen'));
@@ -392,19 +396,19 @@ describe('action interface', () => {
     let settle: () => void = () => undefined;
     outcome = () => new Promise<void>((resolve) => (settle = resolve));
     create().show(capture('bank'));
-    button('listen').click();
-    expect(button('listen').getAttribute('aria-disabled')).toBe('true');
-    expect(button('listen').getAttribute('data-state')).toBe('working');
+    button('explain').click();
+    expect(button('explain').getAttribute('aria-disabled')).toBe('true');
+    expect(button('explain').getAttribute('data-state')).toBe('working');
     expect(shadow().querySelector('[data-clavis="card-note"]')?.textContent).toBe('toolbarWorking');
 
     // A second press on the working button does nothing.
-    button('listen').click();
+    button('explain').click();
     expect(calls).toHaveLength(1);
 
     settle();
     await vi.advanceTimersByTimeAsync(0);
-    expect(button('listen').getAttribute('aria-disabled')).toBeNull();
-    expect(button('listen').getAttribute('data-state')).toBeNull();
+    expect(button('explain').getAttribute('aria-disabled')).toBeNull();
+    expect(button('explain').getAttribute('data-state')).toBeNull();
     expect(shadow().querySelector('[data-clavis="card-note"]')?.textContent).toBe(
       'toolbarCardPlaceholder',
     );
@@ -429,7 +433,7 @@ describe('action interface', () => {
       throw new Error('sync failure');
     };
     create().show(capture('bank'));
-    button('listen').click();
+    button('explain').click();
     await vi.advanceTimersByTimeAsync(200);
     expect(shadow().querySelector('[data-clavis="card-note"]')?.textContent).toBe(
       'toolbarActionFailed',
@@ -507,13 +511,24 @@ describe('action interface', () => {
 describe('cancellation and specific errors (ToolbarActions contract)', () => {
   const pending = (): ToolbarActionResult => new Promise<void>(() => undefined);
 
-  it('aborts the signal when another button supersedes the run', () => {
+  it('aborts the signal when the same button supersedes its own run', () => {
     outcome = pending;
     create().show(capture('bank'));
-    button('listen').click();
-    expect(signals[0]?.aborted).toBe(false);
     button('explain').click();
+    expect(signals[0]?.aborted).toBe(false);
+    // Explain pressed while its card works: the first request is superseded.
+    outcome = pending;
+    (calls.at(-1)?.context as RunContext).surface?.close();
     expect(signals[0]?.aborted).toBe(true);
+  });
+
+  it('Listen and Explain are independent: neither aborts the other (Phase 5 follow-up)', () => {
+    outcome = pending;
+    create().show(capture('bank'));
+    button('explain').click();
+    button('listen').click();
+    expect(calls.map((call) => call.action)).toEqual(['explain', 'listen']);
+    expect(signals[0]?.aborted).toBe(false);
     expect(signals[1]?.aborted).toBe(false);
   });
 
@@ -711,7 +726,7 @@ describe('keyboard and focus (FR-016)', () => {
     handle.show(capture('bank'));
     handle.focus();
     press('ArrowLeft');
-    expect(shadow().activeElement).toBe(button('explain'));
+    expect(shadow().activeElement).toBe(button('slow'));
     press('ArrowRight');
     expect(shadow().activeElement).toBe(button('listen'));
   });

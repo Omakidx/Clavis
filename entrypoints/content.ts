@@ -3,7 +3,7 @@ import { t } from '../lib/i18n';
 import { createSelectionController } from '../lib/selection/controller';
 import { loadedExplainCard, loadExplainCard } from '../lib/selection/card-loader';
 import { ownsFocus } from '../lib/selection/focus';
-import { createLocalActions } from '../lib/selection/local-actions';
+import { createListenController } from '../lib/selection/listen';
 import { isShowNoticeMessage } from '../lib/selection/notice';
 import {
   OBSERVER_GLOBAL,
@@ -45,10 +45,12 @@ export default defineContentScript({
     // the newest instance replaces the old one, which removes its listeners and its toolbar.
     world[OBSERVER_GLOBAL]?.stop();
 
-    const local = createLocalActions();
+    // Listen (Phase 6): TTS_SPEAK with the selected text only, no AI request and no Groq key.
+    // The background reports the end of playback with TTS_EVENT, handled in `onMessage` below.
+    const speech = createListenController();
     const actions: ToolbarActions = {
-      // Phase 6 replaces this with TTS_SPEAK; until then Listen only drives its local state.
-      ...(local.listen === undefined ? {} : { listen: local.listen }),
+      listen: speech.listen,
+      openVoiceSettings: speech.openVoiceSettings,
       // Phase 5: the card is loaded by the first Explain (LOAD_EXPLAIN_CARD -> the background
       // injects content-scripts/explain-card.js into this frame) and draws inside the toolbar.
       // The request, its states and its errors all live in the card; nothing is sent before this
@@ -65,9 +67,11 @@ export default defineContentScript({
     const controller = createSelectionController({ loadToolbar: bundledPreactLoader, actions });
     const onMessage = (
       message: unknown,
-      _sender: unknown,
+      sender: { id?: string } | undefined,
       sendResponse: (response: unknown) => void,
     ): true | undefined => {
+      // Only our own background reports playback state (a request id it never saw is ignored too).
+      if (sender?.id === browser.runtime.id && speech.handleEvent(message)) return undefined;
       if (isOpenSelectionMessage(message)) {
         const focus = message.focus === true;
         // The shortcut reaches every frame: only the frame the user is in reacts.

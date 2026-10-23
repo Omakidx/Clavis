@@ -83,7 +83,7 @@ export function registerBackground(): void {
       areas: [browser.storage.local, browser.storage.session],
       onModelContextChanged: () => void capabilityCache.invalidate(),
     }),
-    speech: createSpeech(),
+    speech: createSpeech({ preferences: () => settingsStore.getPreferences() }),
     injection,
   });
 

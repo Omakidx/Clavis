@@ -8,11 +8,13 @@ import {
   parsePrivilegedMessage,
   parsePublicMessage,
   type ErrorCode,
+  type ErrorReason,
   type KeyStatus,
   type KeyVerification,
   type ModelInfo,
   type OnboardingState,
   type Preferences,
+  type VoicesReport,
 } from '../../../lib/contracts';
 
 type CatalogEntry = { message: string; placeholders?: Record<string, { content: string }> };
@@ -50,7 +52,28 @@ export interface FakeBackendOptions {
   key?: { value: string; storage: 'local' | 'session' };
   /** Reply with nothing this many times first (a restarting service worker). */
   silentReplies?: number;
+  /** What GET_VOICES reports (default: no voice anywhere, on Linux). */
+  voices?: VoicesReport;
+  /** What TTS_SPEAK answers (default `started`). */
+  speak?:
+    | 'started'
+    | 'started-remote'
+    | 'no-voice'
+    | 'no-voice-linux'
+    | 'no-voice-language'
+    | 'online-only'
+    | 'start-failed';
 }
+
+/** A device with no voices (this Linux machine) and no fallback engine. */
+export const NO_VOICES: VoicesReport = {
+  platform: 'linux',
+  defaultEngine: 'none',
+  engines: {
+    chromeTts: { voices: [] },
+    offscreen: { available: false, voices: [] },
+  },
+};
 
 /**
  * An in-memory stand-in for the background's Phase 3 routes. Every message is checked with the
@@ -73,13 +96,19 @@ export function createFakeBackend(options: FakeBackendOptions = {}) {
     silent: options.silentReplies ?? 0,
     siteGranted: false,
     failNext: null as ErrorCode | null,
+    voices: options.voices ?? NO_VOICES,
+    speak: options.speak ?? 'started',
   };
   const calls: Array<{ type: string; [k: string]: unknown }> = [];
 
   const ok = (data: unknown) => ({ ok: true as const, data });
-  const fail = (code: ErrorCode) => ({
+  const fail = (code: ErrorCode, reason?: ErrorReason) => ({
     ok: false as const,
-    error: { code, message: 'internal detail that must never be shown: gsk_RAW_PROVIDER_TEXT' },
+    error: {
+      code,
+      message: 'internal detail that must never be shown: gsk_RAW_PROVIDER_TEXT',
+      ...(reason === undefined ? {} : { reason }),
+    },
   });
   const keyStatus = (): KeyStatus => ({
     hasKey: state.key !== null,
@@ -143,10 +172,23 @@ export function createFakeBackend(options: FakeBackendOptions = {}) {
           readingLevel: p.readingLevel,
           tooltipBehavior: p.tooltipBehavior,
           ttsRate: p.ttsRate,
+          ...(p.ttsLang === undefined ? {} : { ttsLang: p.ttsLang }),
         });
       }
       if (publicParsed.message.type === 'AI_EXPLAIN') return fail('SETUP_REQUIRED');
-      if (publicParsed.message.type === 'TTS_SPEAK') return ok({ state: 'started' });
+      if (publicParsed.message.type === 'TTS_SPEAK') {
+        if (state.speak === 'no-voice') return fail('NO_VOICE');
+        if (state.speak === 'no-voice-linux') return fail('NO_VOICE', 'no-voice-linux');
+        if (state.speak === 'no-voice-language') return fail('NO_VOICE', 'no-voice-language');
+        if (state.speak === 'online-only') return fail('NO_VOICE', 'online-only');
+        if (state.speak === 'start-failed') return fail('NO_VOICE', 'start-failed');
+        return ok({
+          state: 'started',
+          engine: 'chrome-tts',
+          remote: state.speak === 'started-remote',
+        });
+      }
+      if (publicParsed.message.type === 'TTS_STOP') return ok({ stopped: true });
       return ok({});
     }
     switch (message.type) {
@@ -195,6 +237,8 @@ export function createFakeBackend(options: FakeBackendOptions = {}) {
         state.verifiedAt = null;
         state.knownModels = [];
         return ok(keyStatus());
+      case 'GET_VOICES':
+        return ok(state.voices);
       case 'GET_SITE_ACCESS_STATUS':
         return ok({
           granted: state.siteGranted,

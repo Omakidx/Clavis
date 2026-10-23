@@ -209,7 +209,7 @@ test.describe('toolbar behaviour', () => {
       });
       await dblclickText(page, page, 'cartographer');
       await tb(page).waitShown();
-      await tb(page).click('listen');
+      await tb(page).click('explain');
       await expect.poll(() => tb(page).text(SEL.cardText)).toBe('cartographer');
       expect(await selectedText(page)).toBe('');
       // The collapse did not dismiss the toolbar while the pointer was on it.
@@ -243,6 +243,9 @@ test.describe('toolbar behaviour', () => {
       await dblclickText(page, page, 'cartographer');
       await tb(page).waitShown();
       await tb(page).focusAction('listen');
+      // Since Phase 6 the order is Listen, Slow, Explain.
+      await page.keyboard.press('ArrowRight');
+      await expect.poll(() => tb(page).focusedAction()).toBe('slow');
       await page.keyboard.press('ArrowRight');
       await expect.poll(() => tb(page).focusedAction()).toBe('explain');
       await page.keyboard.press('Enter');
@@ -271,7 +274,7 @@ test.describe('toolbar behaviour', () => {
         SEL.toolbar,
         `function () { return Array.from(this.children, (c) => c.tagName + ':' + c.getAttribute('type')); }`,
       );
-      expect(tags).toEqual(['BUTTON:button', 'BUTTON:button']);
+      expect(tags).toEqual(['BUTTON:button', 'BUTTON:button', 'BUTTON:button']);
     } finally {
       await dispose();
     }

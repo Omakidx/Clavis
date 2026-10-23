@@ -1,3 +1,4 @@
+import { languageTagSchema } from '../contracts';
 import type { SpeechVoice } from './types';
 
 /** Lowercase, `_` to `-`, trimmed. Empty input stays empty. */
@@ -7,6 +8,49 @@ export function normalizeLang(lang: string | undefined): string {
 
 function primarySubtag(normalized: string): string {
   return normalized.split('-')[0] ?? '';
+}
+
+/** Hyphenated BCP-47 form of an engine-reported tag, or undefined if it is not a valid tag. */
+export function toLanguageTag(lang: string | undefined): string | undefined {
+  const tag = (lang ?? '').trim().replace(/_/g, '-');
+  return languageTagSchema.safeParse(tag).success ? tag : undefined;
+}
+
+/**
+ * Language to speak in: the language the caller sent, else the saved preference. When the caller
+ * only knows the language ("en") and the preference names a region of it ("en-GB"), the
+ * preference refines it, so the British/American choice of FR-025 still applies to detected text.
+ */
+export function resolveLanguage(
+  messageLang: string | undefined,
+  preferredLang: string | undefined,
+): string | undefined {
+  if (messageLang === undefined) return preferredLang;
+  if (preferredLang === undefined) return messageLang;
+  const wanted = normalizeLang(messageLang);
+  const preferred = normalizeLang(preferredLang);
+  const refines =
+    !wanted.includes('-') && preferred !== wanted && primarySubtag(preferred) === wanted;
+  return refines ? preferredLang : messageLang;
+}
+
+/** True when both tags are the same language (region ignored). Unknown languages never match. */
+export function sameLanguage(a: string | undefined, b: string | undefined): boolean {
+  const left = primarySubtag(normalizeLang(a));
+  return left !== '' && left === primarySubtag(normalizeLang(b));
+}
+
+/** The voice with exactly this name that could prove it started, or undefined. */
+export function findNamedVoice(
+  voices: readonly SpeechVoice[],
+  name: string,
+): SpeechVoice | undefined {
+  return voices.find((voice) => voice.name === name && canReportStart(voice));
+}
+
+/** Whether any voice could actually speak (and prove it). */
+export function hasUsableVoice(voices: readonly SpeechVoice[]): boolean {
+  return voices.some(canReportStart);
 }
 
 export type VoiceSelection =

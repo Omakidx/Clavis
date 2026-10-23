@@ -6,7 +6,8 @@ const LOCAL_WORKING_MS = 700;
 /**
  * Phase 4 controller: Listen and Explain only drive the toolbar's own visual states (button
  * pressed for a moment, then reset). It sends nothing: no background message, no AI call, no
- * speech (FR-017). Phases 5 and 6 replace `listen` and `explain` with real implementations.
+ * speech (FR-017). No longer used by the content script (Phase 5 implemented `explain`, Phase 6
+ * `listen`: lib/selection/listen.ts); kept as a backend-free `ToolbarActions` for tests and hosts.
  */
 export function createLocalActions(workingMs: number = LOCAL_WORKING_MS): ToolbarActions {
   // Ends early when the run is no longer wanted (superseded, replaced or dismissed).

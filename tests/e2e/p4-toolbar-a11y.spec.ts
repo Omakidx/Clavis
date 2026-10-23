@@ -39,6 +39,9 @@ test.afterAll(async () => {
 
 type Props = Record<string, unknown>;
 
+/** Listen's view state (Phase 6): what `ToolbarViewProps.listen` carries. */
+const IDLE = { status: 'idle', slow: false, message: '', hint: '', note: '' };
+
 const BASE: Props = {
   mode: 'actions',
   kind: 'word',
@@ -46,6 +49,7 @@ const BASE: Props = {
   card: null,
   trimmed: null,
   busy: null,
+  listen: IDLE,
   live: '',
   tabStop: 'listen',
 };
@@ -63,10 +67,49 @@ const STATES: Array<{ name: string; props: Props }> = [
     },
   },
   {
-    name: 'card after Listen',
+    name: 'Listen starting (spinner)',
+    props: { ...BASE, listen: { ...IDLE, status: 'starting' }, live: 'Starting playback…' },
+  },
+  {
+    name: 'Listen playing (Stop) with Slow on and the online-voice note',
     props: {
       ...BASE,
-      card: { action: 'listen', text: 'cartographer', note: 'The explanation will appear here.' },
+      listen: {
+        ...IDLE,
+        status: 'playing',
+        slow: true,
+        note: 'This voice sends the text to an online service.',
+      },
+      live: 'Playing.',
+    },
+  },
+  {
+    name: 'Listen ended (Replay)',
+    props: { ...BASE, listen: { ...IDLE, status: 'ended' } },
+  },
+  {
+    name: 'Listen ended by an error',
+    props: {
+      ...BASE,
+      listen: {
+        ...IDLE,
+        status: 'ended',
+        message: 'Playback stopped unexpectedly. Press Replay to try again.',
+      },
+      live: 'Playback stopped unexpectedly. Press Replay to try again.',
+    },
+  },
+  {
+    name: 'no voice on Linux (message, hint and Voice settings)',
+    props: {
+      ...BASE,
+      listen: {
+        ...IDLE,
+        status: 'unavailable',
+        message: "Voice isn't available on this device.",
+        hint: 'Install speech-dispatcher and a voice such as espeak-ng, then restart Chrome.',
+      },
+      live: "Voice isn't available on this device. Install speech-dispatcher and a voice such as espeak-ng, then restart Chrome.",
     },
   },
   {
@@ -93,7 +136,7 @@ const STATES: Array<{ name: string; props: Props }> = [
     props: {
       ...BASE,
       card: {
-        action: 'listen',
+        action: 'explain',
         text: 'bank',
         note: "That didn't work. Press the button to try again.",
       },
@@ -208,6 +251,7 @@ test.describe('structure and targets', () => {
       expect(shape.label).toBe('Clavis actions for the selected text');
       expect(shape.buttons).toEqual([
         { type: 'button', name: 'Listen', tabIndex: 0 },
+        { type: 'button', name: 'Slow', tabIndex: 0 },
         { type: 'button', name: 'Explain', tabIndex: 0 },
       ]);
       expect(shape.live).toBe('live');
@@ -273,24 +317,24 @@ test.describe('structure and targets', () => {
 });
 
 test.describe('user preferences', () => {
-  test('prefers-reduced-motion: the toolbar has no animation or transition to reduce', async () => {
+  test('prefers-reduced-motion: no transitions, and the Listen spinner stops rotating', async () => {
     const reduced = await openPage({ reducedMotion: 'reduce' });
     const normal = await openPage();
     try {
-      const duration = async (page: Page): Promise<string> => {
-        await renderState(page, BASE);
-        return page.evaluate(
-          () =>
-            getComputedStyle(
-              (document.getElementById('host')?.shadowRoot as ShadowRoot).querySelector(
-                'button',
-              ) as Element,
-            ).transitionDuration,
-        );
+      const motion = async (page: Page): Promise<{ transition: string; spinner: string }> => {
+        await renderState(page, { ...BASE, listen: { ...IDLE, status: 'starting' } });
+        return page.evaluate(() => {
+          const root = document.getElementById('host')?.shadowRoot as ShadowRoot;
+          return {
+            transition: getComputedStyle(root.querySelector('button') as Element)
+              .transitionDuration,
+            spinner: getComputedStyle(root.querySelector('.spinner') as Element).animationName,
+          };
+        });
       };
-      expect(await duration(reduced)).toBe('0s');
-      // Nothing moves in either mode, so reduced motion is respected by construction.
-      expect(await duration(normal)).toBe('0s');
+      expect(await motion(reduced)).toEqual({ transition: '0s', spinner: 'none' });
+      // The only motion in the toolbar is that spinner, and only without a reduced-motion request.
+      expect(await motion(normal)).toEqual({ transition: '0s', spinner: 'clavis-spin' });
     } finally {
       await reduced.context().close();
       await normal.context().close();
@@ -323,7 +367,11 @@ test.describe('user preferences', () => {
   test('forced-colors (high contrast): system colours, a real border and a Highlight focus ring', async () => {
     const page = await openPage({ forcedColors: 'active' });
     try {
-      await renderState(page, { ...BASE, card: { action: 'listen', text: 'bank', note: 'x' } });
+      await renderState(page, {
+        ...BASE,
+        listen: { ...IDLE, status: 'playing', slow: true },
+        card: { action: 'explain', text: 'bank', note: 'x' },
+      });
       const styles = await page.evaluate(() => {
         const root = document.getElementById('host')?.shadowRoot as ShadowRoot;
         const toolbar = getComputedStyle(root.querySelector('.toolbar') as Element);
@@ -333,12 +381,16 @@ test.describe('user preferences', () => {
         return {
           toolbarBorder: toolbar.borderTopWidth,
           buttonBorder: getComputedStyle(button).borderTopWidth,
+          pressedBorder: getComputedStyle(root.querySelector('[aria-pressed="true"]') as Element)
+            .borderTopWidth,
           outline: focused.outlineStyle,
           outlineWidth: focused.outlineWidth,
           matches: matchMedia('(forced-colors: active)').matches,
         };
       });
       expect(styles.matches).toBe(true);
+      // Stop (playing) and a pressed Slow toggle stay distinguishable without colour: a border.
+      expect(styles.pressedBorder).toBe('1px');
       expect(styles.toolbarBorder).toBe('1px');
       expect(styles.buttonBorder).toBe('1px');
       expect(styles.outline).toBe('solid');

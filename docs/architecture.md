@@ -366,6 +366,8 @@ flowchart LR
     F -->|No| ERR[Explain unavailable voice]
 ```
 
+**Phase 6 implementation notes.** `TTS_SPEAK` resolves the voice as: an explicit `voiceName` exactly (else `NO_VOICE`), then the saved `ttsVoice` only if it speaks the requested language, then the best match by language (local before remote, `chrome.tts` before the offscreen fallback) — never a voice for another language. The reply comes only after the engine starts (`speakResultSchema`, with `remote`); `TTS_EVENT` (ended/cancelled/error) goes to exactly the requesting document. On Linux with no voices, `NO_VOICE` carries `reason: 'no-voice-linux'`. `GET_VOICES` reports per-engine voices for Settings → Voice. On the toolbar, Listen has its own run slot, so it never closes an open explanation.
+
 **Responsibilities:**
 
 - `SpeechService`: `getVoices`, `speak({ text, lang, rate })`, `stop`, `isSupported` and TTS event adapters; hides which engine is used.

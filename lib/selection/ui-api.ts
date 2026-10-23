@@ -36,10 +36,42 @@ export interface ActionContext {
 export interface RunContext extends ActionContext {
   signal: AbortSignal;
   /**
+   * Present for `listen` only: what the toolbar needs to know about the playback to show it
+   * truthfully (Phase 6). Listen and Explain have separate run slots, so pressing one never aborts
+   * the other; `signal` of a Listen run is aborted by Stop, by another Listen press, by a new
+   * selection and by dismissal, and the action must then stop the audio.
+   */
+  listen?: ListenSurface;
+  /**
    * Lets the action draw its own card inside the toolbar (Phase 5 Explain card). Absent for
    * hosts that only show the toolbar's state line.
    */
   surface?: CardSurface;
+}
+
+/**
+ * What Listen reports back. The toolbar shows "playing" only after `playing`, which the action may
+ * report only once audio has really started (never on a guess).
+ */
+export type ListenReport =
+  /** Nothing is playing (a run that ended without anything to say). */
+  | { status: 'idle' }
+  /** Requested, no audio yet (spinner). `slow` is the effective speed once known. */
+  | { status: 'starting'; slow?: boolean }
+  /** Audio is playing. `remote`: the voice sends the text to an online service. */
+  | { status: 'playing'; slow: boolean; remote: boolean }
+  /** Playback finished or was cut short; `message` is set when it ended by error. Replay is offered. */
+  | { status: 'ended'; message?: MessageKey }
+  /** Could not start (not for lack of a voice). */
+  | { status: 'failed'; message: MessageKey; hint?: MessageKey }
+  /** No voice on this device. The toolbar adds a "Voice settings" action. */
+  | { status: 'unavailable'; message: MessageKey; hint?: MessageKey };
+
+/** What a Listen run receives to report through (see `RunContext.listen`). */
+export interface ListenSurface {
+  /** The speed the user chose with the toolbar's Slow toggle for this selection; undefined = preference. */
+  slow: boolean | undefined;
+  report(report: ListenReport): void;
 }
 
 /**
@@ -123,7 +155,10 @@ export type ToolbarActionResult = void | Promise<void>;
 
 /** Implemented by the content-side controller; every member is optional. */
 export interface ToolbarActions {
-  /** Listen pressed (Phase 6: send TTS_SPEAK with `snapshot.text`). */
+  /**
+   * Listen pressed (Phase 6: TTS_SPEAK with `snapshot.text` only). Reports its state through
+   * `context.listen`; a returned promise is also honoured (pending = starting, rejected = failed).
+   */
   listen?(context: RunContext): ToolbarActionResult;
   /** Explain pressed (Phase 5: send AI_EXPLAIN with `snapshot`). The only step that may send text. */
   explain?(context: RunContext): ToolbarActionResult;
@@ -134,6 +169,8 @@ export interface ToolbarActions {
   trim?(context: ActionContext): void;
   /** The toolbar closed: cancel pending work for `snapshot.selectionId` (stale-response guard). */
   dismiss?(context: DismissContext): void;
+  /** "Voice settings" pressed in the no-voice message: open Settings at the Voice section. */
+  openVoiceSettings?(): void;
 }
 
 export interface ToolbarOptions {

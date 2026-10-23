@@ -6,3 +6,4 @@ export * from './replies';
 export * from './selection';
 export * from './key-storage';
 export * from './setup';
+export * from './speech';

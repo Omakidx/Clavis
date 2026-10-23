@@ -176,3 +176,58 @@ describe('ChromeTtsEngine: voices that load late (speech-dispatcher on Linux)', 
     await expect(new ChromeTtsEngine(tts, 1_000).getVoices()).resolves.toEqual([]);
   });
 });
+
+describe('ChromeTtsEngine: remembered empty answer, peek and invalidate', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  function emptyTts() {
+    const listeners = new Set<() => void>();
+    const { tts } = fakeTts();
+    let voices: { voiceName: string; lang: string }[] = [];
+    tts.getVoices = vi.fn(() => Promise.resolve(voices));
+    tts.onVoicesChanged = {
+      addListener: (cb) => listeners.add(cb),
+      removeListener: (cb) => listeners.delete(cb),
+    };
+    return { tts, setVoices: (next: typeof voices) => (voices = next) };
+  }
+
+  it('peekVoices answers at once and never waits for voices to load', async () => {
+    const { tts } = emptyTts();
+    const engine = new ChromeTtsEngine(tts, 1_000);
+    await expect(engine.peekVoices()).resolves.toEqual([]);
+    expect(tts.onVoicesChanged).toBeDefined();
+  });
+
+  it('invalidate() makes the next empty answer wait and look again (voices installed later)', async () => {
+    const { tts, setVoices } = emptyTts();
+    const engine = new ChromeTtsEngine(tts, 1_000);
+    const first = engine.getVoices();
+    await vi.advanceTimersByTimeAsync(1_000);
+    expect(await first).toEqual([]);
+    // Remembered: no wait now, even though voices appeared in the meantime.
+    setVoices([{ voiceName: 'espeak', lang: 'en' }]);
+    engine.invalidate();
+    expect((await engine.getVoices()).map((v) => v.name)).toEqual(['espeak']);
+  });
+
+  it('refresh: true forgets the remembered answer and waits again', async () => {
+    const { tts } = emptyTts();
+    const engine = new ChromeTtsEngine(tts, 1_000);
+    const first = engine.getVoices();
+    await vi.advanceTimersByTimeAsync(1_000);
+    await first;
+    const refreshed = engine.getVoices({ refresh: true });
+    let settled = false;
+    void refreshed.then(() => (settled = true));
+    await vi.advanceTimersByTimeAsync(999);
+    expect(settled).toBe(false);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(await refreshed).toEqual([]);
+  });
+});

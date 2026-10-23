@@ -4,6 +4,10 @@ import { idSchema, type ErrorCode, type ErrorReason, type MessageReply } from '.
 /** Fixed message for an envelope that carries a `reason` (the plain code message would mislead). */
 const REASON_MESSAGES: Record<ErrorReason, string> = {
   disclosure: 'Confirm that Clavis may send the selected text to Groq.',
+  'no-voice-linux': 'No speech engine is installed on this Linux system.',
+  'no-voice-language': 'No voice is available for this language.',
+  'start-failed': 'The voice did not start.',
+  'online-only': 'Only online voices are available for this language.',
 };
 
 /**

@@ -200,6 +200,7 @@ describe('OPEN_SETTINGS', () => {
       ['key', 'section-key'],
       ['model', 'section-model'],
       ['privacy', 'section-privacy'],
+      ['voice', 'section-voice'],
     ].entries()) {
       expect(
         await h.call({ v: 1, type: 'OPEN_SETTINGS', section }, contentSender(20 + i)),

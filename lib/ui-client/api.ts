@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import type { KeyStorage } from '../contracts/key-storage';
 import { explainResultSchema, type ExplainRequest } from '../contracts/explain';
+import { speakResultSchema, stopResultSchema, voicesReportSchema } from '../contracts/speech';
 import {
   aiStatusSchema,
   keyStatusSchema,
@@ -13,9 +14,6 @@ import {
 import { request, type ClientResult } from './request';
 
 const clearedSchema = z.strictObject({ cleared: z.literal(true) });
-
-/** Loose on purpose: the speech reply is an internal shape (lib/speech), only `ok` matters here. */
-const speakDataSchema = z.looseObject({});
 
 /**
  * Typed wrappers for the background's message routes (lib/contracts/messages.ts). One place
@@ -32,6 +30,8 @@ export const api = {
   updateOnboarding: (update: { completed?: boolean; siteAccessChoice?: SiteAccessChoice }) =>
     request({ type: 'UPDATE_ONBOARDING', ...update }, settingsSnapshotSchema),
   getSiteAccessStatus: () => request({ type: 'GET_SITE_ACCESS_STATUS' }, siteAccessStatusSchema),
+  /** Voices per engine on this device (Settings voice chooser, FR-025). */
+  getVoices: () => request({ type: 'GET_VOICES' }, voicesReportSchema),
 
   // ---- Privileged: key routes (options and onboarding only) --------------------------
   /** The key travels in this one message and is never stored, logged or echoed by the page. */
@@ -48,9 +48,19 @@ export const api = {
   // Paid call: never retried automatically (a restart must not cause a second Groq request).
   explain: (payload: ExplainRequest) =>
     request({ type: 'AI_EXPLAIN', payload }, explainResultSchema, {}, { retry: false }),
-  speak: (input: { requestId: string; text: string; lang?: string; rate: number }) =>
-    request({ type: 'TTS_SPEAK', ...input }, speakDataSchema),
-  stopSpeaking: () => request({ type: 'TTS_STOP' }, speakDataSchema),
+  /** Speak from an extension page (Settings "Test voice"). Replies once audio has started. */
+  speak: (input: {
+    requestId: string;
+    text: string;
+    lang?: string;
+    rate: number;
+    voiceName?: string;
+  }) => request({ type: 'TTS_SPEAK', ...input }, speakResultSchema, {}, { retry: false }),
+  stopSpeaking: (requestId?: string) =>
+    request(
+      { type: 'TTS_STOP', ...(requestId === undefined ? {} : { requestId }) },
+      stopResultSchema,
+    ),
 } as const;
 
 export type Api = typeof api;

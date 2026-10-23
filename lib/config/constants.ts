@@ -131,4 +131,5 @@ export const SETTINGS_SECTION_ANCHORS = {
   key: 'section-key',
   model: 'section-model',
   privacy: 'section-privacy',
+  voice: 'section-voice',
 } as const;

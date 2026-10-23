@@ -1,6 +1,7 @@
 import { t } from '../../../lib/i18n';
 import { PreferencesForm } from '../../settings/PreferencesForm';
 import { ResourceGate } from '../../settings/ResourceGate';
+import { VoiceStepField } from '../../settings/VoiceSection';
 import type { StepContext } from '../StepTypes';
 
 /** FR-006: language, reading level, speed, toolbar behaviour and (when known) the model. */
@@ -19,6 +20,7 @@ export function PreferencesStep({ settings, keys }: StepContext) {
           />
         )}
       </ResourceGate>
+      <VoiceStepField settings={settings} />
     </>
   );
 }
