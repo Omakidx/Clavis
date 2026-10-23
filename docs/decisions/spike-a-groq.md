@@ -99,15 +99,7 @@ Choose **quick** as the acceptable model with the lowest p95. Choose **deep** as
 
 ## Results and decision
 
-_To be filled after the user's run._
-
-- Run date, command, commit:
-- Models compared and the non-reasoning model chosen:
-- Table (p50, p95, completion tokens, JSON %, schema %):
-- Quality notes (bank river / bank money / idiom / injection):
-- Observed `response_format` and `reasoning_effort` support per model:
-- Decision: quick = ?, deep = ?, `max_completion_tokens` per mode = ?
-- Follow-ups:
+Settled by the Phase 5 evaluation run on 2026-10-23, which covered `core` plus the lazy modes on the same candidate models: **default model `openai/gpt-oss-20b`** (D-09). Full table, manual review of flags and reasoning: [p5-prompt-eval.md](p5-prompt-eval.md#results-and-decision).
 
 ## Follow-ups for later phases
 

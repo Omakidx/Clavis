@@ -40,7 +40,7 @@ flowchart TD
 | 2 — Feasibility spikes | Engineering done 2026-10-22; awaiting user runs | Groq call + model comparison, permission flow + toolbar latency, PDF viewer text layer and TTS capability proven |
 | 3 — Onboarding & BYOK | Done 2026-10-22 | Site access, valid/invalid keys, trusted storage and settings covered |
 | 4 — Web highlight toolbar | Done 2026-10-22 | Reliable selection/position/dismiss/keyboard behavior on both injection paths |
-| 5 — AI explanation | Done 2026-10-23 (eval run pending) | Core request + Must tabs function with typed responses |
+| 5 — AI explanation | Done 2026-10-23 | Core request + Must tabs function with typed responses |
 | 6 — Listen/TTS | 1–3 days | Word + sentence playback with usable no-voice fallback |
 | 7 — Custom PDF reader | 3–5 days | Local PDF in viewer components + text selection + reader controls |
 | 8 — Unified UX | 2–4 days | Web/PDF consistent; side panel, copy, Should tabs if on schedule |
@@ -109,10 +109,10 @@ Effort counts are overlapping planning estimates, not additive deadlines; use th
 
 - [ ] **User:** get a test key from <https://console.groq.com/keys> (never commit or paste it in chat).
 - [x] `https://api.groq.com/*` host permission; the packaged worker reaches Groq (401 for a fake key on `/models` and `/chat/completions`). Groq currently allows any origin, so the permission is defence in depth.
-- [ ] **User:** verify authenticated model list and `chat/completions` with a real key — done by the comparison script below.
+- [x] Authenticated model list and `chat/completions` verified with a real key (eval run, 2026-10-23).
 - [x] Capability table: `reasoning_effort` only for gpt-oss; strict `json_schema` for documented models, automatic fallback to `json_object` on a 400 (from Groq docs; to be confirmed by the user's run).
-- [ ] **User — model comparison (D-09):** `GROQ_API_KEY=… npx tsx scripts/spikes/groq-compare.ts --runs 3 --max-requests 75`, then review the summary and record the decision in the findings doc.
-- [ ] Confirm model IDs and free limits against live provider data (the user's run).
+- [x] **Model comparison (D-09):** settled 2026-10-23 by the Phase 5 evaluation run — default `openai/gpt-oss-20b` ([results](decisions/p5-prompt-eval.md#results-and-decision)).
+- [x] Model IDs confirmed against the account's live model list (eval run, 2026-10-23); free-tier limits are account-specific and are not hard-coded.
 - [x] 400/401/403/404/408/429/5xx/network/timeout/invalid-JSON paths unit-tested with mocks (48 tests).
 
 ### Spike B: Site access, selection + tooltip — [findings](decisions/spike-b-toolbar.md)
@@ -145,7 +145,7 @@ Effort counts are overlapping planning estimates, not additive deadlines; use th
 - [ ] **User:** in your own Chrome, check voice counts per engine and listen to word/sentence/slow playback; optionally install `speech-dispatcher espeak-ng` and repeat. Then decide D-07: keep the offscreen fallback and `offscreen` permission only if it finds voices `chrome.tts` misses.
 
 **Deliverables (2026-10-22):** spike implementations in `lib/ai`, `lib/site-access`, `lib/selection`, `components/tooltip`, `lib/pdf`, `components/reader`, `lib/speech`, `entrypoints/offscreen`; findings in `docs/decisions/`; decisions D-08, D-17 and D-18; [security review](decisions/phase-2-security-review.md) fixes.  
-**Gate:** All four spikes have a demonstrable working or consciously downgraded implementation path. **Engineering passed 2026-10-22** (`npm run ci`, full E2E suite). **Closes when the user's runs settle D-09 (models) and D-07 (voice fallback).**
+**Gate:** All four spikes have a demonstrable working or consciously downgraded implementation path. **Engineering passed 2026-10-22** (`npm run ci`, full E2E suite). D-09 settled 2026-10-23; **closes when the user's voice check settles D-07.**
 
 **Phase 2 follow-ups:**
 
@@ -238,7 +238,7 @@ Effort counts are overlapping planning estimates, not additive deadlines; use th
 
 **Phase 5 follow-ups:**
 
-- After the user's eval run: settle D-09 (default model), tune `MODE_TOKEN_BUDGETS`, decide whether strict schemas must drop `maxLength`/`minItems` keywords for gpt-oss, and decide the Grammar/Translate flags (Phase 8).
+- Eval run done 2026-10-23: D-09 = `openai/gpt-oss-20b`; token budgets kept (no truncation; caps only); strict schemas work as-is on gpt-oss. Still open: run `--include-should` before Phase 8 decides the Grammar/Translate flags; tighten the eval's injection/markup heuristics (false positives).
 - Phase 6: pressing Listen after Explain currently supersedes the run and removes the card — Listen should not discard an open explanation.
 - Optional: add `model` to the logger's metadata allowlist; update `spike-a-groq.md` to point at `scripts/eval/explain-eval.ts` (the old command still works through a shim).
 
