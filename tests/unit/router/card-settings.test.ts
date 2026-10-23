@@ -54,7 +54,7 @@ describe('LOAD_EXPLAIN_CARD', () => {
       target: { tabId: 7, frameIds: [3] },
       files: [EXPLAIN_CARD_SCRIPT_FILE],
     });
-    expect(EXPLAIN_CARD_SCRIPT_FILE).toBe('content-scripts/explain-card.js');
+    expect(EXPLAIN_CARD_SCRIPT_FILE).toBe('explain-card.js');
   });
 
   it('never targets all frames, and the message cannot choose the target', async () => {

@@ -4,7 +4,7 @@ import { copyPlainText } from '../../../components/explanation/copy';
 
 // Source of the whole card, read as text: the fallback must not exist in any form.
 const sources = import.meta.glob<string>(
-  ['../../../components/explanation/*.{ts,tsx}', '../../../entrypoints/explain-card.content.ts'],
+  ['../../../components/explanation/*.{ts,tsx}', '../../../entrypoints/explain-card.ts'],
   { query: '?raw', import: 'default', eager: true },
 );
 

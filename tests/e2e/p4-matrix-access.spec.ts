@@ -374,6 +374,8 @@ test.describe('site access granted', () => {
 
     test('control: the request tracker does see a Groq request made by the service worker', async () => {
       const before = harness.groqRequests.length;
+      // Offline: the request is observed, then refused before it leaves the machine.
+      await harness.ext.context.route('https://api.groq.com/**', (route) => route.abort());
       await harness.ext.serviceWorker.evaluate(() =>
         fetch('https://api.groq.com/openai/v1/models').catch(() => null),
       );

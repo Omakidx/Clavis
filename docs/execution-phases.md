@@ -208,7 +208,7 @@ Effort counts are overlapping planning estimates, not additive deadlines; use th
 
 **Phase 4 follow-ups:**
 
-- Phase 5: the explanation card loads separately on the first Explain (keep the observer under 18 KB, D-20). The spike's UI-injection route was removed in Phase 4, so Phase 5 must add a loading path (background `scripting.executeScript` of a card script into the sender's frame, or a dynamic import) and a size-budget entry for the card in `scripts/size-budgets.json`. Implement `ToolbarActions.explain` (with its `AbortSignal`) in `entrypoints/content.ts`.
+- Phase 5: the explanation card loads separately on the first Explain (keep the observer under 18 KB, D-20). The spike's UI-injection route was removed in Phase 4, so Phase 5 must add a loading path (background `scripting.executeScript` of a card script into the sender's frame, or a dynamic import) and a size-budget entry for the card in `scripts/size-budgets.json`. Implement `ToolbarActions.explain` (with its `AbortSignal`) in `entrypoints/content.ts` (now `entrypoints/observer.ts`, Phase 9).
 - Phase 6: implement `ToolbarActions.listen`.
 - Phase 9: latency on a quiet reference machine; real browser zoom, touch selection handles, screen reader pass; make the real-UI CI job blocking once stable.
 
@@ -333,33 +333,35 @@ Remote PDF URLs and thumbnails are not part of v1 (D-03; thumbnails are a Could)
 
 ### Automated verification
 
-- [ ] Typecheck, lint and unit suite all pass in CI.
-- [ ] Add `chrome.runtime`/storage message integration tests and secret-boundary checks.
-- [ ] E2E tests for full setup -> grant site access -> highlight -> Listen -> Explain -> open tab -> dismiss.
-- [ ] E2E tests for the declined-access path: context menu -> Explain -> card.
-- [ ] E2E tests for local PDF open -> page navigation -> select -> Listen -> Explain.
-- [ ] Mock Groq 401/403/404/429/5xx, invalid JSON, huge answers, missing key, offline and worker cancellation.
-- [ ] Regression test navigation/reselection stale answers and toolbar persistence.
-- [ ] PDF large-file/malformed/encrypted/scan-only and voice absent fixtures.
-- [ ] Run automated accessibility audits; manual keyboard and screen-reader spot checks.
+- [x] Typecheck, lint and unit suite all pass in CI.
+- [x] Add `chrome.runtime`/storage message integration tests and secret-boundary checks.
+- [x] E2E tests for full setup -> grant site access -> highlight -> Listen -> Explain -> open tab -> dismiss.
+- [x] E2E tests for the declined-access path: context menu -> Explain -> card.
+- [x] E2E tests for local PDF open -> page navigation -> select -> Listen -> Explain.
+- [x] Mock Groq 401/403/404/429/5xx, invalid JSON, huge answers, missing key, offline and worker cancellation.
+- [x] Regression test navigation/reselection stale answers and toolbar persistence.
+- [x] PDF large-file/malformed/encrypted/scan-only and voice absent fixtures.
+- [x] Run automated accessibility audits; manual keyboard and screen-reader spot checks. *Automated audits and keyboard E2E done; the screen-reader spot check needs a person (test report §7).*
 
 ### Security, privacy and performance
 
-- [ ] Capture Chrome network traffic: zero selection-only AI requests.
-- [ ] Inspect content-script messages/DOM/storage to confirm key never leaves trusted extension contexts.
-- [ ] Fuzz selected text with HTML, model jailbreak text, URLs and Unicode; no code execution.
-- [ ] Check that PDF worker and scripts are bundled and no remote executable code loads.
-- [ ] Audit minimum necessary manifest permissions and their developer-dashboard justifications.
-- [ ] Validate per-site disable, granting site access later, and revoking it (registration removed).
-- [ ] Verify `web_accessible_resources` exposes nothing beyond the chosen lazy UI chunk, with `use_dynamic_url`.
-- [ ] Set memory budget for reader and verify that long PDF doesn't create unbounded canvases.
-- [ ] Measure first and repeat toolbar p95 against the budget; track AI latency without promising backend SLA.
-- [ ] Count Groq requests per session in E2E: one per Explain, one per newly opened tab, zero on reopen.
-- [ ] Inspect ZIP for secrets, debug keys, `.env`, localhost URLs, unsupported features and source map leakage.
-- [ ] Recheck Chrome/Groq/PDF.js dependency and security advisories before release.
+- [x] Capture Chrome network traffic: zero selection-only AI requests.
+- [x] Inspect content-script messages/DOM/storage to confirm key never leaves trusted extension contexts.
+- [x] Fuzz selected text with HTML, model jailbreak text, URLs and Unicode; no code execution.
+- [x] Check that PDF worker and scripts are bundled and no remote executable code loads.
+- [x] Audit minimum necessary manifest permissions and their developer-dashboard justifications.
+- [x] Validate per-site disable, granting site access later, and revoking it (registration removed).
+- [x] Verify `web_accessible_resources` exposes nothing beyond the chosen lazy UI chunk, with `use_dynamic_url`. *None at all: the card is injected with `scripting`, so the manifest has no `web_accessible_resources`.*
+- [x] Set memory budget for reader and verify that long PDF doesn't create unbounded canvases.
+- [x] Measure first and repeat toolbar p95 against the budget; track AI latency without promising backend SLA.
+- [x] Count Groq requests per session in E2E: one per Explain, one per newly opened tab, zero on reopen.
+- [x] Inspect ZIP for secrets, debug keys, `.env`, localhost URLs, unsupported features and source map leakage.
+- [x] Recheck Chrome/Groq/PDF.js dependency and security advisories before release. *Done 2026-10-23 (`npm audit`: 0); repeat on submission day.*
 
 **Deliverables:** Test report tied to requirement IDs, triaged defect list, candidate version.  
 **Gate:** No blocking bugs, security leaks, policy conflicts or broken core flows.
+
+**Status (2026-10-23): release candidate 1.0.0, gate met** for everything verifiable without a person ([p9-test-report.md](decisions/p9-test-report.md), [phase-9-security-review.md](decisions/phase-9-security-review.md), [p9-performance.md](decisions/p9-performance.md)). Release audit M1 (editable text in context) and L1 (WXT start event) fixed; verification defects Q1–Q4 fixed; privacy policy and store text updated ([store/permission-justifications.md](store/permission-justifications.md)). Needs a person before submission: screen-reader spot check, Windows/macOS voices, a Chrome 147 smoke run, a live Groq run (incl. the Grammar/Translate eval), the password-manager check; Phase 10: publish the policy (P3, D-15).
 
 ## Phase 10 — Chrome Web Store submission
 

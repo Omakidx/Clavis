@@ -109,6 +109,8 @@ export function codeForStatus(status: number): ErrorCode {
   if (status === 401 || status === 403) return 'INVALID_API_KEY';
   if (status === 404) return 'MODEL_UNAVAILABLE';
   if (status === 408) return 'TIMEOUT';
+  // 413: the request (selection plus context) is larger than the model accepts, not a connection problem.
+  if (status === 413) return 'SELECTION_TOO_LONG';
   if (status === 429) return 'RATE_LIMITED';
   // 400/422: invalid request or unsupported option/model. No dedicated code exists, and the
   // user remedy ("Choose another model") matches MODEL_UNAVAILABLE in requirements §7.

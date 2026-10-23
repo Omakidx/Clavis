@@ -20,12 +20,33 @@ const scratch = mkdtempSync(path.join(tmpdir(), 'clavis-selftest-'));
 
 // Built at run time so this file never contains a key-shaped literal (secret scanners).
 const fakeKey = ['gsk', 'X7kQ9mZ2vB4nL8cD1fG5hJ3pR6tW0yA'].join('_');
+const tail = 'Q7mZ2vB4nL8cD1fG5hJ3pR6tW0yAx9Kd';
+const otherSecrets = {
+  'AWS access key id': ['AK', 'IA', 'IOSFODNN7EXAMPLE'].join(''),
+  'GitHub token': ['gh', 'p_', tail, 'abcd'].join(''),
+  'Slack token': ['xo', 'xb-', '123456789012-abcdefghij'].join(''),
+  'OpenAI/Anthropic-style API key': ['s', 'k-', 'proj-', tail, tail].join(''),
+  'Google API key': ['AI', 'za', 'SyA1B2C3D4E5F6G7H8I9J0K1L2M3N4O5P6Q'].join(''),
+  'JSON Web Token': [
+    'ey',
+    'JhbGciOiJub25lIn0',
+    '.',
+    'ey',
+    'Jzd',
+    'WIiOiIxMjMifQ',
+    '.',
+    'c2lnbmF0dXJl',
+    'abcdef',
+  ].join(''),
+  'hard-coded bearer credential': ['Bea', 'rer ', tail].join(''),
+  'PEM private key': ['-----BEGIN ', 'OPENSSH PRIVATE KEY', '-----'].join(''),
+};
 
 function writeZip(files) {
   const locals = [];
   const central = [];
   let offset = 0;
-  for (const [name, content] of Object.entries(files)) {
+  for (const [name, content] of Array.isArray(files) ? files : Object.entries(files)) {
     const data = Buffer.isBuffer(content) ? content : Buffer.from(content);
     const packed = deflateRawSync(data);
     const nameBuf = Buffer.from(name);
@@ -442,19 +463,311 @@ const zipCases = [
     { budgets: {} },
   ],
 
-  // Unknown file types warn normally and fail under --strict.
+  // ---- Phase 9 hardening ----
+
+  // Other credential shapes (values are assembled at run time; see otherSecrets).
+  ...Object.entries(otherSecrets).map(([label, value]) => [
+    `secret: ${label}`,
+    { ...baseFiles(), 'background.js': `var k="${value}";` },
+    1,
+    label,
+  ]),
   [
-    'unknown file type only warns by default',
-    { ...baseFiles(), 'data.xyz': 'abc' },
+    'secret: bearer template (no literal credential) passes',
+    { ...baseFiles(), 'background.js': 'var h={Authorization:`Bearer ${key}`};' },
     0,
-    'unrecognised file type',
+    'AUDIT PASSED',
   ],
   [
-    'unknown file type fails under --strict',
+    'secret inside a binary-looking JSON/locale file',
+    {
+      ...baseFiles(),
+      '_locales/en/messages.json': JSON.stringify({
+        extName: { message: 'x' },
+        k: { message: otherSecrets['GitHub token'] },
+      }),
+    },
+    1,
+    'GitHub token',
+  ],
+
+  // Source maps: file, comment in JS, comment in CSS, eval-wrapper sourceURL.
+  [
+    'sourceMappingURL comment in JS (map file stripped)',
+    { ...baseFiles(), 'popup.js': 'var a=1;\n//# sourceMappingURL=popup.js.map\n' },
+    1,
+    'sourceMappingURL comment',
+  ],
+  [
+    'sourceMappingURL comment in CSS',
+    { ...baseFiles(), 'assets/app.css': 'a{b:c}\n/*# sourceMappingURL=app.css.map */\n' },
+    1,
+    'sourceMappingURL comment',
+  ],
+  [
+    'legacy //@ sourceMappingURL comment',
+    { ...baseFiles(), 'popup.js': 'var a=1;\n//@ sourceMappingURL=a.map\n' },
+    1,
+    'sourceMappingURL comment',
+  ],
+  [
+    'sourceURL eval wrapper (dev build)',
+    { ...baseFiles(), 'popup.js': 'eval("1\\n//# sourceURL=app.js");' },
+    1,
+    'sourceURL',
+  ],
+  ['nested .map file', { ...baseFiles(), 'chunks/a.js.map': '{}' }, 1, 'source map'],
+
+  // Test-only code and test-build residue.
+  [
+    'test hook global __clavisSent',
+    { ...baseFiles(), 'background.js': 'window.__clavisSent=[];' },
+    1,
+    'test hook global',
+  ],
+  [
+    'latency probe global __clavisT',
+    { ...baseFiles(), 'popup.js': 'window.__clavisT={t0:null};' },
+    1,
+    'test hook global',
+  ],
+  [
+    'Playwright reference in a script',
+    { ...baseFiles(), 'popup.js': 'var x=window.__playwright_binding__;' },
+    1,
+    'Playwright reference',
+  ],
+  [
+    'vitest reference in a script',
+    { ...baseFiles(), 'popup.js': 'import("vitest");' },
+    1,
+    'unit-test framework',
+  ],
+  [
+    'test-build environment variable name in a script',
+    { ...baseFiles(), 'popup.js': 'var f="CLAVIS_FORCE_FEATURES";' },
+    1,
+    'test-build environment variable',
+  ],
+  [
+    'forced-features marker in a chunk subdirectory',
+    { ...baseFiles(), 'chunks/x-1.js': 'void "CLAVIS_FORCED_FEATURES_BUILD_NEVER_SHIP";' },
+    1,
+    'CLAVIS_FORCE_FEATURES test build',
+  ],
+  [
+    'Vite dev client',
+    { ...baseFiles(), 'popup.js': 'import "/@vite/client";' },
+    1,
+    'Vite dev-server',
+  ],
+  ['HMR hook', { ...baseFiles(), 'popup.js': 'if(import.meta.hot){}' }, 1, 'Vite dev-server'],
+  [
+    'legitimate __vite__mapDeps preload helper passes',
+    { ...baseFiles(), 'popup.js': 'var m=__vite__mapDeps([0,1]);' },
+    0,
+    'AUDIT PASSED',
+  ],
+
+  // Localhost / loopback / wildcard-address URLs in any text file.
+  [
+    'http://127.0.0.1:port in HTML',
+    { ...baseFiles(), 'popup.html': '<a href="http://127.0.0.1:5173/">x</a>' },
+    1,
+    'dev-server URL',
+  ],
+  [
+    'http://0.0.0.0:port in JSON',
+    {
+      ...baseFiles(),
+      '_locales/en/messages.json': '{"extName":{"message":"http://0.0.0.0:3000/x"}}',
+    },
+    1,
+    'dev-server URL',
+  ],
+  [
+    'ws://[::1]:port in JS',
+    { ...baseFiles(), 'background.js': 'new WebSocket("ws://[::1]:3000");' },
+    1,
+    'dev-server URL',
+  ],
+  [
+    'scheme-less localhost:3000 in JS',
+    { ...baseFiles(), 'background.js': 'var host="localhost:3000";' },
+    1,
+    'dev-server address',
+  ],
+  [
+    'scheme-less 127.0.0.1:8080 in CSS',
+    { ...baseFiles(), 'assets/a.css': '.a{background:url(127.0.0.1:8080/x.png)}' },
+    1,
+    'dev-server address',
+  ],
+  [
+    'bare http://0.0.0.0 in JS only warns',
+    { ...baseFiles(), 'popup.js': 'var d="http://0.0.0.0";' },
+    0,
+    'localhost URL',
+  ],
+  [
+    'localhost in the manifest CSP',
+    withManifest(
+      (m) =>
+        (m.content_security_policy = {
+          extension_pages: "script-src 'self' http://localhost:3000",
+        }),
+    ),
+    1,
+    'content_security_policy',
+  ],
+
+  // Network inventory: every literal URL host must be reviewed.
+  [
+    'unreviewed CDN host in a script string',
+    { ...baseFiles(), 'popup.js': 'var u="https://cdn.example.net/lib.js";' },
+    1,
+    'URL host "cdn.example.net"',
+  ],
+  [
+    'analytics host',
+    { ...baseFiles(), 'background.js': 'fetch("https://www.google-analytics.com/collect");' },
+    1,
+    'URL host "www.google-analytics.com"',
+  ],
+  [
+    'look-alike of the Groq host',
+    { ...baseFiles(), 'background.js': 'fetch("https://api.groq.com.evil.example/x");' },
+    1,
+    'URL host "api.groq.com.evil.example"',
+  ],
+  [
+    'suffix look-alike (evilgroq.com)',
+    { ...baseFiles(), 'background.js': 'fetch("https://evilgroq.com/x");' },
+    1,
+    'URL host "evilgroq.com"',
+  ],
+  [
+    'URL host inside HTML',
+    { ...baseFiles(), 'popup.html': '<img src="https://tracker.example.org/p.gif">' },
+    1,
+    'URL host "tracker.example.org"',
+  ],
+  [
+    'reviewed hosts (Groq API, XML namespace) pass',
+    {
+      ...baseFiles(),
+      'background.js': 'fetch("https://api.groq.com/openai/v1/models");',
+      'assets/a.svg': '<svg xmlns="http://www.w3.org/2000/svg"></svg>',
+    },
+    0,
+    'AUDIT PASSED',
+  ],
+
+  // Every file in the ZIP must be expected: nothing from the repository or tooling ships.
+  ...[
+    ['tests/e2e/a.spec.ts', 'test, fixture, docs or tooling directory'],
+    ['tests/fixtures/pdf/text-1page.pdf', 'test, fixture, docs or tooling directory'],
+    ['docs/architecture.md', 'test, fixture, docs or tooling directory'],
+    ['scripts/audit-zip.mjs', 'test, fixture, docs or tooling directory'],
+    ['chunks/app.test.js', 'test file'],
+    ['chunks/app.ts', 'source, markdown, log or build-info file'],
+    ['README.md', 'source, markdown, log or build-info file'],
+    ['debug.log', 'source, markdown, log or build-info file'],
+    ['package.json', 'project config file'],
+    ['tsconfig.json', 'project config file'],
+    ['wxt.config.ts', 'project config file'],
+    ['.gitignore', 'hidden file or directory'],
+    ['.hidden/x.js', 'hidden file or directory'],
+    ['.npmrc', 'npm credentials file'],
+    ['.git/config', 'git metadata'],
+    ['clavis.crx', 'extension package'],
+    ['debug.keystore', 'keystore'],
+    ['id_rsa', 'SSH key'],
+    ['credentials.json', 'credentials file'],
+    ['secrets', 'credentials file'],
+    ['assets/sample.pdf', 'unexpected file'],
+    ['notes.txt', 'unexpected file'],
+    ['chunks/data.json', 'unexpected file'],
+    ['pdfjs/wasm/helper.js', 'unexpected file'],
+    ['pdfjs/cmaps/readme.txt', 'unexpected file'],
+    ['icon/16.jpg', 'unexpected file'],
+  ].map(([name, text]) => [`unexpected file: ${name}`, { ...baseFiles(), [name]: 'x' }, 1, text]),
+  [
+    'case-colliding names',
+    { ...baseFiles(), 'Popup.html': '<!doctype html>' },
+    1,
+    'duplicate or case-colliding',
+  ],
+  [
+    'duplicate entry name',
+    [...Object.entries(baseFiles()), ['popup.js', 'var b=2;']],
+    1,
+    'duplicate or case-colliding',
+  ],
+
+  // Size cap on the unpacked package.
+  [
+    'unpacked size over the cap fails',
+    baseFiles(),
+    1,
+    'entries unpack to',
+    { budgets: { maxUnpackedBytes: 100 } },
+  ],
+  [
+    'unpacked size under the cap passes',
+    baseFiles(),
+    0,
+    'Unpacked size',
+    { budgets: { maxUnpackedBytes: 1_000_000 } },
+  ],
+
+  // Version rules.
+  [
+    'pre-release version string',
+    withManifest((m) => (m.version = '1.0.0-rc.1')),
+    1,
+    'is not 1-4 dot-separated integers',
+  ],
+  ['two-part version is valid', withManifest((m) => (m.version = '1.0')), 0, 'AUDIT PASSED'],
+  [
+    'stale ZIP (version differs from the expected one)',
+    baseFiles(),
+    1,
+    'expected "9.9.9"',
+    { args: ['--expect-version', '9.9.9'] },
+  ],
+  [
+    'matching expected version passes',
+    baseFiles(),
+    0,
+    'AUDIT PASSED',
+    { args: ['--expect-version', '0.1.0'] },
+  ],
+
+  // Every file must be expected (allowedFilePatterns); nothing is merely a warning any more.
+  [
+    'unexpected file type fails even without --strict',
     { ...baseFiles(), 'data.xyz': 'abc' },
     1,
-    'unrecognised file type',
+    'unexpected file',
+  ],
+  [
+    'unexpected file type fails under --strict',
+    { ...baseFiles(), 'data.xyz': 'abc' },
+    1,
+    'unexpected file',
     { args: ['--strict'] },
+  ],
+  [
+    'allowlist without allowedFilePatterns cannot judge files',
+    baseFiles(),
+    1,
+    'allowedFilePatterns is missing',
+    {
+      allowlist: Object.fromEntries(
+        Object.entries(expected).filter(([k]) => k !== 'allowedFilePatterns'),
+      ),
+    },
   ],
 ];
 
@@ -486,7 +799,7 @@ zipCases.forEach(([name, files, wantCode, wantText, options = {}], index) => {
   }
   const run = runNode('audit-zip.mjs', args);
   const output = `${run.stdout}${run.stderr}`;
-  const leaked = output.includes(fakeKey);
+  const leaked = [fakeKey, ...Object.values(otherSecrets)].some((value) => output.includes(value));
   const ok = run.status === wantCode && output.includes(wantText) && !leaked;
   record(
     `audit-zip: ${name}`,
@@ -590,6 +903,31 @@ sizeCase(
 {
   const run = runNode('check-bundle-size.mjs', ['--dir', path.join(scratch, 'does-not-exist')]);
   record('check-bundle-size: missing build dir fails', run.status !== 0, `exit ${run.status}`);
+}
+
+// The release gate must keep running every deterministic check (guards against a step being dropped).
+{
+  const run = runNode('release-check.mjs', ['--dry-run']);
+  const output = `${run.stdout}${run.stderr}`;
+  const required = [
+    'npm run check',
+    'npm run build',
+    'npm run size',
+    'npm run zip',
+    'npm run audit:zip',
+    '--expect-version',
+    'scripts/selftest.mjs',
+    'scripts/scan-secrets.mjs --require',
+    'reproducibility',
+  ];
+  const missing = required.filter((text) => !output.includes(text));
+  record(
+    'release-check: plan lists every gate',
+    run.status === 0 && missing.length === 0,
+    `exit ${run.status}, missing: ${missing.join(', ')}`,
+  );
+  const bad = runNode('release-check.mjs', ['--no-such-flag']);
+  record('release-check: unknown flag is rejected', bad.status === 2, `exit ${bad.status}`);
 }
 
 rmSync(scratch, { recursive: true, force: true });

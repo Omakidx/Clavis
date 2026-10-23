@@ -11,7 +11,7 @@ import { createKeyService } from './handlers/key';
 import { createNavigationHandlers } from './handlers/navigation';
 import { createSidePanelHandlers } from './handlers/sidepanel';
 import { createSettingsHandlers } from './handlers/settings';
-import { createAiGuard, panelKey, senderKey } from './limiter';
+import { abortTabRequests, createAiGuard, panelKey, senderKey } from './limiter';
 import { createMessageListener } from './router';
 import { buildRoutes } from './routes';
 
@@ -122,5 +122,9 @@ export function registerBackground(): void {
   // runs on.
   browser.tabs.onUpdated.addListener((tabId, changeInfo) => {
     if (changeInfo.status === 'loading' || changeInfo.url !== undefined) sidePanel.reset(tabId);
+    // The page the request was for is going away: stop paying for an answer nobody will read (the
+    // tab's own request, and its side panel's, which belongs to the same page). A single-page
+    // app's route change also reports `status: 'loading'` (verified in Chrome), so it counts too.
+    if (changeInfo.status === 'loading') abortTabRequests(guard, tabId);
   });
 }

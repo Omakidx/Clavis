@@ -5,6 +5,7 @@ import { loadedExplainCard, loadExplainCard } from '../lib/selection/card-loader
 import { ownsFocus } from '../lib/selection/focus';
 import { createListenController } from '../lib/selection/listen';
 import { isShowNoticeMessage } from '../lib/selection/notice';
+import { onRuntimeGone, runtimeAlive } from '../lib/selection/runtime-guard';
 import {
   OBSERVER_GLOBAL,
   type SelectionControllerLike,
@@ -21,24 +22,17 @@ import { isOpenSelectionMessage } from '../lib/site-access/messages';
 // manifest `content_scripts`. The same file is injected on demand via `activeTab`
 // for users who declined site access.
 //
-// `matches` is intentionally empty: for `registration: 'runtime'` WXT copies
-// `matches` into the manifest `host_permissions`, which would force an all-sites
-// install prompt. The real match patterns (http://*/*, https://*/*) are passed to
-// registerContentScripts from lib/site-access.
-export default defineContentScript({
-  matches: [],
-  registration: 'runtime',
-  allFrames: true,
-  runAt: 'document_idle',
-  // WXT announces every start with `window.postMessage({ type: '<extension id>:<name>:wxt:...' }, '*')`,
-  // which tells any page script the extension id (fingerprinting). Off: the document CustomEvent
-  // that WXT also dispatches is a forgeable "a newer script started" signal, so teardown below
-  // never trusts it; symbol-keyed replacement (OBSERVER_GLOBAL) handles re-injection instead.
-  noScriptStartedPostMessage: true,
-  main(ctx) {
+// An UNLISTED script, not `defineContentScript` (audit L1): WXT's ContentScriptContext always
+// dispatches a document CustomEvent named after the extension id when a content script starts,
+// whatever `noScriptStartedPostMessage` says, so a page that knows the published id could detect
+// Clavis. An unlisted script creates no such context and emits nothing a page can hear. The build
+// output is `observer.js` (OBSERVER_SCRIPT_FILE); replacing an older instance is symbol-keyed
+// (OBSERVER_GLOBAL) and the runtime-gone teardown is lib/selection/runtime-guard.ts.
+export default defineUnlistedScript({
+  main() {
     // After an extension update the old script can outlive its runtime (every call then fails
     // with "Extension context invalidated"): never start from such a context.
-    if ((browser.runtime as { id?: string } | undefined)?.id === undefined) return;
+    if (!runtimeAlive()) return;
 
     const world = globalThis as Record<symbol, SelectionControllerLike | undefined>;
     // Registered AND activeTab-injected (or re-injected after an update) into the same frame:
@@ -52,7 +46,7 @@ export default defineContentScript({
       listen: speech.listen,
       openVoiceSettings: speech.openVoiceSettings,
       // Phase 5: the card is loaded by the first Explain (LOAD_EXPLAIN_CARD -> the background
-      // injects content-scripts/explain-card.js into this frame) and draws inside the toolbar.
+      // injects explain-card.js into this frame) and draws inside the toolbar.
       // The request, its states and its errors all live in the card; nothing is sent before this
       // press (FR-017).
       async explain(context) {
@@ -102,6 +96,7 @@ export default defineContentScript({
     // Remove listeners, observer, toolbar host and card. Runs for a newer injection (through the
     // symbol-keyed global, which a page cannot reach) and when the runtime is gone.
     let stopped = false;
+    let stopWatching = (): void => undefined;
     const instance: SelectionControllerLike = {
       stop() {
         if (stopped) return;
@@ -111,6 +106,7 @@ export default defineContentScript({
         } catch {
           // The runtime is already gone; the listener went with it.
         }
+        stopWatching();
         controller.stop();
         loadedExplainCard()?.destroy();
         if (world[OBSERVER_GLOBAL] === instance) delete world[OBSERVER_GLOBAL];
@@ -118,10 +114,7 @@ export default defineContentScript({
     };
     world[OBSERVER_GLOBAL] = instance;
 
-    // WXT also aborts the context when a document event with its name arrives, and a page can
-    // dispatch one. Tear down only when the extension runtime is truly gone (update or removal).
-    ctx.onInvalidated(() => {
-      if ((browser.runtime as { id?: string } | undefined)?.id === undefined) instance.stop();
-    });
+    // Remove everything when the extension runtime is truly gone (update or removal).
+    stopWatching = onRuntimeGone(() => instance.stop());
   },
 });

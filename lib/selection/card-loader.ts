@@ -5,7 +5,7 @@ import { actionError, EXPLAIN_CARD_GLOBAL, type ExplainCardApi } from './ui-api'
 /**
  * Loads the explanation card on the first Explain (D-08: it is not part of the observer bundle).
  * The content script asks the background (LOAD_EXPLAIN_CARD), which injects
- * `content-scripts/explain-card.js` into THIS frame; the card then registers itself on a
+ * `explain-card.js` into THIS frame; the card then registers itself on a
  * symbol-keyed global of the extension's isolated world, which the page cannot see.
  *
  * Plain objects and no zod: this file ships inside the observer (budget 18 KB gzip, D-20).

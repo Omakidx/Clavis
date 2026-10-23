@@ -12,17 +12,17 @@ Work in this order. Phases 3, 4 and 7 can overlap once Phase 2 closes; see the d
 | --- | --- | --- | --- | --- |
 | 1 | WXT scaffold in `Clavis/`, strict TS, lint, Vitest, CI, `_locales`, bundle-size report | 1 | Everything | Done |
 | 2 | Zod contracts: messages, `SelectionSnapshot`, `ExplainRequest`, `ExplainResult` | 1 | 6, 8, 9 | Done |
-| 3 | Spike A — Groq from background + model comparison (D-09) | 2 | 8 | Done; model comparison awaits the user's key |
+| 3 | Spike A — Groq from background + model comparison (D-09) | 2 | 8 | Done (D-09 settled) |
 | 4 | Spike B — optional permission flow, runtime registration, toolbar loading measurement (D-02, D-08) | 2 | 6, 7 | Done (option c chosen) |
 | 5 | Spike C — PDF.js viewer components (D-06) | 2 | 10 | Done |
-| 6 | Spike D — `chrome.tts` on Linux + offscreen fallback (D-07) | 2 | 9 | Done; voice check awaits the user |
+| 6 | Spike D — `chrome.tts` on Linux + offscreen fallback (D-07) | 2 | 9 | Done (D-07 settled: fallback not adopted) |
 | 7 | Onboarding, disclosure, site access, key lifecycle, settings | 3 | 8 | Done |
 | 8 | Selection observer + toolbar on both injection paths | 4 | 8, 9 | Done |
 | 9 | Core Explain + Must tabs (roots, related words, simplify) | 5 | 11 | Done |
 | 10 | Listen / `SpeechService` | 6 | 11 | Done (audible check pending, D-07/D-14) |
-| 11 | PDF reader | 7 | 11 | Not started |
+| 11 | PDF reader | 7 | 11 | Done |
 | 12 | Unified UX, side panel, copy; Should tabs if on schedule | 8 | 13 | Done (Grammar/Translate flags wait for the live eval) |
-| 13 | QA, security, performance, privacy verification | 9 | 14 | Not started |
+| 13 | QA, security, performance, privacy verification | 9 | 14 | Done (RC 1.0.0; human checks listed in the test report) |
 | 14 | Store package, privacy policy publish, submission | 10 | — | Not started |
 
 ## 2. Requirement checklist
@@ -74,11 +74,11 @@ Work in this order. Phases 3, 4 and 7 can overlap once Phase 2 closes; see the d
 | FR-070 | Key only in trusted contexts | 3 | Done |
 | FR-071 | Key storage caveats; session mode | 3 | Done |
 | FR-072 | Revoked key / transient errors | 5 | Done (key routes and AI_EXPLAIN) |
-| FR-073 | No content/key in logs | 1–9 | In progress (metadata-only logger; lint bans console.log) |
-| FR-074 | Public privacy policy + store disclosures | 10 | Draft written ([privacy-policy.md](privacy-policy.md)) |
-| FR-075 | All executable code packaged locally | 1–10 | In progress (ZIP audit enforces it) |
-| FR-076 | Minimum permissions with justification | 1–10 | In progress (ZIP audit checks the allowlist) |
-| FR-077 | Works from production ZIP | 9–10 | Not started |
+| FR-073 | No content/key in logs | 1–9 | Done (metadata-only logger; static scan and secret-boundary E2E, Phase 9) |
+| FR-074 | Public privacy policy + store disclosures | 10 | Policy matches the code; store text drafted ([store/permission-justifications.md](store/permission-justifications.md)); publish in Phase 10 |
+| FR-075 | All executable code packaged locally | 1–10 | Done (ZIP audit enforces it; release audit Phase 9) |
+| FR-076 | Minimum permissions with justification | 1–10 | Done (exact allowlist; justifications drafted) |
+| FR-077 | Works from production ZIP | 9–10 | In progress (E2E runs the production build; fresh-profile install of the final ZIP in Phase 10) |
 
 ### Should
 

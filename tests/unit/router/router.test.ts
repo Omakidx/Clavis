@@ -122,7 +122,7 @@ describe('sender matrix: privileged routes', () => {
       `${ORIGIN}/sub/options.html`,
       `${ORIGIN}/options.htmlx`,
       `${ORIGIN}/other.html`,
-      `${ORIGIN}/content-scripts/content.js`,
+      `${ORIGIN}/observer.js`,
       `${ORIGIN}.evil.example/options.html`,
       `https://evil.example/${ORIGIN}/options.html`,
     ]) {

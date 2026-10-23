@@ -38,6 +38,26 @@ describe('interpretReply', () => {
       code: 'INTERNAL_ERROR',
     });
   });
+  it('keeps the "local-limit" reason of Clavis own throttle, for RATE_LIMITED only', () => {
+    expect(
+      interpretReply({
+        ok: false,
+        error: { code: 'RATE_LIMITED', message: 'x', retryAfterMs: 3000, reason: 'local-limit' },
+      }),
+    ).toEqual({ kind: 'error', code: 'RATE_LIMITED', retryAfterMs: 3000, reason: 'local-limit' });
+    expect(
+      interpretReply({
+        ok: false,
+        error: { code: 'RATE_LIMITED', message: 'x', retryAfterMs: 3000 },
+      }),
+    ).toEqual({ kind: 'error', code: 'RATE_LIMITED', retryAfterMs: 3000 });
+    expect(
+      interpretReply({
+        ok: false,
+        error: { code: 'TIMEOUT', message: 'x', reason: 'local-limit' },
+      }),
+    ).toEqual({ kind: 'error', code: 'TIMEOUT' });
+  });
   it('SETUP_REQUIRED with reason "disclosure" asks for the one-time confirmation', () => {
     expect(
       interpretReply({

@@ -157,3 +157,12 @@ export function senderKey(sender: { tabId?: number; path?: string; url?: string 
 
 /** The limiter key of the side panel that belongs to `tabId` (forgotten when the tab closes). */
 export const panelKey = (tabId: number): string => `panel:${tabId}`;
+
+/**
+ * The page of `tabId` is going away (it started loading another page): abort the tab's in-flight
+ * AI request and the one of its side panel. Rate-limit buckets are kept (a navigation is no reset).
+ */
+export function abortTabRequests(guard: AiGuard, tabId: number): void {
+  guard.inFlight.forget(senderKey({ tabId }));
+  guard.inFlight.forget(panelKey(tabId));
+}

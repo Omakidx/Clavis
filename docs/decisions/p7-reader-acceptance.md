@@ -1,5 +1,7 @@
 # Phase 7 acceptance: local PDF reader
 
+> **Update (2026-10-23, before the Phase 7 commit):** D1, D3, D4 and D5 were fixed and their `test.fail` lines removed; the XFA-only branch (O2) was made reachable and the stale find events (O5) are ignored. The status below describes the run as first recorded.
+
 Independent, black-box verification of the Phase 7 reader (FR-050 to FR-059, UJ-04, the PDF rows of the
 [error catalog](../requirements.md#7-error-catalog) and of the [verification matrix](../requirements.md#9-verification-test-matrix))
 and of the gaps Spike C left open ([spike-c-pdf.md](spike-c-pdf.md), "Gaps and untested"): AES encryption, embedded

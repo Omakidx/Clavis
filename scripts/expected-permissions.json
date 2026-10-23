@@ -1,5 +1,5 @@
 {
-  "$comment": "Allowlist for the release ZIP audit (scripts/audit-zip.mjs). Mirrors docs/architecture.md section 3 and wxt.config.ts. Change docs first, then wxt.config.ts, then this file, and update the privacy policy. Permission order is ignored; any addition or removal fails. Manifest top-level keys outside allowedManifestKeys fail. Risky keys (web_accessible_resources, externally_connectable, sandbox, oauth2, key, update_url, chrome_url_overrides) fail unless a matching expected value is added to this file; web_accessible_resources must also set use_dynamic_url: true on every entry. commands, minimum_chrome_version and content_security_policy must equal the values here.",
+  "$comment": "Allowlist for the release ZIP audit (scripts/audit-zip.mjs). Mirrors docs/architecture.md section 3 and wxt.config.ts. Change docs first, then wxt.config.ts, then this file, and update the privacy policy. Permission order is ignored; any addition or removal fails. Manifest top-level keys outside allowedManifestKeys fail. Risky keys (web_accessible_resources, externally_connectable, sandbox, oauth2, key, update_url, chrome_url_overrides) fail unless a matching expected value is added to this file; web_accessible_resources must also set use_dynamic_url: true on every entry. commands, minimum_chrome_version and content_security_policy must equal the values here. allowedFilePatterns (regular expressions over ZIP paths) lists every file the package may contain; any other file fails. allowedUrlHosts lists every host a literal http(s)/ws(s) URL in shipped text may name (suffix match, so w3.org covers www.w3.org): network = contacted by the code (must also be a host_permissions entry), links = opened only after a user click, inert = XML namespaces, documentation and error-message text inside bundled libraries. A new host fails the audit until it is reviewed and added here.",
   "allowedManifestKeys": [
     "manifest_version",
     "name",
@@ -31,5 +31,40 @@
   },
   "content_security_policy": {
     "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'; media-src 'none'; frame-src 'none'; form-action 'none'; base-uri 'none'"
+  },
+  "allowedFilePatterns": [
+    "^manifest\\.json$",
+    "^[^/]+\\.(?:js|html)$",
+    "^_locales/[A-Za-z_]+/messages\\.json$",
+    "^(?:chunks|content-scripts)/[^/]+\\.(?:js|css)$",
+    "^assets/[^/]+\\.(?:css|svg|png|mjs)$",
+    "^icon/[^/]+\\.png$",
+    "^pdfjs/cmaps/(?:[^/]+\\.bcmap|LICENSE[^/]*)$",
+    "^pdfjs/standard_fonts/(?:[^/]+\\.(?:pfb|ttf)|LICENSE[^/]*)$",
+    "^pdfjs/iccs/(?:[^/]+\\.icc|LICENSE[^/]*)$",
+    "^pdfjs/wasm/(?:[^/]+\\.wasm|LICENSE[^/]*)$"
+  ],
+  "allowedUrlHosts": {
+    "network": ["api.groq.com"],
+    "links": [
+      "console.groq.com",
+      "groq.com",
+      "omakidx.github.io",
+      "chromewebstore.google.com",
+      "chrome.google.com"
+    ],
+    "inert": [
+      "w3.org",
+      "xfa.org",
+      "ns.adobe.com",
+      "json-schema.org",
+      "mozilla.org",
+      "apache.org",
+      "github.com",
+      "react.dev",
+      "wxt.dev",
+      "example.com",
+      "foo.bar"
+    ]
   }
 }

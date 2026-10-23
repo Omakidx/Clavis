@@ -51,6 +51,8 @@ export const errorReasonSchema = z.enum([
   // With NO_VOICE: only online voices exist for this language; by default Listen uses
   // on-device voices only (D-22), so the user must choose an online voice in Settings.
   'online-only',
+  // With RATE_LIMITED: Clavis's own request throttle (per tab), not Groq's rate limit.
+  'local-limit',
 ]);
 export type ErrorReason = z.infer<typeof errorReasonSchema>;
 

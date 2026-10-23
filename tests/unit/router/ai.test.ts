@@ -27,7 +27,7 @@ import {
   failWith,
   makeReady,
   pageSender,
-  popupSender,
+  panelSender,
   type Harness,
 } from './harness';
 
@@ -279,11 +279,11 @@ describe('AI_EXPLAIN', () => {
     expect(await h.settingsStore.getPreferences()).toMatchObject({ readingLevel: 'advanced' });
   });
 
-  it('works from the reader and the practice page too', async () => {
+  it('works from the reader, the practice page and the side panel too', async () => {
     for (const sender of [
       pageSender('/reader.html', 3),
       pageSender('/practice.html', 4),
-      popupSender(),
+      panelSender(5),
     ]) {
       expect(await h.call(explainMessage(REQ_A), sender)).toMatchObject({ ok: true });
     }
@@ -392,7 +392,12 @@ describe('one in-flight request per sender, and a rate limit', () => {
       expect(limited).toEqual({
         ok: false,
         requestId: REQ_A,
-        error: expect.objectContaining({ code: 'RATE_LIMITED', retryAfterMs: refillMs }),
+        error: expect.objectContaining({
+          code: 'RATE_LIMITED',
+          retryAfterMs: refillMs,
+          // Clavis's own throttle, told apart from Groq's 429 (which carries no reason).
+          reason: 'local-limit',
+        }),
       });
       expect(h.provider.explain).toHaveBeenCalledTimes(AI_RATE_LIMIT.capacity);
       expect(await h.call(explainMessage(), contentSender(6))).toMatchObject({ ok: true });

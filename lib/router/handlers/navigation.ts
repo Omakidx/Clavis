@@ -37,6 +37,7 @@ export function createNavigationHandlers(deps: NavigationHandlerDeps) {
       if (previous !== undefined && at - previous < OPEN_SETTINGS_MIN_INTERVAL_MS) {
         return failure('RATE_LIMITED', {
           retryAfterMs: Math.max(1, OPEN_SETTINGS_MIN_INTERVAL_MS - (at - previous)),
+          reason: 'local-limit',
         });
       }
       lastOpened.delete(key);

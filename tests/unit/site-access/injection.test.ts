@@ -74,7 +74,7 @@ describe('explainInTab (declined-access path, activeTab)', () => {
     const result = await explainInTab(value, { tabId: 7, frameId: 3, url: 'https://example.com/' });
     expect(executeScript).toHaveBeenCalledWith({
       target: { tabId: 7, frameIds: [3] },
-      files: ['/content-scripts/content.js'],
+      files: ['/observer.js'],
     });
     expect(sendMessage).toHaveBeenCalledWith(
       7,
@@ -265,11 +265,11 @@ describe('handleContextMenuClick: cross-origin iframe under activeTab', () => {
 
     expect(executeScript).toHaveBeenNthCalledWith(1, {
       target: { tabId: 9, frameIds: [5] },
-      files: ['/content-scripts/content.js'],
+      files: ['/observer.js'],
     });
     expect(executeScript).toHaveBeenNthCalledWith(2, {
       target: { tabId: 9, frameIds: [0] },
-      files: ['/content-scripts/content.js'],
+      files: ['/observer.js'],
     });
     expect(sendMessage).toHaveBeenCalledTimes(1);
     expect(sendMessage).toHaveBeenCalledWith(

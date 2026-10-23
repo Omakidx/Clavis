@@ -60,10 +60,12 @@ export function describeError(
   const mapping: Mapping = voice?.mapping ??
     MAPPING[code] ?? { key: 'errGeneric', action: 'retry' };
   const seconds = retryAfterMs === undefined ? 0 : Math.ceil(retryAfterMs / 1000);
+  // Clavis's own throttle says so; Groq's 429 keeps the provider wording.
+  const own = code === 'RATE_LIMITED' && reason === 'local-limit';
   const message =
     code === 'RATE_LIMITED' && seconds > 0
-      ? t('errRateLimitedSeconds', String(seconds))
-      : t(mapping.key);
+      ? t(own ? 'errRateLimitedLocalSeconds' : 'errRateLimitedSeconds', String(seconds))
+      : t(own ? 'errRateLimitedLocal' : mapping.key);
   return {
     code,
     message,

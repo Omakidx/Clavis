@@ -5,8 +5,8 @@ import { isOwnUiNode } from './own-ui';
  * Everything here is cheap, synchronous DOM inspection.
  */
 
-const EDITABLE_SELECTOR =
-  'input, textarea, select, [contenteditable]:not([contenteditable="false"])';
+export const EDITABLE_SELECTOR =
+  'input, textarea, select, [role="textbox"], [contenteditable]:not([contenteditable="false"])';
 
 function elementOf(node: Node | null): Element | null {
   if (node === null) return null;

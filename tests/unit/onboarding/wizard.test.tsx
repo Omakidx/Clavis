@@ -121,6 +121,21 @@ describe('website access step (FR-009, UJ-02b)', () => {
     expect(await screen.findByRole('status')).toHaveTextContent(text('toolbarSiteAccessGranted'));
   });
 
+  it('with access already granted (Phase 9 Q3): shows that it is on, records it and Next works', async () => {
+    const { user, perms } = setup({}, { granted: true, answer: true });
+    await user.click(next());
+    await user.click(await screen.findByRole('button', { name: 'I understand' }));
+    await user.click(await screen.findByRole('button', { name: 'Next' }));
+    expect(await screen.findByRole('status')).toHaveTextContent(text('toolbarSiteAccessGranted'));
+    // Nothing to ask: no buttons for the question, nothing requested from Chrome.
+    expect(screen.queryByRole('button', { name: text('siteAccessGrant') })).toBeNull();
+    expect(screen.queryByRole('button', { name: text('siteAccessSkip') })).toBeNull();
+    expect(perms.request).not.toHaveBeenCalled();
+    await waitFor(() => expect(backend.state.onboarding.siteAccessChoice).toBe('granted'));
+    await user.click(await screen.findByRole('button', { name: 'Next' }));
+    expect(heading()).toHaveTextContent(text('onbGetKeyTitle'));
+  });
+
   it('stores "declined" when the Chrome prompt is refused and keeps the extension usable', async () => {
     const { user } = setup({}, { granted: false, answer: false });
     await toAccess(user);

@@ -41,6 +41,30 @@ export function createSelectionController(
   let shown = false;
   let stopped = false;
 
+  // Chrome fires no `selectionchange` when the PAGE deletes the selected text (a single-page app
+  // changing route replaces its content), so while the toolbar shows a web page's selection it is
+  // checked twice a second: a range that collapsed or left the document is gone (FR-014; Phase 9
+  // Q4). Not for a custom capture (the PDF reader re-renders its text layer and repositions).
+  const win = options.win ?? window;
+  let gone: number | undefined;
+  function watchSelection(): void {
+    if (options.capture !== undefined || gone !== undefined) return;
+    gone = win.setInterval(() => {
+      const range = current?.range;
+      if (!shown || range === undefined) return unwatch();
+      if (range.collapsed || !range.startContainer.isConnected) {
+        current = null;
+        shown = false;
+        toolbar?.hide('cleared');
+        unwatch();
+      }
+    }, 500);
+  }
+  function unwatch(): void {
+    if (gone !== undefined) win.clearInterval(gone);
+    gone = undefined;
+  }
+
   function load(): Promise<ToolbarHandle | null> {
     loading ??= options
       .loadToolbar({
@@ -84,6 +108,7 @@ export function createSelectionController(
     if (ready === null || current !== selection || stopped) return false;
     ready.show(selection);
     shown = true;
+    watchSelection();
     return true;
   }
 
@@ -99,6 +124,7 @@ export function createSelectionController(
       if (toolbar?.isInteracting() === true) return;
       current = null;
       shown = false;
+      unwatch();
       toolbar?.hide('cleared');
     },
   });
@@ -125,6 +151,7 @@ export function createSelectionController(
     stop() {
       stopped = true;
       shown = false;
+      unwatch();
       observer.stop();
       toolbar?.destroy();
       toolbar = null;

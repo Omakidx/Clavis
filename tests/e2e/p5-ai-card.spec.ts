@@ -83,7 +83,7 @@ async function openFramesPage(): Promise<{ page: Page; url: string }> {
 
 test.describe('LOAD_EXPLAIN_CARD', () => {
   test('the configured card script path exists in the real build', async () => {
-    expect(EXPLAIN_CARD_SCRIPT_FILE).toBe('content-scripts/explain-card.js');
+    expect(EXPLAIN_CARD_SCRIPT_FILE).toBe('explain-card.js');
     const real = await access(path.join(defaultBuildDir, EXPLAIN_CARD_SCRIPT_FILE)).then(
       () => true,
       () => false,

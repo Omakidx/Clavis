@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Editable text next to a selection</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 1rem;
+        font:
+          18px/1.6 system-ui,
+          sans-serif;
+      }
+      [contenteditable],
+      [role='textbox'] {
+        border: 1px solid #888;
+        padding: 0 0.25rem;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- One block: the selected word, readable text, then three kinds of editable drafts. -->
+    <div id="thread">
+      The cartographer replied to the thread.
+      <span id="ce" contenteditable="true">DRAFT-CONTENTEDITABLE-SECRET</span>
+      <span id="rt" role="textbox" aria-label="Reply">DRAFT-ROLE-TEXTBOX-SECRET</span>
+      <span id="pt" contenteditable="plaintext-only">DRAFT-PLAINTEXT-SECRET</span>
+      <span id="island">Visible tail of the sentence.</span>
+    </div>
+    <!-- A reply composer that is not contenteditable at all: only role=textbox. -->
+    <p id="composer"><span role="textbox" aria-label="Compose">composer words here</span></p>
+  </body>
+</html>

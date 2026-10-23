@@ -3,7 +3,14 @@ import { expect, test } from './fixtures';
 // Spike A (docs/execution-phases.md Phase 2): prove the packaged MV3 service worker can reach
 // api.groq.com (host permission, no CORS failure) with a deliberately FAKE key.
 // No real secret is involved: Groq rejects the key with 401.
-// Needs outbound network access; skipped with a reason when it is missing.
+//
+// OFFLINE BY DEFAULT: the default suite never contacts api.groq.com. The two live tests (a worker
+// fetch with the fake key to the real endpoint) only run when explicitly opted in:
+//
+//   CLAVIS_E2E_LIVE_GROQ=1 npx playwright test tests/e2e/spike-a-groq.spec.ts
+//
+// They also need outbound network access, and skip with a reason when it is missing. The manifest
+// test needs no network and always runs.
 
 const MODELS_URL = 'https://api.groq.com/openai/v1/models';
 const CHAT_URL = 'https://api.groq.com/openai/v1/chat/completions';
@@ -43,24 +50,28 @@ async function probeFetch(args: { url: string; key: string; post: boolean }): Pr
   }
 }
 
-test.describe('Spike A: Groq reachability from the packaged extension', () => {
+const LIVE = process.env['CLAVIS_E2E_LIVE_GROQ'] === '1';
+
+test('manifest grants the narrow Groq host permission and nothing broader at install', async ({
+  serviceWorker,
+}) => {
+  const manifest = await serviceWorker.evaluate(() => {
+    const m = chrome.runtime.getManifest();
+    return { host: m.host_permissions ?? [], optional: m.optional_host_permissions ?? [] };
+  });
+  expect(manifest.host).toEqual(['https://api.groq.com/*']);
+  expect(manifest.optional).toEqual(['http://*/*', 'https://*/*']);
+});
+
+test.describe('Spike A (live): Groq reachability from the packaged extension', () => {
+  test.skip(!LIVE, 'opt-in: set CLAVIS_E2E_LIVE_GROQ=1 (contacts the real api.groq.com)');
+
   test.beforeAll(async () => {
     try {
       await fetch(MODELS_URL, { method: 'HEAD', signal: AbortSignal.timeout(8_000) });
     } catch {
       test.skip(true, 'No outbound network access to api.groq.com; cannot verify reachability.');
     }
-  });
-
-  test('manifest grants the narrow Groq host permission and nothing broader at install', async ({
-    serviceWorker,
-  }) => {
-    const manifest = await serviceWorker.evaluate(() => {
-      const m = chrome.runtime.getManifest();
-      return { host: m.host_permissions ?? [], optional: m.optional_host_permissions ?? [] };
-    });
-    expect(manifest.host).toEqual(['https://api.groq.com/*']);
-    expect(manifest.optional).toEqual(['http://*/*', 'https://*/*']);
   });
 
   test('service worker fetch to the models endpoint returns 401 for a fake key (not CORS-blocked)', async ({

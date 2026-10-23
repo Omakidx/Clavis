@@ -215,7 +215,7 @@ describe('registerSiteAccess', () => {
     await vi.waitFor(() => expect(api.executeScript).toHaveBeenCalledTimes(1));
     expect(api.executeScript).toHaveBeenCalledWith({
       target: { tabId: 1, frameIds: [0] },
-      files: ['/content-scripts/content.js'],
+      files: ['/observer.js'],
     });
   });
 

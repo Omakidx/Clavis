@@ -7,8 +7,11 @@ const TEST_LIMIT = { ...AI_RATE_LIMIT, capacity: 10, windowMs: 60_000 };
 const CAP = TEST_LIMIT.capacity;
 const REFILL_MS = TEST_LIMIT.windowMs / TEST_LIMIT.capacity;
 import {
+  abortTabRequests,
+  createAiGuard,
   InFlightRequests,
   TokenBuckets,
+  panelKey,
   senderKey,
   type RateLimitConfig,
 } from '../../../lib/router/limiter';
@@ -144,5 +147,27 @@ describe('senderKey', () => {
     expect(senderKey({ tabId: 7, path: '/reader.html' })).toBe('tab:7');
     expect(senderKey({ path: '/popup.html' })).toBe('page:/popup.html');
     expect(senderKey({})).toBe('page:unknown');
+  });
+});
+
+describe('abortTabRequests (Phase 9 Q1)', () => {
+  it('aborts the request of the tab and of its side panel, and no other tab', () => {
+    const guard = createAiGuard();
+    const tab = guard.inFlight.begin(senderKey({ tabId: 7 }), 'a');
+    const panel = guard.inFlight.begin(panelKey(7), 'b');
+    const other = guard.inFlight.begin(senderKey({ tabId: 8 }), 'c');
+    const otherPanel = guard.inFlight.begin(panelKey(8), 'd');
+    abortTabRequests(guard, 7);
+    expect(tab.signal.aborted).toBe(true);
+    expect(panel.signal.aborted).toBe(true);
+    expect(other.signal.aborted).toBe(false);
+    expect(otherPanel.signal.aborted).toBe(false);
+    expect(guard.inFlight.size).toBe(2);
+  });
+
+  it('is harmless for a tab with nothing in flight, and keeps the rate-limit state', () => {
+    const guard = createAiGuard();
+    expect(guard.buckets.take(senderKey({ tabId: 7 })).ok).toBe(true);
+    expect(() => abortTabRequests(guard, 7)).not.toThrow();
   });
 });

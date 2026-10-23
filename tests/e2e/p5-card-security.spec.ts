@@ -20,18 +20,33 @@ test.afterAll(async () => {
   await h?.close();
 });
 
-test('L1: no page-visible message carries the extension id, and forged "script started" events kill nothing', async () => {
+/** Every name WXT's ContentScriptContext could announce a start under (audit L1), for both scripts. */
+const STARTED_EVENTS = ['content', 'observer', 'explain-card'].map(
+  (name) => `${name}:wxt:content-script-started`,
+);
+
+test('L1: nothing a page can hear carries the extension id: no message, no "script started" event, and forged ones kill nothing', async () => {
   const page = await h.ext.context.newPage();
-  // A hostile page that records every message event from the first moment.
-  await page.addInitScript(() => {
-    const seen: string[] = [];
-    (window as unknown as { __seen: string[] }).__seen = seen;
-    window.addEventListener(
-      'message',
-      (event) => seen.push(JSON.stringify(event.data) ?? ''),
-      true,
-    );
-  });
+  // A hostile page that knows the published id and records every message event, and every
+  // "<id>:<script>:wxt:content-script-started" document event, from the first moment.
+  await page.addInitScript(
+    ({ id, names }) => {
+      const seen: string[] = [];
+      const started: string[] = [];
+      const w = window as unknown as { __seen: string[]; __started: string[] };
+      w.__seen = seen;
+      w.__started = started;
+      window.addEventListener(
+        'message',
+        (event) => seen.push(JSON.stringify(event.data) ?? ''),
+        true,
+      );
+      for (const name of names) {
+        document.addEventListener(`${id}:${name}`, () => started.push(name), true);
+      }
+    },
+    { id: h.ext.extensionId, names: STARTED_EVENTS },
+  );
   const world = await contentWorld(page);
   await page.goto(`${h.server.origin}/article.html`);
   await world.ready();
@@ -48,6 +63,12 @@ test('L1: no page-visible message carries the extension id, and forged "script s
   await card.waitFor(CARD.ready('core'));
   expect(await globalsAlive()).toBe('object/object');
 
+  // Loading the page (access granted: the registered observer) and the first Explain (which
+  // injects the card script) announced nothing to the page.
+  const heard = (): Promise<string[]> =>
+    page.evaluate(() => (window as unknown as { __started: string[] }).__started);
+  expect(await heard()).toEqual([]);
+
   // The page forges the events WXT uses to say "a newer copy of this script started", for BOTH
   // entrypoints (it is given the id here to prove the forged events fail on their own).
   await page.evaluate((extensionId) => {
@@ -61,6 +82,8 @@ test('L1: no page-visible message carries the extension id, and forged "script s
   }, id);
   await page.waitForTimeout(200);
   expect(await globalsAlive()).toBe('object/object');
+  // (Only its own forgeries are heard now: two events, no real announcement among them.)
+  expect(await heard()).toEqual(STARTED_EVENTS.filter((name) => !name.startsWith('observer')));
 
   // Nothing the page could hear contained the id or the WXT announcement.
   const seen = await page.evaluate(() => (window as unknown as { __seen: string[] }).__seen);

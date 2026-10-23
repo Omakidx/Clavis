@@ -91,6 +91,12 @@ describe('captureSelection', () => {
     ['text input', '<input id="f" value="secret words here">'],
     ['password input', '<input id="f" type="password" value="secret words here">'],
     ['contenteditable', '<div id="f" contenteditable="true">secret words here</div>'],
+    [
+      'contenteditable="plaintext-only"',
+      '<div id="f" contenteditable="plaintext-only">secret words here</div>',
+    ],
+    ['role=textbox (audit M1)', '<div id="f" role="textbox">secret words here</div>'],
+    ['role=textbox child', '<div role="textbox"><span id="f">secret words here</span></div>'],
   ])('ignores selections inside a %s', (_name, html) => {
     setBody(`<p>Outside</p>${html}`);
     const field = document.getElementById('f')!;

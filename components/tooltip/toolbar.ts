@@ -1,6 +1,7 @@
 import { trimCaptured, type Box, type CapturedSelection } from '../../lib/selection/capture';
 import { deepActiveElement } from '../../lib/selection/eligibility';
 import { markOwnUi, isOwnUiNode } from '../../lib/selection/own-ui';
+import { truncateText } from '../../lib/selection/text';
 import { isTrustedEvent } from '../../lib/selection/trust';
 import type {
   ActionContext,
@@ -329,7 +330,7 @@ export function createToolbar(
     const id = runs.explain.id;
     const control = new AbortController();
     runs.explain.abort = control;
-    const text = snapshot.text.slice(0, CARD_TEXT_MAX_CHARS);
+    const text = truncateText(snapshot.text, CARD_TEXT_MAX_CHARS);
     const keyboard = (shadow?.activeElement ?? null) !== null;
     // The state line stays until an action that draws its own card replaces it (`surface.open()`).
     card = { action: name, text, note: t('toolbarWorking') };

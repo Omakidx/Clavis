@@ -108,9 +108,10 @@ describe('structure and accessibility', () => {
     root.replaceChildren();
     const long = `${'long '.repeat(80)}end`;
     await setup('passage', long);
-    // The DOM keeps the same 200 characters as the toolbar's own state line; CSS clamps it to two
-    // lines. The accessible name is shorter still.
-    expect($('[data-clavis="card-text"]').textContent).toBe(long.slice(0, 200));
+    // The DOM keeps the same 200 characters (cut on a character boundary, a trailing space
+    // dropped) as the toolbar's own state line; CSS clamps it to two lines. The accessible name is
+    // shorter still.
+    expect($('[data-clavis="card-text"]').textContent).toBe(long.slice(0, 200).trimEnd());
     expect($('[data-clavis="card"]').getAttribute('aria-label')?.endsWith('…')).toBe(true);
     expect($('[data-clavis="card"]').getAttribute('data-action')).toBe('explain');
   });

@@ -119,6 +119,7 @@ export function createSidePanelHandlers(deps: SidePanelDeps) {
         return Promise.resolve(
           failure('RATE_LIMITED', {
             retryAfterMs: Math.max(1, OPEN_SIDE_PANEL_MIN_INTERVAL_MS - (at - previous)),
+            reason: 'local-limit',
           }),
         );
       }

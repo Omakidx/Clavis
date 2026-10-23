@@ -169,8 +169,10 @@ test.describe('key lifecycle', () => {
     expect(await send(options, { v: 1, type: 'GET_AI_STATUS' })).toMatchObject({
       data: { state: 'setup_required' },
     });
+    // AI_EXPLAIN is not an options-page route (Phase 9 audit I1): ask from the practice page.
+    const practice = await openExtensionPage(context, extensionId, 'practice');
     expect(
-      await send(options, {
+      await send(practice, {
         v: 1,
         type: 'AI_EXPLAIN',
         payload: {

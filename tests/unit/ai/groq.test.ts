@@ -270,6 +270,8 @@ describe('GroqProvider.explain', () => {
     [403, 'INVALID_API_KEY'],
     [404, 'MODEL_UNAVAILABLE'],
     [408, 'TIMEOUT'],
+    // The request (selection plus context) is larger than the model takes: not a connection problem.
+    [413, 'SELECTION_TOO_LONG'],
     [500, 'NETWORK_ERROR'],
     [503, 'NETWORK_ERROR'],
   ])('maps HTTP %i to %s without leaking the key', async (status, code) => {

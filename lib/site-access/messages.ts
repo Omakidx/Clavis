@@ -38,7 +38,7 @@ export type InjectReason = 'restricted' | 'no-access' | 'failed';
 export type InjectResult = { ok: true; shown: boolean } | { ok: false; reason: InjectReason };
 
 /** Build output paths. `*_FILE` is manifest-relative (registerContentScripts); `*_PATH` is root-relative (executeScript, getURL). */
-export const OBSERVER_SCRIPT_FILE = 'content-scripts/content.js';
+export const OBSERVER_SCRIPT_FILE = 'observer.js';
 export const OBSERVER_SCRIPT_PATH = `/${OBSERVER_SCRIPT_FILE}` as const satisfies ScriptPublicPath;
 
 /** Background -> top-frame observer: show a notice instead of a toolbar (handled in lib/selection/notice.ts). */

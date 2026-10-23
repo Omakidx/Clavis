@@ -2,7 +2,7 @@
   "name": "clavis",
   "description": "Understand and pronounce selected text in webpages and PDFs.",
   "private": true,
-  "version": "0.1.0",
+  "version": "1.0.0",
   "license": "MIT",
   "type": "module",
   "engines": {
@@ -24,6 +24,7 @@
     "audit:zip": "node scripts/audit-zip.mjs --strict",
     "test:e2e": "playwright test",
     "e2e:install": "playwright install chromium",
+    "release:check": "node scripts/release-check.mjs",
     "ci": "npm run check && npm run build && npm run size && npm run zip && npm run audit:zip && node scripts/selftest.mjs && node scripts/scan-secrets.mjs"
   },
   "dependencies": {

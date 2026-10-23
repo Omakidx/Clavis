@@ -45,15 +45,33 @@ export const PUBLIC_SENDERS: SenderRule = {
 };
 
 /**
- * The routes the side panel (FR-042) shares with the card: AI_EXPLAIN (further modes on demand),
- * AI_CANCEL, TTS_SPEAK / TTS_STOP (Listen for the selected text) and GET_PUBLIC_SETTINGS (rate,
- * language). Not GET_AI_STATUS. The panel never carries `acknowledgeDisclosure`: that stays with
- * the card (`mayAcknowledgeDisclosure`), so the panel adds no new disclosure path.
+ * AI_EXPLAIN (further modes on demand) and AI_CANCEL: the contexts that host the explanation card
+ * (web page content scripts, the reader and the practice page) and the side panel (FR-042). Not
+ * Settings, onboarding or the popup: they never send these, so a paid Groq request can be started
+ * by nothing but a card. The panel never carries `acknowledgeDisclosure`: that stays with the card
+ * (`mayAcknowledgeDisclosure`), so the panel adds no new disclosure path.
+ */
+export const AI_SENDERS: SenderRule = {
+  content: true,
+  pages: [reader, PRACTICE_PAGE_PATH, sidepanel],
+};
+
+/**
+ * TTS_SPEAK / TTS_STOP (Listen for the selected text; Settings "Test voice" speaks from Settings
+ * and onboarding) and GET_PUBLIC_SETTINGS (rate, language). Not GET_AI_STATUS.
  */
 export const PANEL_SENDERS: SenderRule = {
   content: true,
   pages: [options, onboarding, popup, reader, PRACTICE_PAGE_PATH, sidepanel],
 };
+
+/**
+ * Who may send TTS_SPEAK with an explicit `voiceName` (Settings "Test voice"): Settings and
+ * onboarding only. The voice Listen uses everywhere else comes from the saved settings in the
+ * background, so a page-side content script cannot pick a voice (D-22: on-device voices only, and
+ * an explicit voice is the one thing allowed to bypass that rule).
+ */
+export const VOICE_NAME_SENDERS: readonly string[] = [options, onboarding];
 
 /**
  * OPEN_SIDE_PANEL: the contexts that host the explanation card (web page content scripts, the
@@ -195,19 +213,27 @@ export function buildRoutes(services: RouteServices): Route[] {
         ai.explain(message.payload, context, {
           acknowledgeDisclosure: message.acknowledgeDisclosure === true,
         }),
-      { allow: PANEL_SENDERS },
+      { allow: AI_SENDERS },
     ),
     publicRoute('AI_CANCEL', (message, context) => ai.cancel(message.requestId, context), {
-      allow: PANEL_SENDERS,
+      allow: AI_SENDERS,
     }),
     publicRoute(
       'TTS_SPEAK',
-      (message, { sender }) =>
-        speech.speak(message, {
+      (message, { sender }) => {
+        // An explicit voice is Settings' "Test voice" only; anyone else's is refused outright.
+        if (
+          message.voiceName !== undefined &&
+          !(sender.kind === 'extension' && VOICE_NAME_SENDERS.includes(sender.path ?? ''))
+        ) {
+          return rejectedSpeakReply(message);
+        }
+        return speech.speak(message, {
           tabId: sender.tabId,
           frameId: sender.frameId,
           documentId: sender.documentId,
-        }),
+        });
+      },
       {
         allow: PANEL_SENDERS,
         reject: (raw, why) => (why === 'shape' ? rejectedSpeakReply(raw) : invalidRequest(raw)),

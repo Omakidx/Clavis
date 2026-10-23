@@ -8,6 +8,7 @@ const REASON_MESSAGES: Record<ErrorReason, string> = {
   'no-voice-language': 'No voice is available for this language.',
   'start-failed': 'The voice did not start.',
   'online-only': 'Only online voices are available for this language.',
+  'local-limit': 'Too many requests from Clavis. Try again shortly.',
 };
 
 /**

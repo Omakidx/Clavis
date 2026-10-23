@@ -24,11 +24,11 @@ describe('injectObserverIntoOpenTabs', () => {
     expect(query).toHaveBeenCalledWith({ url: ['http://*/*', 'https://*/*'] });
     expect(executeScript).toHaveBeenCalledWith({
       target: { tabId: 1, frameIds: [0] },
-      files: ['/content-scripts/content.js'],
+      files: ['/observer.js'],
     });
     expect(executeScript).toHaveBeenCalledWith({
       target: { tabId: 2, frameIds: [0] },
-      files: ['/content-scripts/content.js'],
+      files: ['/observer.js'],
     });
   });
 

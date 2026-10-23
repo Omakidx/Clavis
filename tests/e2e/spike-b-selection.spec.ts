@@ -91,7 +91,7 @@ test.describe('registration (D-02)', () => {
     expect(scripts).toHaveLength(1);
     expect(scripts[0]).toMatchObject({
       id: 'clavis-observer',
-      js: ['content-scripts/content.js'],
+      js: ['observer.js'],
       matches: ['http://*/*', 'https://*/*'],
       allFrames: true,
       runAt: 'document_idle',

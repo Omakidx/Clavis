@@ -2,6 +2,7 @@ import { FEATURES } from '../../lib/config/constants';
 import type { ExplainMode, ExplainResult } from '../../lib/contracts/explain';
 import type { SelectionKind } from '../../lib/contracts/selection';
 import { t, type MessageKey } from '../../lib/i18n';
+import { truncateText as cutAtCodePoint } from '../../lib/selection/text';
 
 /**
  * Pure data and rules of the explanation card: which tabs a selection gets, what a result
@@ -94,7 +95,7 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
 
 const text = (value: unknown): string | undefined =>
-  typeof value === 'string' && value !== '' ? value.slice(0, MAX_FIELD_CHARS) : undefined;
+  typeof value === 'string' && value !== '' ? cutAtCodePoint(value, MAX_FIELD_CHARS) : undefined;
 
 function words(value: unknown): string[] | undefined {
   if (!Array.isArray(value)) return undefined;

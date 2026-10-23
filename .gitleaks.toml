@@ -28,6 +28,7 @@ description = "Generated and third-party directories"
 paths = [
   '''(^|/)node_modules/''',
   '''(^|/)\.output/''',
+  '''(^|/)\.output-[^/]+/''',
   '''(^|/)\.wxt/''',
   '''(^|/)coverage/''',
   '''(^|/)playwright-report/''',
@@ -40,3 +41,9 @@ paths = [
 description = "Fixture PDF passwords in the acceptance manifest"
 targetRules = ["generic-api-key"]
 paths = ['''(^|/)tests/fixtures/pdf/accept/manifest\.json$''']
+
+# Test-file names such as "p9-secret-boundary" that follow the word "key" in the test report.
+[[allowlists]]
+description = "Test spec names mentioned in docs"
+targetRules = ["generic-api-key"]
+regexes = ['''^p9-secret-boundary$''']

@@ -184,4 +184,20 @@ describe('error mapping', () => {
     expect(describeError('RATE_LIMITED', 2500).message).toContain('3 seconds');
     expect(describeError('RATE_LIMITED').message).not.toContain('seconds');
   });
+
+  it("words Clavis's own throttle as Clavis's, and Groq's 429 as Groq's", () => {
+    const own = describeError('RATE_LIMITED', 2500, 'local-limit');
+    expect(own.message).toBe('Too many requests from Clavis. Try again in about 3 seconds.');
+    expect(describeError('RATE_LIMITED', undefined, 'local-limit').message).toMatch(
+      /^Too many requests from Clavis\./,
+    );
+    expect(own.message).not.toContain('Groq');
+    expect(describeError('RATE_LIMITED', 2500).message).toContain("Groq's rate limit");
+    expect(describeError('RATE_LIMITED').message).toContain("Groq's rate limit");
+  });
+
+  it('413 has its own message: the selection was too long, not a connection problem', () => {
+    expect(describeError('SELECTION_TOO_LONG').message).toContain('too long');
+    expect(describeError('SELECTION_TOO_LONG').message).not.toContain('connection');
+  });
 });

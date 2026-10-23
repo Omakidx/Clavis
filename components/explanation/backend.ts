@@ -21,7 +21,7 @@ export type BackendReply =
   | { kind: 'result'; result: ExplainResult }
   /** The one-time "Send this to Groq?" confirmation is still owed (FR-002, D-16). */
   | { kind: 'disclosure' }
-  | { kind: 'error'; code: ClientErrorCode; retryAfterMs?: number };
+  | { kind: 'error'; code: ClientErrorCode; retryAfterMs?: number; reason?: 'local-limit' };
 
 export interface ExplainBackend {
   /**
@@ -97,6 +97,10 @@ export function interpretReply(raw: unknown): BackendReply {
     code: (KNOWN_CODES.includes(code) ? code : 'INTERNAL_ERROR') as ClientErrorCode,
     ...(typeof retryAfter === 'number' && Number.isFinite(retryAfter) && retryAfter >= 0
       ? { retryAfterMs: Math.min(retryAfter, 3_600_000) }
+      : {}),
+    // Clavis's own throttle (not Groq's rate limit) is worded as such.
+    ...(code === 'RATE_LIMITED' && error['reason'] === 'local-limit'
+      ? { reason: 'local-limit' as const }
       : {}),
   };
 }

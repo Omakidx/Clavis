@@ -1,4 +1,5 @@
 import { LIMITS } from '../config/constants';
+import { EDITABLE_SELECTOR } from './eligibility';
 import { isOwnUiNode } from './own-ui';
 import { normalizeText } from './text';
 
@@ -198,6 +199,11 @@ interface TextRun {
   block: Element | null;
 }
 
+/** Text the user is typing (drafts, replies, editors) is never context, even next to the selection. */
+function isEditableNode(el: Element): boolean {
+  return (el as HTMLElement).isContentEditable === true || el.matches(EDITABLE_SELECTOR);
+}
+
 /** Whether a text node may contribute context. `cache` memoizes per parent element. */
 function isUsable(text: Node, scope: Element, cache: Map<Element, boolean>): boolean {
   const parent = text.parentElement;
@@ -207,7 +213,7 @@ function isUsable(text: Node, scope: Element, cache: Map<Element, boolean>): boo
     usable = true;
     for (let el: Element | null = parent; el !== null; el = el.parentElement) {
       if (EXCLUDED_TAGS.has(el.tagName) && el !== scope) usable = false;
-      else if (isOwnUiNode(el) || isHiddenElement(el)) usable = false;
+      else if (isEditableNode(el) || isOwnUiNode(el) || isHiddenElement(el)) usable = false;
       if (!usable || el === scope) break;
     }
     cache.set(parent, usable);
@@ -345,6 +351,10 @@ export function extractContext(
   range: Range,
   maxChars: number = LIMITS.maxContextChars,
 ): SelectionContext {
+  // A document the user is editing as a whole (`designMode`) has no safe context at all.
+  if ((range.commonAncestorContainer.ownerDocument ?? document).designMode === 'on') {
+    return { before: '', after: '' };
+  }
   const half = Math.floor(maxChars / 2);
   const scope = findContextScope(range);
   // Gather more raw text than needed: whitespace collapsing shrinks it.

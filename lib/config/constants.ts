@@ -132,7 +132,7 @@ export const MODE_FEATURE_FLAGS = {
  * the one place to change if the card entrypoint moves. WXT places a content-script entrypoint
  * named `explain-card` at this path.
  */
-export const EXPLAIN_CARD_SCRIPT_FILE = 'content-scripts/explain-card.js';
+export const EXPLAIN_CARD_SCRIPT_FILE = 'explain-card.js';
 
 /** Settings page sections OPEN_SETTINGS can jump to (anchor ids in the options page). */
 export const SETTINGS_SECTION_ANCHORS = {

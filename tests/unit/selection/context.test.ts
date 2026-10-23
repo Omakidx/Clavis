@@ -199,3 +199,43 @@ describe('context inside an open shadow root', () => {
     expect(extractContext(range)).toEqual({ before: 'plain', after: 'text' });
   });
 });
+
+describe('extractContext: editable regions are never context (audit M1)', () => {
+  const draft = 'SECRET-DRAFT';
+
+  it.each([
+    ['contenteditable', `<div contenteditable="true">${draft} before</div>`],
+    ['empty contenteditable attribute', `<div contenteditable>${draft} before</div>`],
+    ['plaintext-only', `<div contenteditable="plaintext-only">${draft} before</div>`],
+    ['role=textbox', `<div role="textbox">${draft} before</div>`],
+    ['nested inside a contenteditable host', `<div contenteditable="true"><b>${draft}</b></div>`],
+  ])('skips %s siblings of the selected word', (_name, editable) => {
+    setBody(`<div>Lead <b id="t">target</b> tail ${editable} more text</div>`);
+    const { before, after } = extractContext(selectText('target'));
+    expect(before).toBe('Lead');
+    expect(after).toBe('tail more text');
+    expect(`${before}${after}`).not.toContain(draft);
+  });
+
+  it('keeps contenteditable="false" text usable', () => {
+    setBody('<div>Lead <b id="t">target</b> <span contenteditable="false">fixed</span> tail</div>');
+    expect(extractContext(selectText('target')).after).toBe('fixed tail');
+  });
+
+  it('honours isContentEditable where the engine computes it (jsdom does not)', () => {
+    setBody(`<div>Lead <b id="t">target</b> <span id="x">${draft}</span> tail</div>`);
+    Object.defineProperty(document.getElementById('x'), 'isContentEditable', { value: true });
+    expect(extractContext(selectText('target')).after).toBe('tail');
+  });
+
+  it('returns no context at all when the document is in designMode', () => {
+    setBody('<p>Lead <b>target</b> tail.</p>');
+    const range = selectText('target');
+    document.designMode = 'on';
+    try {
+      expect(extractContext(range)).toEqual({ before: '', after: '' });
+    } finally {
+      document.designMode = 'off';
+    }
+  });
+});

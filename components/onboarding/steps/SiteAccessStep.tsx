@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { t } from '../../../lib/i18n';
 import type { SiteAccessChoice } from '../../../lib/contracts/setup';
 import { useSiteAccess, type SiteAccess } from '../../../lib/site-access/use-site-access';
@@ -43,6 +43,23 @@ export function SiteAccessStep({ settings, focusNext, access: injected }: SiteAc
     else setError(result.error);
   }
 
+  // Chrome already says yes (switched on in chrome://extensions, or the tutorial run again after
+  // "Clear all data", which does not revoke permissions): the question is answered. Record it, so
+  // Next works, instead of leaving a step with no button (Phase 9 test report Q3).
+  const recorded = useRef(false);
+  const { adopt } = settings;
+  const unset =
+    settings.resource.state.status === 'ready' &&
+    settings.resource.state.data.onboarding.siteAccessChoice === 'unset';
+  const recordGranted = access.status === 'granted' && unset;
+  useEffect(() => {
+    if (!recordGranted || recorded.current) return;
+    recorded.current = true;
+    void adopt(api.updateOnboarding({ siteAccessChoice: 'granted' })).then((result) => {
+      if (!result.ok) setError(result.error);
+    });
+  }, [recordGranted, adopt]);
+
   function enable() {
     // Nothing may be awaited before this call: Chrome only shows the prompt inside the gesture.
     access.grant((outcome) => {
@@ -64,9 +81,11 @@ export function SiteAccessStep({ settings, focusNext, access: injected }: SiteAc
         const statusKey =
           access.requestState !== 'idle'
             ? REQUEST_TEXT[access.requestState]
-            : choice === 'unset'
-              ? null
-              : CHOICE_TEXT[choice];
+            : access.status === 'granted'
+              ? CHOICE_TEXT.granted
+              : choice === 'unset'
+                ? null
+                : CHOICE_TEXT[choice];
         return (
           <>
             <p>{t('siteAccessBody')}</p>

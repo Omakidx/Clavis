@@ -6,6 +6,7 @@ import type { SidePanelHandoff } from '../../lib/contracts/sidepanel';
 import { t } from '../../lib/i18n';
 import { isTrustedEvent } from '../../lib/selection/trust';
 import type { SettingsSection } from './backend';
+import { truncateText as cutAtCodePoint } from '../../lib/selection/text';
 import { kindLabel, resultBlocks, tabLabel, truncateText, type Block } from './model';
 import {
   settingsSectionFor,
@@ -157,7 +158,7 @@ function ExplanationCard({ session, host }: Props) {
 
   const selected = truncateText(state.text);
   // The same cut as the toolbar's own state line (CARD_TEXT_MAX_CHARS); CSS clamps it to two lines.
-  const shown = state.text.slice(0, HEADER_TEXT_CHARS);
+  const shown = cutAtCodePoint(state.text, HEADER_TEXT_CHARS);
   const tabs = state.tabs;
   const active = entries[state.active];
 

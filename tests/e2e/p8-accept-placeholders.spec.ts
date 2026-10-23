@@ -56,8 +56,12 @@ function findZip(): string | undefined {
   const given = process.env['CLAVIS_EXTENSION_ZIP'];
   if (given !== undefined) return path.resolve(given);
   const parent = path.dirname(extensionPath);
-  const zips = readdirSync(parent).filter((n) => n.endsWith('-chrome.zip'));
-  return zips[0] === undefined ? undefined : path.join(parent, zips[0]);
+  // Newest first: an older version's ZIP may still sit next to the build.
+  const zips = readdirSync(parent)
+    .filter((n) => n.endsWith('-chrome.zip'))
+    .map((n) => path.join(parent, n))
+    .sort((a, b) => statSync(b).mtimeMs - statSync(a).mtimeMs);
+  return zips[0];
 }
 
 function walk(dir: string, base = dir): string[] {

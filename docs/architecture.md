@@ -69,7 +69,7 @@ flowchart TD
 
 ```text
 entrypoints/background.ts        # service worker: bootstrap listeners synchronously
-entrypoints/content.ts           # selection observer; registered at runtime, not in manifest
+entrypoints/observer.ts          # selection observer (unlisted script); registered at runtime, not in manifest
 entrypoints/popup/index.html     # action launcher, provider status
 entrypoints/onboarding/index.html
 entrypoints/options/index.html   # user key settings, tests, preferences
@@ -182,7 +182,7 @@ All result strings are **plain text** (D-10). The UI renders them as text nodes;
 
 **Response normalization:** ask Groq for a **mode-specific minimal JSON schema** — `core` returns `title`, `summary`, `contextualMeaning`, `definition`, `examples` (2), optional `caveat`; each lazy mode returns only its own field(s). The adapter converts valid output into the unified response. Check which structured-output modes the chosen model supports; do not assume strict JSON Schema support on every Groq model. If schema mode fails due to unsupported capability, fall back to supported JSON mode with strong validation, or show an actionable error.
 
-**Phase 5 additions.** `AI_EXPLAIN` may carry `acknowledgeDisclosure: true` (only from content scripts, `/reader.html`, `/practice.html`, after a trusted click on the one-time first-send prompt); when the disclosure was never acknowledged the reply is `SETUP_REQUIRED` with `reason: 'disclosure'`. `LOAD_EXPLAIN_CARD` (website content scripts only) injects `content-scripts/explain-card.js` into exactly the sender's frame, once per document. `OPEN_SETTINGS` opens Settings at an optional section. The card renders into a slot inside the toolbar's closed shadow root via an isolated-world registry; it never reaches the page.
+**Phase 5 additions.** `AI_EXPLAIN` may carry `acknowledgeDisclosure: true` (only from content scripts, `/reader.html`, `/practice.html`, after a trusted click on the one-time first-send prompt); when the disclosure was never acknowledged the reply is `SETUP_REQUIRED` with `reason: 'disclosure'`. `LOAD_EXPLAIN_CARD` (website content scripts only) injects `explain-card.js` into exactly the sender's frame, once per document. `OPEN_SETTINGS` opens Settings at an optional section. The card renders into a slot inside the toolbar's closed shadow root via an isolated-world registry; it never reaches the page.
 
 **Phase 8 additions (side panel, FR-042).** Two routes with their own contract file (`lib/contracts/sidepanel.ts`) and the only message size bound above 32 KiB (`LIMITS.maxHandoffBytes`, 128 KiB: a snapshot plus up to six loaded results at full field size):
 
@@ -210,6 +210,8 @@ How the hand-off works (spike: [p8-sidepanel-spike.md](decisions/p8-sidepanel-sp
 4. The panel starts an `ExplainSession` from the loaded results (`seed`, `attach({ requestCore: false })`): **opening it sends nothing**. Other tabs load only when the user presses **Load** (D-05, one request each, cached per selection in memory). It may call `AI_EXPLAIN`, `AI_CANCEL`, `TTS_SPEAK`, `TTS_STOP`, `GET_PUBLIC_SETTINGS` and `OPEN_SETTINGS`; it can never carry `acknowledgeDisclosure` (a first-send prompt in the panel says to confirm in the card), and its AI limiter key is per tab (`panel:<tabId>`).
 
 `GET_SIDE_PANEL_STATE` also answers `/sidepanel.html` opened as an ordinary tab (the sender is then tab-bearing). That is reachable only by the user typing the extension URL (there are no `web_accessible_resources`), and it is accepted as a design choice (Phase 8 security review L-3); the handler still serves only the tab named in that page's own url. The panel has its own AI limiter key (`panel:<tabId>`), so a card and its panel together get twice the per-tab budget and may each have one request in flight; every such request still comes from a user click. The hand-off is also dropped when `tabs.onUpdated` reports a `url` change (single-page navigations), besides `status: 'loading'`.
+
+**Phase 9 sender rules (release audit).** `AI_EXPLAIN` and `AI_CANCEL` are accepted only from content scripts, `/reader.html`, `/practice.html` and `/sidepanel.html` (`AI_SENDERS` in `lib/router/routes.ts`): Settings, onboarding and the popup never send them. `TTS_SPEAK.voiceName` (an explicit voice, which bypasses the on-device-only rule of D-22) is accepted only from `/options.html` and `/onboarding.html` (Settings "Test voice"); from every other sender a message that carries it is refused with `INVALID_REQUEST`, and Listen takes the chosen voice from the saved settings in the background. The reader, the side panel and the practice page accept background events (`TTS_EVENT`, `CLAVIS_OPEN_SELECTION`) only from the service worker itself (`isFromBackground`: our id, no tab, `/background.js`). The observer and the card script are unlisted scripts (`observer.js`, `explain-card.js`), not WXT content scripts, so no `<extension id>:…:wxt:content-script-started` event is dispatched to the page.
 
 ### Message contract
 
@@ -304,7 +306,7 @@ stateDiagram-v2
     ToolbarVisible --> Idle: Escape / outside click
 ```
 
-**Phase 4 implementation notes.** The toolbar emits typed actions (`listen`, `explain`, `trim`, `dismiss`) with the snapshot captured at selection end to a `ToolbarActions` controller (`lib/selection/ui-api.ts`); Phases 5–6 implement `explain` and `listen` in `entrypoints/content.ts`. A returned promise shows a working state; a rejection shows an error line. Extra states: **Selection too long** (one action, *Use the first 2,000 characters*, which creates a new trimmed snapshot) and a top-of-page notice for cross-origin frames Chrome won't let the extension read. Selections are found in open shadow roots via `Selection.getComposedRanges`, and inside a modal `<dialog>` the host is mounted in the dialog so it isn't inert. Closed shadow roots are unsupported by design.
+**Phase 4 implementation notes.** The toolbar emits typed actions (`listen`, `explain`, `trim`, `dismiss`) with the snapshot captured at selection end to a `ToolbarActions` controller (`lib/selection/ui-api.ts`); Phases 5–6 implement `explain` and `listen` in `entrypoints/observer.ts`. A returned promise shows a working state; a rejection shows an error line. Extra states: **Selection too long** (one action, *Use the first 2,000 characters*, which creates a new trimmed snapshot) and a top-of-page notice for cross-origin frames Chrome won't let the extension read. Selections are found in open shadow roots via `Selection.getComposedRanges`, and inside a modal `<dialog>` the host is mounted in the dialog so it isn't inert. Closed shadow roots are unsupported by design.
 
 A response is displayed only if its `requestId` **and** selection token match the current visible selection. Timers and subscriptions must be cleaned up when the content script UI is removed or its document navigates.
 

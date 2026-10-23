@@ -51,7 +51,7 @@ describe('buildRegisteredScript', () => {
   it('registers the observer on every http(s) frame at idle and persists across sessions (D-02)', () => {
     expect(buildRegisteredScript()).toEqual({
       id: CONTENT_SCRIPT_ID,
-      js: ['content-scripts/content.js'],
+      js: ['observer.js'],
       matches: [...OPTIONAL_SITE_ORIGINS],
       excludeMatches: [
         'https://chromewebstore.google.com/*',

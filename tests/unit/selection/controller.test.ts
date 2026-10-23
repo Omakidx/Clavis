@@ -444,3 +444,45 @@ describe('controller lifecycle and edge cases', () => {
     expect(toolbar.shown).toHaveLength(0);
   });
 });
+
+describe('selection removed by the page itself (Phase 9 Q4)', () => {
+  async function showFor(word: string, options: object = {}) {
+    const toolbar = fakeToolbar();
+    controller = createSelectionController({
+      loadToolbar: () => Promise.resolve(toolbar),
+      ...options,
+    });
+    selectText(word);
+    mouseUp();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(toolbar.shown).toHaveLength(1);
+    return toolbar;
+  }
+
+  it('hides the toolbar when the selected text is deleted from the DOM (no selectionchange)', async () => {
+    const toolbar = await showFor('river');
+    await vi.advanceTimersByTimeAsync(2000);
+    expect(toolbar.hide).not.toHaveBeenCalled();
+    document.body.replaceChildren();
+    await vi.advanceTimersByTimeAsync(600);
+    expect(toolbar.hide).toHaveBeenCalledWith('cleared');
+    expect(toolbar.hide).toHaveBeenCalledTimes(1);
+    // Nothing keeps checking afterwards.
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(toolbar.hide).toHaveBeenCalledTimes(1);
+  });
+
+  it('hides it when only the text node is removed and the range collapses', async () => {
+    const toolbar = await showFor('river');
+    document.querySelector('p')!.replaceChildren();
+    await vi.advanceTimersByTimeAsync(600);
+    expect(toolbar.hide).toHaveBeenCalledWith('cleared');
+  });
+
+  it('keeps it while the text is still in the document, also after other DOM changes', async () => {
+    const toolbar = await showFor('river');
+    document.body.append(document.createElement('div'));
+    await vi.advanceTimersByTimeAsync(3000);
+    expect(toolbar.hide).not.toHaveBeenCalled();
+  });
+});

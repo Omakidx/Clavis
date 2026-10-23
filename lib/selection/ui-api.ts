@@ -97,7 +97,7 @@ export interface CardSurface {
 }
 
 /**
- * The separately loaded explanation card (components/explanation). `entrypoints/explain-card.content.ts`
+ * The separately loaded explanation card (components/explanation). `entrypoints/explain-card.ts`
  * registers it on `EXPLAIN_CARD_GLOBAL` in the frame's isolated world; the page's main world has no
  * access to that world, so a page can neither reach it nor replace it.
  */

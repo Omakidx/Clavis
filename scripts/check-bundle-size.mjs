@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // Content-script bundle-size budget check (docs/tech-stack.md section 6, D-08).
 // Usage: node scripts/check-bundle-size.mjs [--dir <build dir>] [--budgets <file>] [--verbose]
+// Default build dir: <$WXT_OUT_DIR>/chrome-mv3 when WXT_OUT_DIR is set (scratch builds), else buildDir from the budgets file.
 // Aggregate rows that match more than 3 files show `first (+N more)`; --verbose lists every file.
 // Exit 0 when every budget holds, 1 on an overrun or a missing required file, 2 on bad input.
 import { readFileSync, readdirSync, statSync } from 'node:fs';
@@ -61,7 +62,10 @@ const kb = (bytes) => `${(bytes / 1024).toFixed(2)} KB`;
 function main() {
   const opts = parseArgs(process.argv.slice(2));
   const config = JSON.parse(readFileSync(opts.budgets, 'utf8'));
-  const buildDir = path.resolve(root, opts.dir ?? config.buildDir);
+  const envDir = process.env['WXT_OUT_DIR']
+    ? `${process.env['WXT_OUT_DIR']}/chrome-mv3`
+    : undefined;
+  const buildDir = path.resolve(root, opts.dir ?? envDir ?? config.buildDir);
   try {
     statSync(buildDir);
   } catch {

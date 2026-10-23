@@ -349,6 +349,22 @@ describe('retry is never automatic', () => {
     expect(calls).toHaveLength(2);
   });
 
+  it("Clavis's own throttle is worded as Clavis's, with the same countdown", async () => {
+    const { session, calls } = make();
+    session.attach();
+    calls[0]?.reply({
+      kind: 'error',
+      code: 'RATE_LIMITED',
+      retryAfterMs: 5000,
+      reason: 'local-limit',
+    });
+    await flush();
+    const error = session.state.entries.core?.error;
+    expect(error?.message).toBe('Too many requests from Clavis. Try again in about 5 seconds.');
+    expect(error?.retryAt).toBe(clock + 5000);
+    expect(session.retry('core')).toBe(false);
+  });
+
   it('only a failed tab with a retry action can be retried', async () => {
     const { session, calls } = make();
     session.attach();

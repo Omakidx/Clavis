@@ -86,7 +86,7 @@ test.describe('lifecycle', () => {
           (id) =>
             chrome.scripting.executeScript({
               target: { tabId: id },
-              files: ['/content-scripts/content.js'],
+              files: ['/observer.js'],
             }),
           tabId,
         );

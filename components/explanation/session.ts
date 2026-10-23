@@ -82,8 +82,9 @@ export function toCardError(
   code: ClientErrorCode,
   retryAfterMs: number | undefined,
   now: number,
+  reason?: 'local-limit',
 ): CardError {
-  const described = describeError(code, retryAfterMs);
+  const described = describeError(code, retryAfterMs, reason);
   let action: ErrorAction = described.action;
   let title: string | null = null;
   switch (code) {
@@ -423,12 +424,17 @@ export class ExplainSession {
       this.live = t('firstSendBody');
       return;
     }
-    this.fail(entry, reply.code, reply.retryAfterMs);
+    this.fail(entry, reply.code, reply.retryAfterMs, reply.reason);
   }
 
-  private fail(entry: Entry, code: ClientErrorCode, retryAfterMs?: number): void {
+  private fail(
+    entry: Entry,
+    code: ClientErrorCode,
+    retryAfterMs?: number,
+    reason?: 'local-limit',
+  ): void {
     entry.status = 'error';
-    entry.error = toCardError(code, retryAfterMs, this.now());
+    entry.error = toCardError(code, retryAfterMs, this.now(), reason);
     this.live = [entry.error.title, entry.error.message].filter(Boolean).join('. ');
   }
 

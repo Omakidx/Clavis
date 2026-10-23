@@ -183,7 +183,11 @@ export function createAiHandlers(deps: AiHandlerDeps) {
       // Rate limit first, so rejected and invalid calls cost nothing but cannot be free to spam.
       const decision = deps.guard.buckets.take(sender);
       if (!decision.ok) {
-        return failure('RATE_LIMITED', { requestId, retryAfterMs: decision.retryAfterMs });
+        return failure('RATE_LIMITED', {
+          requestId,
+          retryAfterMs: decision.retryAfterMs,
+          reason: 'local-limit',
+        });
       }
       // Should-priority modes stay off until their flags are on (Phase 8 decides).
       if (!modeEnabled(payload.mode, deps.features ?? FEATURES)) {

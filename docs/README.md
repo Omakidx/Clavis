@@ -123,8 +123,9 @@ Clavis/
 │   └── pdf-assets/                    # if required by pinned PDF.js version
 ├── entrypoints/
 │   ├── background.ts                  # MV3 service worker; secrets and Groq
-│   ├── content.ts                     # tiny selection observer (no framework)
-│   ├── offscreen/                     # speechSynthesis fallback, if Spike D adopts it
+│   ├── observer.ts                    # selection observer + toolbar (unlisted script, registered at runtime)
+│   ├── explain-card.ts                # explanation card, injected on the first Explain
+│   ├── practice/                      # practice page from onboarding and Help
 │   ├── popup/                         # browser-action launcher
 │   ├── options/                       # provider, privacy, voice settings
 │   ├── onboarding/                    # first-run tutorial

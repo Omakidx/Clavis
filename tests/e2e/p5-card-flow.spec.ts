@@ -209,7 +209,7 @@ test('the card script can run again in the same frame (the background re-injects
         const [tab] = await chrome.tabs.query({ url: `${origin}/*` });
         await chrome.scripting.executeScript({
           target: { tabId: tab?.id as number, frameIds: [0] },
-          files: ['/content-scripts/explain-card.js'],
+          files: ['/explain-card.js'],
         });
       }, h.server.origin);
     // Twice before any Explain, then once more after the card has been used.

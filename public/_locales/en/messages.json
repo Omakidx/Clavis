@@ -532,6 +532,15 @@
     "description": "Error shown for a Groq rate limit when Groq says how long to wait. $SECONDS$ is a whole number of seconds.",
     "placeholders": { "SECONDS": { "content": "$1" } }
   },
+  "errRateLimitedLocal": {
+    "message": "Too many requests from Clavis. Wait a moment, then try again.",
+    "description": "Error shown when Clavis's own per-tab request limit was reached (not a Groq limit). Nothing was sent to Groq."
+  },
+  "errRateLimitedLocalSeconds": {
+    "message": "Too many requests from Clavis. Try again in about $SECONDS$ seconds.",
+    "description": "Error shown when Clavis's own per-tab request limit was reached, with the wait. $SECONDS$ is a whole number of seconds.",
+    "placeholders": { "SECONDS": { "content": "$1" } }
+  },
   "errStorage": {
     "message": "Chrome's protected extension storage isn't available, so Clavis can't save or use your key. Restart Chrome and try again.",
     "description": "Error shown when the browser could not restrict extension storage to trusted pages, so key actions are refused."

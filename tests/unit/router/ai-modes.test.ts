@@ -183,18 +183,15 @@ describe('first-send disclosure acknowledgement', () => {
     ['the options page', pageSender('/options.html')],
     ['the onboarding page', pageSender('/onboarding.html')],
   ])('rejects the flag from %s: nothing recorded, nothing sent', async (_name, sender) => {
-    expect(await h.call(acknowledging(), sender)).toEqual({
-      ok: false,
-      requestId: REQ_A,
-      error: expect.objectContaining({ code: 'INVALID_REQUEST' }),
-    });
+    // These pages may not send AI_EXPLAIN at all (audit I1), with or without the flag.
+    for (const message of [acknowledging(), explainMessage()]) {
+      expect(await h.call(message, sender)).toMatchObject({
+        ok: false,
+        error: { code: 'INVALID_REQUEST' },
+      });
+    }
     expect(h.provider.explain).not.toHaveBeenCalled();
     expect(await accepted()).toBeNull();
-    // The same sender without the flag still gets the ordinary answer.
-    expect(await h.call(explainMessage(), sender)).toMatchObject({
-      ok: false,
-      error: { code: 'SETUP_REQUIRED', reason: 'disclosure' },
-    });
   });
 
   it('is not reachable by the offscreen document or a foreign sender', async () => {

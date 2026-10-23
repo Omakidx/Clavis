@@ -8,6 +8,7 @@ import { createPreactRenderer } from '../../components/tooltip/preact-renderer';
 import { createToolbar } from '../../components/tooltip/toolbar';
 import { t } from '../../lib/i18n';
 import { api } from '../../lib/ui-client/api';
+import { isFromBackground, type BackgroundSenderLike } from '../../lib/ui-client/background-sender';
 import { useResource } from '../../lib/ui-client/use-resource';
 import {
   createSelectionController,
@@ -54,8 +55,9 @@ export function App() {
     [],
   );
   useEffect(() => {
-    const onMessage = (message: unknown, sender: { id?: string } | undefined) => {
-      if (sender?.id === browser.runtime.id) speech.handleEvent(message);
+    const onMessage = (message: unknown, sender: BackgroundSenderLike | undefined) => {
+      // Only our service worker reports playback: not a content script of ours in a web page.
+      if (isFromBackground(sender)) speech.handleEvent(message);
       return undefined;
     };
     browser.runtime.onMessage.addListener(onMessage);
