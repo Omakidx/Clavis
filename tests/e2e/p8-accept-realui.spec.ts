@@ -490,6 +490,7 @@ test.describe('journey 2 with the real browser UI: site access declined, found f
     await auto.close();
 
     // "Only when I ask": the toolbar stays hidden by itself even with access on (the help warns of it) ...
+    await settings.getByRole('link', { name: 'Preferences', exact: true }).click();
     await settings.getByRole('radio', { name: /^Only when I ask/ }).check();
     await settings.waitForTimeout(600);
     const quiet = await openArticle(world, '?auto=3');

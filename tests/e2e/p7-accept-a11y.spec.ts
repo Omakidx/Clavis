@@ -151,6 +151,7 @@ test.describe('keyboard only', () => {
     await expect.poll(() => reader.currentPage()).toBeGreaterThan(95);
     await reader.page.keyboard.press('Home');
     await expect.poll(() => reader.viewer.evaluate((el) => el.scrollTop)).toBe(0);
+    await expect.poll(() => reader.currentPage()).toBe(1);
 
     // Zoom.
     await reader.page.keyboard.press('0');

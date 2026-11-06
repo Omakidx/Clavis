@@ -28,6 +28,7 @@ test('without voices: the toolbar and the panel both say so, with the Linux hint
   context,
   extensionId,
 }) => {
+  test.skip(process.platform !== 'linux', 'This case checks Linux no-voice installation guidance.');
   // GET_VOICES is an options/onboarding/popup route: ask from the options page.
   const options = await openExtensionPage(context, extensionId, 'options');
   const report = await sendFromPage(options.page, { v: 1, type: 'GET_VOICES' });

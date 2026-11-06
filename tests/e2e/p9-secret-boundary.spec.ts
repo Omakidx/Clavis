@@ -302,11 +302,14 @@ test('Explain on a web page, success and every failure: the key appears in no me
     'TTS_STOP',
     'GET_PUBLIC_SETTINGS',
     'GET_AI_STATUS',
+    'LOAD_TOOLBAR',
     'LOAD_EXPLAIN_CARD',
     'OPEN_SETTINGS',
     'OPEN_SIDE_PANEL',
   ]);
   expect([...types].filter((t) => !allowed.has(t))).toEqual([]);
+  const toolbarLoads = rec.sent.map((s) => JSON.parse(s)).filter((m) => m.type === 'LOAD_TOOLBAR');
+  expect(toolbarLoads).toEqual([{ v: 1, type: 'LOAD_TOOLBAR' }]);
   expect(types.has('AI_EXPLAIN')).toBe(true);
   // Storage events reach a content script only for areas it may read: none of ours.
   expect(rec.changes.filter((c) => /^(local|session):/.test(c))).toEqual([]);

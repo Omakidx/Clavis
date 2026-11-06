@@ -25,6 +25,8 @@ const NO_VISIBLE_EFFECT: Record<string, string> = {
   'reader, a PDF open :: Previous page': 'one-page document: there is no other page (boundary)',
   'reader, a PDF open :: Next page': 'one-page document: there is no other page (boundary)',
   'reader, a PDF open :: Fit width': 'a new document already opens fit to width',
+  'onboarding step 5 :: Recommended by Clavis (default)':
+    'setup skipped the key, so only the recommended model is available until a key is connected',
   'Settings, no key :: Recommended by Clavis (default)':
     'without a key the model list is empty, so the recommended model is the only choice; the text beside it says to connect a key (observation O-3 in docs/decisions/p8-acceptance.md)',
 };

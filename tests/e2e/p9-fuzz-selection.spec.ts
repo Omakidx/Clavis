@@ -80,6 +80,8 @@ interface Structure {
   /** Attribute values that look like a URL or script. */
   urlish: string[];
   forbidden: string[];
+  /** Fixed UI artwork; hostile output must not add or change any SVG. */
+  artwork: string[];
 }
 
 /** Runs in the closed root (this = the root) or in a document (this = document.body). */
@@ -96,10 +98,11 @@ const STRUCTURE_FN = `function () {
           /^javascript:/i.test(a.value) || /^https?:/i.test(a.value)) urlish.push(e.localName + '[' + a.name + ']');
     }
   }
-  const bad = ['script','iframe','frame','object','embed','img','svg','math','video','audio','source','link','meta','base','form','input','textarea','select','template']
+  const bad = ['script','iframe','frame','object','embed','img','math','video','audio','source','link','meta','base','form','input','textarea','select','template']
     .filter((t) => root.querySelector(t) !== null);
   const onAttrs = Array.from(attrs).filter((n) => n.startsWith('on'));
-  return { tags: Array.from(tags).sort(), attrs: Array.from(attrs).sort(), urlish, forbidden: [...bad, ...onAttrs] };
+  const artwork = Array.from(root.querySelectorAll('svg')).map((e) => e.outerHTML);
+  return { tags: Array.from(tags).sort(), attrs: Array.from(attrs).sort(), urlish, forbidden: [...bad, ...onAttrs], artwork };
 }`;
 
 async function cardStructure(card: CardProbe): Promise<Structure> {
@@ -329,6 +332,9 @@ async function runPayload(text: string, mode: 'selected' | 'context'): Promise<v
   expect(collapse(panelText)).toContain(collapse(clip(echo, 300)));
   const structure = await cardStructure(card);
   expect(structure.forbidden, 'the card must not contain script, img, a, form ...').toEqual([]);
+  expect(structure.artwork, 'hostile text must not add or change SVG artwork').toEqual(
+    benignCard.artwork,
+  );
   for (const tag of structure.tags) expect(benignCard.tags, `card tag <${tag}>`).toContain(tag);
   for (const attr of structure.attrs)
     expect(benignCard.attrs, `card attribute ${attr}`).toContain(attr);
@@ -365,6 +371,7 @@ async function runPayload(text: string, mode: 'selected' | 'context'): Promise<v
   expect(collapse(section)).toContain(collapse(clip(echo, 300)));
   const panelStruct = await panelStructure(panel);
   expect(panelStruct.forbidden).toEqual([]);
+  expect(panelStruct.artwork).toEqual(benignPanel.artwork);
   for (const tag of panelStruct.tags) expect(benignPanel.tags, `panel tag <${tag}>`).toContain(tag);
   for (const attr of panelStruct.attrs)
     expect(benignPanel.attrs, `panel attribute ${attr}`).toContain(attr);
@@ -414,10 +421,12 @@ test('self-check: the structure probe flags script, img, handlers and URLs when 
   const { page, dispose } = await openFuzzPage();
   const found = (await page.evaluate(`(() => {
     // An inert document (DOMParser): the image is never fetched, the script never runs.
-    const doc = new DOMParser().parseFromString('<img src="http://evil.test/x" onerror="1"><script>1<\\/script><a href="javascript:1">x</a>', 'text/html');
+    const doc = new DOMParser().parseFromString('<img src="http://evil.test/x" onerror="1"><script>1<\\/script><a href="javascript:1">x</a><svg onload="1"></svg>', 'text/html');
     return (${STRUCTURE_FN}).call(doc.body);
   })()`)) as Structure;
-  expect(found.forbidden).toEqual(expect.arrayContaining(['script', 'img', 'onerror']));
+  expect(found.forbidden).toEqual(expect.arrayContaining(['script', 'img', 'onerror', 'onload']));
+  expect(found.artwork).toEqual(['<svg onload="1"></svg>']);
+  expect(found.artwork).not.toEqual(benignCard.artwork);
   expect(found.urlish).toEqual(expect.arrayContaining(['img[src]', 'a[href]']));
   await dispose();
 });

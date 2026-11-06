@@ -207,13 +207,14 @@ test.describe('onboarding site-access step', () => {
 });
 
 test.describe('granted site access', () => {
-  test('the popup hides the fallback button once Chrome reports access granted', async () => {
+  test('the popup keeps manual lookup available with website access granted', async () => {
     const granted = await launchExtension({ grantedSiteAccess: true });
     try {
       const popup = await granted.context.newPage();
       await popup.goto(`chrome-extension://${granted.extensionId}/popup.html`);
+      await expect(popup.getByTestId('popup-site')).toHaveText('On');
       await expect(popup.getByRole('button', { name: 'Open PDF reader' })).toBeVisible();
-      await expect(popup.getByRole('button', { name: 'Explain on this page' })).toHaveCount(0);
+      await expect(popup.getByRole('button', { name: 'Explain on this page' })).toBeEnabled();
     } finally {
       await granted.close();
     }

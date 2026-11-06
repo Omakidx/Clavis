@@ -58,10 +58,15 @@ for (const scheme of ['light', 'dark'] as const) {
       test(`options at ${width}px`, async ({ context, extensionId }) => {
         const { page } = await openExtensionPage(context, extensionId, 'options');
         await page.setViewportSize({ width, height: 900 });
-        await expect(page.getByTestId('pdf-help')).toBeVisible();
-        await expect(page.getByTestId('voice-counts')).toBeVisible({ timeout: 15_000 });
+        await expect(page.getByTestId('voice-counts')).toBeAttached({ timeout: 15_000 });
         await axe(page, `options ${width} ${scheme}`);
         await noHorizontalScroll(page, `options ${width}`);
+        for (const section of ['Preferences', 'Website access', 'Privacy & help']) {
+          await page.getByRole('link', { name: section, exact: true }).click();
+          await axe(page, `options ${section} ${width} ${scheme}`);
+          await noHorizontalScroll(page, `options ${section} ${width}`);
+        }
+        await expect(page.getByTestId('pdf-help')).toBeVisible();
       });
 
       test(`onboarding (first and last step) at ${width}px`, async ({ context, extensionId }) => {

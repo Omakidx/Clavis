@@ -58,6 +58,11 @@
   font-weight: 500;
 }
 
+.clavis-page .clavis-settings__nav-list a:focus-visible {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
 .clavis-settings__content {
   min-width: 0;
 }

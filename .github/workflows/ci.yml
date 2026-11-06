@@ -130,12 +130,17 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build extension
-        run: npm run build
+      - name: Build and package extension
+        # ZIP acceptance tests inspect the package on this runner, not the artifact of another job.
+        run: npm run zip
 
       # Playwright's bundled Chromium, not Chrome: branded Chrome 137+ ignores --load-extension.
       - name: Install Playwright Chromium
         run: npm run e2e:install -- ${{ matrix.playwright-install-args }}
+
+      - name: Install Japanese fonts for vertical-writing fixtures
+        if: runner.os == 'Linux'
+        run: sudo apt-get install -y fonts-noto-cjk
 
       # The fixture uses Chromium's new headless mode, which supports extensions, so no xvfb is needed.
       - name: Run E2E tests

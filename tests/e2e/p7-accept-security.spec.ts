@@ -1,5 +1,4 @@
-import { copyFileSync } from 'node:fs';
-import path from 'node:path';
+import { readFileSync } from 'node:fs';
 import { expect, test } from '@playwright/test';
 import { CARD, cardOf } from './p5-card-support/harness';
 import {
@@ -11,7 +10,6 @@ import {
 import { accept, acceptManifest, acceptPath } from './p7-accept-support/manifest';
 import { foreignRequests, HOOK, squash, TEXT, type Reader } from './p7-accept-support/reader';
 import { clickText, dragSelectText } from './p7-accept-support/selection';
-import { tempDir } from './p7-accept-support/synth';
 import { tb } from './spike-b-support/toolbar';
 
 // Phase 7 acceptance, security (docs/requirements.md section 8 abuse case 4, architecture
@@ -317,22 +315,26 @@ test.describe('forms and PDF JavaScript', () => {
 
 test.describe('hostile file names and the CSP canary', () => {
   test('a file name that is HTML is shown as text (title, label, password prompt) and never parsed', async () => {
-    const tmp = tempDir();
+    const reader = await h.openReader();
     try {
       const name = '<img src=x onerror=window.__clavisPwned=1>.pdf';
-      const plain = path.join(tmp.dir, name);
-      copyFileSync(acceptPath('basic-1page.pdf'), plain);
-      const encrypted = path.join(tmp.dir, '<svg onload=window.__clavisPwned=1>.pdf');
-      copyFileSync(acceptPath('encrypted-aes128.pdf'), encrypted);
-      const reader = await h.openReader();
-      await reader.openPath(plain);
+      // File.name can contain markup even where the host filesystem rejects those characters.
+      await reader.tid(HOOK.fileInput).setInputFiles({
+        name,
+        mimeType: 'application/pdf',
+        buffer: readFileSync(acceptPath('basic-1page.pdf')),
+      });
       await reader.waitPhase('ready');
       await reader.waitFirstPage();
       await expect(reader.tid(HOOK.fileName)).toHaveText(name);
       await expect(reader.page).toHaveTitle(
         new RegExp(name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')),
       );
-      await reader.openPath(encrypted);
+      await reader.tid(HOOK.fileInput).setInputFiles({
+        name: '<svg onload=window.__clavisPwned=1>.pdf',
+        mimeType: 'application/pdf',
+        buffer: readFileSync(acceptPath('encrypted-aes128.pdf')),
+      });
       await reader.waitPhase('password-required');
       await expect(reader.tid(HOOK.passwordPrompt)).toContainText(
         '<svg onload=window.__clavisPwned=1>.pdf',
@@ -345,9 +347,8 @@ test.describe('hostile file names and the CSP canary', () => {
       expect(facts).toEqual({ injected: 0, pwned: undefined });
       expect(h.requests.filter((u) => /\/x$/.test(u))).toEqual([]);
       await reader.expectQuiet({ allowConsoleErrors: /Password/ });
-      await reader.page.close();
     } finally {
-      tmp.dispose();
+      await reader.page.close();
     }
   });
 

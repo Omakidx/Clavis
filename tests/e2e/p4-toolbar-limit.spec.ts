@@ -139,7 +139,7 @@ test('keyboard: focus lands on the one action, Enter trims, focus moves on to Li
 test('Ctrl+A on a long page: too-long state, inside the viewport, trimmed text starts at the top of the page', async () => {
   const { page, dispose } = await h.open('long.html');
   try {
-    await page.keyboard.press('Control+a');
+    await page.keyboard.press('ControlOrMeta+a');
     await tb(page).waitShown();
     expect(await tb(page).attr(SEL.panel, 'data-mode')).toBe('too-long');
     const box = await tb(page).box();
@@ -182,7 +182,7 @@ test('the too-long state fits a 320 px wide viewport', async () => {
   try {
     await page.setViewportSize({ width: 320, height: 568 });
     await page.reload();
-    await page.keyboard.press('Control+a');
+    await page.keyboard.press('ControlOrMeta+a');
     await tb(page).waitShown();
     const box = await tb(page).box(SEL.panel);
     expect(box.x).toBeGreaterThanOrEqual(0);

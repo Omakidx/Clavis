@@ -238,8 +238,17 @@ test.describe('FR-055 broken and unusual files: a specific message, no crash, th
     try {
       const file = path.join(tmp.dir, 'unreadable.pdf');
       copyFileSync(acceptPath('basic-1page.pdf'), file);
-      chmodSync(file, 0o000);
       const reader = await h.openReader();
+      if (process.platform === 'win32') {
+        // chmod does not remove Windows read ACLs. Supply the same browser read failure instead.
+        await reader.page.evaluate(() => {
+          File.prototype.stream = () => {
+            throw new DOMException('File access denied', 'NotReadableError');
+          };
+        });
+      } else {
+        chmodSync(file, 0o000);
+      }
       await reader.openPath(file).catch(() => undefined);
       const phase = await reader.waitPhase(['error', 'ready'], 15_000);
       test.info().annotations.push({ type: 'observed', description: `chmod 000 -> ${phase}` });

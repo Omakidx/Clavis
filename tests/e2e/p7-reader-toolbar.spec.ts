@@ -228,6 +228,10 @@ test.describe('Listen from the PDF reader', () => {
     context,
     extensionId,
   }) => {
+    test.skip(
+      process.platform !== 'linux',
+      'This case checks Linux no-voice installation guidance.',
+    );
     test.skip(await machineHasVoices(context, extensionId), 'This machine has voices.');
     const session = await openReader(context, extensionId);
     const { page } = session;

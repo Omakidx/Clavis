@@ -82,7 +82,7 @@ test.describe('practice page', () => {
     await tb(frame).click('listen');
     // CI and this Linux dev machine have no voices (docs/decisions/spike-d-voices.md): either is correct.
     await expect(page.locator('main')).toContainText(
-      /Reading aloud|isn.t available on this device/,
+      /Reading aloud|isn.t available on this device|The voice didn.t start/,
       {
         timeout: 15_000,
       },

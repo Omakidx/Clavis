@@ -226,7 +226,7 @@ test.describe('toolbar behaviour', () => {
   test('a keyboard-only selection (Ctrl+A) shows the toolbar and captures a passage', async () => {
     const { page, dispose } = await open('article.html');
     try {
-      await page.keyboard.press('Control+a');
+      await page.keyboard.press('ControlOrMeta+a');
       await tb(page).waitShown();
       expect(await tb(page).attr(SEL.panel, 'data-kind')).toBe('passage');
       await expectToolbarNearSelection(page);
@@ -395,10 +395,10 @@ test.describe('toolbar behaviour', () => {
     try {
       for (const id of ['text', 'password', 'area']) {
         await page.locator(`#${id}`).focus();
-        await page.keyboard.press('Control+a');
+        await page.keyboard.press('ControlOrMeta+a');
       }
       await page.locator('#editable').focus();
-      await page.keyboard.press('Control+a');
+      await page.keyboard.press('ControlOrMeta+a');
       await page.keyboard.press('Shift+End');
       await page.waitForTimeout(400);
       await tb(page).expectNoHost();

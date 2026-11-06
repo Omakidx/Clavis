@@ -7,7 +7,7 @@ import { SEL, tb } from './spike-b-support/toolbar';
 // inside small windows, follows the colour scheme, and keeps touch-sized buttons.
 test.describe.configure({ timeout: 90_000 });
 
-const BAR = { light: 'rgb(27, 31, 36)', dark: 'rgb(232, 236, 241)' } as const;
+const BAR = { light: 'rgb(246, 247, 235)', dark: 'rgb(32, 34, 27)' } as const;
 
 for (const scheme of ['light', 'dark'] as const) {
   for (const width of [1000, 320]) {

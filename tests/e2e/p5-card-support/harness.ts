@@ -174,7 +174,7 @@ export class CardProbe {
 
   /** Real mouse click on the centre of an element of the card. */
   async click(selector: string): Promise<void> {
-    const box = await this.toolbar.box(selector);
+    const box = await this.toolbar.stableBox(selector);
     const offset = await frameOffset(this.target);
     await this.page.mouse.click(
       offset.x + box.x + box.width / 2,

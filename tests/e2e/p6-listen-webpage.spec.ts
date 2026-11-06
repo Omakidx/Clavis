@@ -25,6 +25,7 @@ test.beforeAll(async () => {
   const data = report?.data as
     { engines: { chromeTts: { voices: unknown[] }; offscreen: { voices: unknown[] } } } | undefined;
   noVoices =
+    process.platform === 'linux' &&
     report?.ok === true &&
     data?.engines.chromeTts.voices.length === 0 &&
     data.engines.offscreen.voices.length === 0;

@@ -1,0 +1,2 @@
+# PDF offsets, compressed streams, and fixture checksums depend on exact bytes on every OS.
+*.pdf binary

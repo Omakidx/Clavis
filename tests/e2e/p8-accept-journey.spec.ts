@@ -370,6 +370,7 @@ test('UJ-01: setup state survives a browser restart', async () => {
     const key = await send(probe, { v: 1, type: 'GET_KEY_STATUS' });
     expect(key?.data).toMatchObject({ hasKey: true, storage: 'local' });
     // Settings still offers the tutorial again (FR-008).
+    await probe.getByRole('link', { name: 'Privacy & help' }).click();
     await expect(probe.getByRole('link', { name: 'Run the welcome tutorial again' })).toBeVisible();
   } finally {
     await profile.dispose();

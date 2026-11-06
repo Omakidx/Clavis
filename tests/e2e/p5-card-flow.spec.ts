@@ -37,7 +37,7 @@ test('nothing is sent and no card is loaded until Explain is pressed (FR-017, D-
     ).toBe('undefined');
 
     await tb(page).click('explain');
-    await cardOf(page).waitFor(CARD.card);
+    await cardOf(page).waitFor(CARD.ready('core'));
     expect(
       await world.evaluate<string>(`typeof globalThis[Symbol.for('clavis.explain-card')]`),
     ).toBe('object');

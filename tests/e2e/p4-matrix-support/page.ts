@@ -540,6 +540,9 @@ export async function perform(page: Page, surface: Surface, plan: InputPlan): Pr
     }
     case 'keyboard': {
       await page.mouse.dblclick(start.x, start.y);
+      // Japanese word-selection direction differs between platforms. Collapse to its reading
+      // start before extending, so Shift+Down always grows from the same boundary.
+      if (located.vertical) await page.keyboard.press(backKeyFor(plan.forwardKey));
       let current = normalize((await readSelection(surface)).text);
       await page.keyboard.down('Shift');
       try {

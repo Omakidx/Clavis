@@ -107,8 +107,12 @@ test('popup: connected, site access off with its help open, and on a tab that lo
 test('Settings: the whole page, and with the sections a person opens', async () => {
   const page = await world.ext.context.newPage();
   await page.goto(`chrome-extension://${world.ext.extensionId}/options.html`);
-  await expect(page.getByTestId('voice-counts')).toBeVisible({ timeout: 15_000 });
-  await sweep(page, 'settings');
+  await expect(page.getByTestId('voice-counts')).toBeAttached({ timeout: 15_000 });
+  await sweep(page, 'settings connection');
+  for (const section of ['Preferences', 'Website access', 'Privacy & help']) {
+    await page.getByRole('link', { name: section, exact: true }).click();
+    await sweep(page, `settings ${section}`);
+  }
   await page.goto(`chrome-extension://${world.ext.extensionId}/options.html#section-help-pdf`);
   await expect(page.getByTestId('pdf-help')).toBeInViewport();
   await sweep(page, 'settings at the PDF help');

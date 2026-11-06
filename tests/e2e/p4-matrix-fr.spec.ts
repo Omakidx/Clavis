@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { installScriptedTts } from './p6-listen-support/listen';
 import {
   axeOnToolbar,
   expectHidden,
@@ -31,7 +32,6 @@ import {
   buttonNames,
   clickAction,
   readCardText,
-  readListenStatus,
   actionSelector,
   readKind,
   readMode,
@@ -49,6 +49,7 @@ import {
 let harness: Harness;
 test.beforeAll(async () => {
   harness = await startHarness();
+  await installScriptedTts(harness.ext.serviceWorker);
 });
 test.afterAll(async () => {
   await harness?.close();
@@ -148,6 +149,7 @@ test.describe('FR-010 detect non-empty selections in regular HTTP(S) text', () =
       for (let i = 0; i < 8; i++) await page.keyboard.press('ArrowRight');
       await page.keyboard.up('Shift');
       expect(await selectedText(page)).toBe('broke the ice');
+      await page.waitForTimeout(80); // Let the final keyboard capture replace the initial word.
       // The toolbar now reports the grown selection: kind phrase and the captured text.
       await waitFor(async () => (await readKind(page)) === 'phrase', 1500, 40);
       expect(await readKind(page)).toBe('phrase');
@@ -159,7 +161,7 @@ test.describe('FR-010 detect non-empty selections in regular HTTP(S) text', () =
   test('keyboard: Ctrl+A raises the toolbar for the page text', async () => {
     await withFixture('plain-baseline', async ({ page }) => {
       await page.mouse.click(5, 5);
-      await page.keyboard.press('Control+a');
+      await page.keyboard.press('ControlOrMeta+a');
       expect(await expectShown(page)).toBe(true);
       expect(await readKind(page)).toBe('passage');
     });
@@ -209,7 +211,7 @@ test.describe('FR-010 detect non-empty selections in regular HTTP(S) text', () =
         await resetPage(page);
         if (how === 'select-all') {
           await page.mouse.click(600, 500);
-          await page.keyboard.press('Control+a');
+          await page.keyboard.press('ControlOrMeta+a');
         } else {
           const start = await locate(page, {
             context: 'Ordinary paragraph text',
@@ -851,7 +853,7 @@ test.describe('FR-010 / FR-012 further layouts and gestures', () => {
   test('select-all on a very long page is "Selection too long"', async () => {
     await withFixture('very-long', async ({ page }) => {
       await page.mouse.click(5, 5);
-      await page.keyboard.press('Control+a');
+      await page.keyboard.press('ControlOrMeta+a');
       expect(await expectShown(page)).toBe(true);
       expect(await readMode(page)).toBe('too-long');
       expect(await rootText(page)).toMatch(/Selection too long/i);
@@ -925,11 +927,12 @@ test.describe('FR-013 Listen, Slow and Explain, by mouse and by keyboard', () =>
         'dblclick',
       );
       expect(await expectShown(page)).toBe(true);
-      // Listen opens no card: it reports on its own status line (this machine has no voices).
+      // Speech is shown on its button; successful pronunciation has no extra status label.
       await clickAction(page, 'listen');
-      const status = await readListenStatus(page);
-      expect(status, 'Listen reports its state').toBeDefined();
-      expect(['starting', 'playing', 'ended', 'unavailable']).toContain(status?.status);
+      await expect
+        .poll(() => toolbar(page).attr(actionSelector('listen'), 'data-state'))
+        .toBe('playing');
+      expect(await toolbar(page).text(actionSelector('listen'))).toBe('Stop');
       expect(
         await toolbar(page).isShown(SEL.card),
         'Listen does not open the explanation card',
@@ -980,7 +983,9 @@ test.describe('FR-013 Listen, Slow and Explain, by mouse and by keyboard', () =>
         40,
       );
       expect(await toolbar(page).attr(SEL.card, 'data-action')).toBe('explain');
-      expect(await focusIsInCard(page), 'focus moved into the explanation card').toBe(true);
+      await expect
+        .poll(() => focusIsInCard(page), { message: 'focus moved into the explanation card' })
+        .toBe(true);
       // Tab to the card's Close button and press it: focus returns to the Explain button.
       for (let i = 0; i < 10 && !(await focusedCardControl(page, 'card-close')); i++) {
         await page.keyboard.press('Tab');
@@ -996,7 +1001,9 @@ test.describe('FR-013 Listen, Slow and Explain, by mouse and by keyboard', () =>
       await page.keyboard.press('ArrowRight');
       expect(await toolbar(page).focusedAction()).toBe('listen');
       await page.keyboard.press('Space');
-      expect(await readListenStatus(page), 'Listen reports through the keyboard too').toBeDefined();
+      await expect
+        .poll(() => toolbar(page).attr(actionSelector('listen'), 'data-state'))
+        .toBe('playing');
       // Escape dismisses everything.
       await page.keyboard.press('Escape');
       expect(await expectHidden(page), 'Escape closes the toolbar and the card').toBe(true);
@@ -1257,7 +1264,7 @@ test.describe('FR-016 accessibility: roles, labels, focus, motion, automated che
   test('keyboard-only flow: select all, move focus into the toolbar, choose with Enter, dismiss with Escape', async () => {
     await withFixture('plain-baseline', async ({ page }) => {
       await page.mouse.click(5, 5);
-      await page.keyboard.press('Control+a');
+      await page.keyboard.press('ControlOrMeta+a');
       expect(await expectShown(page), 'toolbar for the keyboard selection').toBe(true);
       const reply = await openViaCommand(harness.ext.serviceWorker, page);
       expect(reply?.shown).toBe(true);
