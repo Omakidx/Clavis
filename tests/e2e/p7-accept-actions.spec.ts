@@ -96,7 +96,7 @@ test('Listen on this machine (no voices): the honest message and the Linux hint,
       'Install speech-dispatcher and a voice such as espeak-ng, then restart Chrome.',
     );
     expect(await listen.listenButton()).toMatchObject({
-      label: 'Listen',
+      label: 'Speak',
       state: null,
       disabled: null,
       spinner: false,
@@ -450,7 +450,7 @@ test.describe('Listen with a (scripted) voice, the positive path', () => {
       });
       // Stop.
       await listen.click('listen');
-      await listen.waitLabel('Listen');
+      await listen.waitLabel('Speak');
       expect(await scriptedStops(worker)).toBeGreaterThan(0);
       // Slow, then the audio finishes: Replay.
       await listen.click('slow');

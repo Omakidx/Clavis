@@ -112,15 +112,24 @@ test.describe('keyboard and focus', () => {
           (el as HTMLInputElement).labels?.[0]?.textContent ||
           el.textContent?.trim() ||
           '';
-        return {
-          name,
-          tag: el.tagName.toLowerCase(),
-          outline: style.outlineStyle !== 'none' && parseFloat(style.outlineWidth) >= 2,
-        };
+        const surface = () =>
+          [
+            style.backgroundColor,
+            style.backgroundImage,
+            style.boxShadow,
+            style.borderColor,
+            style.textDecorationLine,
+          ].join('|');
+        const focused = surface();
+        const visible = el.matches(':focus-visible');
+        el.blur();
+        const resting = surface();
+        el.focus();
+        return { name, tag: el.tagName.toLowerCase(), cue: visible && focused !== resting };
       });
       if (stop === null) break;
       expect(stop.name, `control #${i} has an accessible name`).not.toBe('');
-      expect(stop.outline, `${stop.name} shows a focus ring`).toBe(true);
+      expect(stop.cue, `${stop.name} shows a focus surface`).toBe(true);
       stops.push(stop.name);
     }
     expect(stops.slice(0, 9)).toEqual([
@@ -236,14 +245,14 @@ test.describe('reduced motion and forced colours', () => {
       return {
         button: border('.clavis-button'),
         input: border('[data-testid=find-input]'),
-        pressed: getComputedStyle(document.querySelector('[data-testid=find-toggle]')!)
-          .outlineStyle,
+        pressed: border('[data-testid=find-toggle]'),
       };
     });
     expect(state.button.width).toBeGreaterThan(0);
     expect(state.button.style).not.toBe('none');
     expect(state.input.width).toBeGreaterThan(0);
-    expect(state.pressed).not.toBe('none'); // the pressed Find toggle is marked by an outline
+    expect(state.pressed.width).toBeGreaterThan(0);
+    expect(state.pressed.style).not.toBe('none'); // pressed Find keeps a visible border
     await axe(page, 'forced colours');
   });
 

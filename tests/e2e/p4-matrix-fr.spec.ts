@@ -908,7 +908,7 @@ test.describe('FR-013 Listen, Slow and Explain, by mouse and by keyboard', () =>
         'dblclick',
       );
       expect(await expectShown(page)).toBe(true);
-      expect(await buttonNames(page)).toEqual(['Listen', 'Slow', 'Explain']);
+      expect(await buttonNames(page)).toEqual(['Lookup', 'Speak', 'Slower speech, 0.75×']);
       for (const action of ['listen', 'slow', 'explain'] as const) {
         expect(await toolbar(page).isShown(actionSelector(action)), action).toBe(true);
       }
@@ -1206,7 +1206,7 @@ test.describe('FR-016 accessibility: roles, labels, focus, motion, automated che
       );
       expect(info?.role).toBe('toolbar');
       expect((info?.label ?? '').length).toBeGreaterThan(3);
-      expect(info?.buttons.map((b) => b.name)).toEqual(['Listen', 'Slow', 'Explain']);
+      expect(info?.buttons.map((b) => b.name)).toEqual(['Lookup', 'Speak', '0.75×']);
       await clickAction(page, 'explain');
       const status = await toolbar(page).evalIn<string | null>(
         SEL.card,
@@ -1473,7 +1473,7 @@ test.describe('Selection constraints: 2,000 characters, "Selection too long", tr
       // Nothing was sent: the trimmed text is shown first, the user still has to act.
       expect(harness.groqRequests.length).toBe(requestsBefore);
       expect(await readMode(page), 'the actions come back for the trimmed text').toBe('actions');
-      expect(await buttonNames(page)).toEqual(['Listen', 'Slow', 'Explain']);
+      expect(await buttonNames(page)).toEqual(['Lookup', 'Speak', 'Slower speech, 0.75×']);
       await clickAction(page, 'explain');
       expect((await readCardText(page)) ?? '').toBe(trimmed.slice(0, 200));
     });

@@ -27,6 +27,8 @@
   --line: #dce0cf;
   --ink: #252820;
   --muted: #5d6255;
+  --wash: #fff0ce;
+  --danger: #b3261e;
   position: fixed;
   left: 0;
   top: 0;
@@ -114,6 +116,7 @@
 .button:hover,
 .button[data-state='working'] {
   background: var(--hover);
+  color: var(--on-bar);
 }
 
 /* Only Explain shows a busy cursor; a starting Listen can be cancelled, so it stays clickable. */
@@ -126,6 +129,7 @@
 .button[aria-pressed='true'] {
   background: #ffebc4;
   border-color: currentColor;
+  color: var(--on-bar);
 }
 
 .spinner {
@@ -161,12 +165,13 @@
 /* The notice's Close button sits on the card, not on the dark bar. */
 .card .button {
   margin-top: 6px;
-  color: var(--ink);
+  color: var(--on-bar);
   border-color: var(--line);
 }
 
 .card .button:hover {
   background: var(--line);
+  color: var(--ink);
 }
 
 .card {
@@ -211,6 +216,23 @@
   overflow: hidden;
   clip-path: inset(50%);
   white-space: nowrap;
+}
+
+@media (prefers-color-scheme: dark) {
+  .panel {
+    --bar: #20221b;
+    --surface: #272a21;
+    --line: #3e4233;
+    --ink: #f6f7eb;
+    --muted: #bec1af;
+    --wash: #493a20;
+    --danger: #ffc0b4;
+  }
+  .button--speak,
+  .button--speed {
+    background: transparent;
+    color: var(--ink);
+  }
 }
 
 /* High contrast: the browser forces system colours and drops shadows; keep a visible hover. */

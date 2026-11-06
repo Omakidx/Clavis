@@ -239,7 +239,7 @@ test.describe('Listen from the PDF reader', () => {
     await listen.waitMessage();
     expect(await listen.toolbar.text(LISTEN.message)).toBe("Voice isn't available on this device.");
     expect(await listen.toolbar.text(LISTEN.hint)).toContain('speech-dispatcher');
-    expect(await listen.listenButton()).toMatchObject({ label: 'Listen', spinner: false });
+    expect(await listen.listenButton()).toMatchObject({ label: 'Speak', spinner: false });
     // Listen is local: it sends the word and nothing else, and makes no AI request.
     const speak = (await sentMessages(page)).filter((m) => m.type === 'TTS_SPEAK');
     expect(speak).toHaveLength(1);

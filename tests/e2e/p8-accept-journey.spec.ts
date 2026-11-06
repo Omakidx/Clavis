@@ -229,7 +229,7 @@ test.describe('part 2: setup skipped, key from the popup, first-send question, t
       await card.waitFor(CARD.disclosure);
       // The approved wording (D-16), and nothing has been sent while the question is open.
       expect(normalize((await card.text(CARD.disclosure)) ?? '')).toContain(APPROVED_FIRST_SEND);
-      expect(await card.text(CARD.confirm)).toBe('Explain');
+      expect(await card.text(CARD.confirm)).toBe('Lookup');
       expect(await card.text(CARD.cancel)).toBe('Cancel');
       await page.waitForTimeout(700);
       expect(chats(world)).toBe(0);
@@ -325,6 +325,7 @@ test.describe('part 2: setup skipped, key from the popup, first-send question, t
     }
     const settings = await world.ext.context.newPage();
     await settings.goto(`chrome-extension://${world.ext.extensionId}/options.html`);
+    await settings.getByRole('link', { name: 'Privacy & help' }).click();
     await settings.getByRole('button', { name: 'Clear all data', exact: true }).click();
     await settings
       .getByRole('alertdialog')

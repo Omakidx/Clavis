@@ -62,6 +62,9 @@
 
 .reader-toolbar__group {
   display: flex;
+  flex-wrap: wrap;
+  min-width: 0;
+  max-width: 100%;
   align-items: center;
   gap: var(--space-1);
 }
@@ -82,6 +85,11 @@
   flex-wrap: wrap;
   align-items: center;
   gap: var(--space-2);
+}
+
+.reader__header :is(.reader-input, .clavis-select):focus-visible {
+  border-color: var(--accent);
+  background-color: var(--info-bg);
 }
 
 .reader-find__status {
@@ -150,6 +158,12 @@
 
 .reader__viewer-container:focus-visible {
   outline: none;
+  background: var(--info-bg);
+}
+
+.reader .pdfViewer .textLayer:focus-visible {
+  outline: none;
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
 }
 
 .reader__overlay {

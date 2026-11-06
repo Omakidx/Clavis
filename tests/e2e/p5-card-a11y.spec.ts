@@ -321,21 +321,31 @@ test.describe('structure, targets and preferences', () => {
     }
   });
 
-  test('the focus ring is visible on keyboard focus in both colour schemes', async () => {
+  test('keyboard focus changes the surface without an outline in both colour schemes', async () => {
     for (const scheme of ['light', 'dark'] as const) {
       const page = await openPage({ colorScheme: scheme });
       try {
         await render(page, { name: 'core', scenario: 'core' });
         await page.keyboard.press('Tab');
-        const ring = await page.evaluate(() => {
+        const focus = await page.evaluate(() => {
           const rootNode = document.getElementById('host')?.shadowRoot as ShadowRoot;
           const active = rootNode.activeElement as HTMLElement | null;
-          const s = active ? getComputedStyle(active) : null;
-          return { has: active !== null, width: s?.outlineWidth, style: s?.outlineStyle };
+          if (active === null) return null;
+          const s = getComputedStyle(active);
+          const background = s.backgroundColor;
+          const outline = s.outlineStyle;
+          const visible = active.matches(':focus-visible');
+          active.blur();
+          return {
+            background,
+            outline,
+            visible,
+            resting: getComputedStyle(active).backgroundColor,
+          };
         });
-        expect(ring.has).toBe(true);
-        expect(ring.style).toBe('solid');
-        expect(ring.width).toBe('2px');
+        expect(focus?.visible).toBe(true);
+        expect(focus?.outline).toBe('none');
+        expect(focus?.background).not.toBe(focus?.resting);
       } finally {
         await page.context().close();
       }

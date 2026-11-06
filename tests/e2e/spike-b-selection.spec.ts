@@ -268,8 +268,8 @@ test.describe('toolbar behaviour', () => {
       expect(await tb(page).attr(SEL.toolbar, 'aria-label')).toBe(
         'Clavis actions for the selected text',
       );
-      expect(await tb(page).text(SEL.action('listen'))).toBe('Listen');
-      expect(await tb(page).text(SEL.action('explain'))).toBe('Explain');
+      expect(await tb(page).text(SEL.action('listen'))).toBe('Speak');
+      expect(await tb(page).text(SEL.action('explain'))).toBe('Lookup');
       const tags = await tb(page).evalIn<string[]>(
         SEL.toolbar,
         `function () { return Array.from(this.children, (c) => c.tagName + ':' + c.getAttribute('type')); }`,

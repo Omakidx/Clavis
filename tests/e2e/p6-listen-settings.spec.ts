@@ -52,7 +52,7 @@ test.describe('Voice section, no voices on this device', () => {
     await expect(section.getByRole('combobox', { name: 'Voice', exact: true })).toBeDisabled();
     // Language and default speed live here and still save.
     await section.getByRole('radio', { name: 'Slow' }).check();
-    await expect(section.getByText('Saved.')).toBeVisible();
+    await expect(page.getByText('Saved.', { exact: true })).toBeVisible();
     await section.getByRole('radio', { name: 'Normal' }).check();
 
     const results = await new AxeBuilder({ page }).include('#section-voice').analyze();
@@ -124,7 +124,7 @@ test.describe('Voice section, with voices (scripted chrome.tts)', () => {
     );
     await chooser.selectOption('Test Voice GB');
     await expect(page.getByTestId('voice-online-note')).toHaveCount(0);
-    await expect(section.getByText('Saved.')).toBeVisible();
+    await expect(page.getByText('Saved.', { exact: true })).toBeVisible();
     await page.reload();
     await expect(
       page

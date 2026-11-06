@@ -114,7 +114,7 @@ test('with no voice on the device, Listen on a PDF word says so, shows no playin
   expect(await listen.toolbar.text(LISTEN.message)).toBe("Voice isn't available on this device.");
   // Never a fake playing state or a spinner, and the button can be pressed again.
   expect(await listen.listenButton()).toMatchObject({
-    label: 'Listen',
+    label: 'Speak',
     state: null,
     spinner: false,
   });

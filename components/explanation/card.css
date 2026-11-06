@@ -7,9 +7,8 @@
 .ec {
   --ec-accent: #fca311;
   --ec-on-accent: #292314;
-  --ec-ring: #805000;
-  --ec-danger: #b3261e;
-  --ec-wash: #fff0ce;
+  --ec-danger: var(--danger, #b3261e);
+  --ec-wash: var(--wash, #fff0ce);
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
@@ -38,6 +37,7 @@
 
 .ec :is(button, [tabindex='0']):focus-visible {
   background: var(--ec-wash);
+  color: var(--ink);
 }
 
 .ec__head {
@@ -91,7 +91,7 @@
   border: 1px solid var(--line);
   border-radius: 999px;
   background: var(--ec-accent);
-  color: inherit;
+  color: var(--ec-on-accent);
   font: inherit;
   text-align: center;
   cursor: pointer;
@@ -99,16 +99,16 @@
 
 .ec__btn:hover {
   background: var(--line);
+  color: var(--ink);
 }
 
 .ec__btn--primary {
-  background: var(--ec-accent);
   border-color: var(--ec-accent);
-  color: var(--ec-on-accent);
 }
 
 .ec__btn--primary:hover {
   background: var(--ec-accent);
+  color: var(--ec-on-accent);
   filter: brightness(1.12);
 }
 

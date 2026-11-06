@@ -41,7 +41,7 @@ test('a word: Listen shows the no-voice message with the Linux hint, never a pla
   try {
     await selectWord(page, 'cartographer');
     const listen = listenOf(page);
-    expect(await listen.listenButton()).toMatchObject({ label: 'Listen', state: null });
+    expect(await listen.listenButton()).toMatchObject({ label: 'Speak', state: null });
 
     await listen.click('listen');
     await listen.waitMessage();
@@ -51,7 +51,7 @@ test('a word: Listen shows the no-voice message with the Linux hint, never a pla
     );
     // The button is usable again: no permanent spinner, no Stop, no disabled state.
     expect(await listen.listenButton()).toMatchObject({
-      label: 'Listen',
+      label: 'Speak',
       state: null,
       disabled: null,
       spinner: false,
@@ -161,7 +161,7 @@ test('Escape dismisses the toolbar and its message; a new selection starts clean
     await dblclickText(page, page, 'old');
     await tb(page).waitShown();
     expect(await listen.exists(LISTEN.message)).toBe(false);
-    expect((await listen.listenButton())?.label).toBe('Listen');
+    expect((await listen.listenButton())?.label).toBe('Speak');
   } finally {
     await dispose();
   }

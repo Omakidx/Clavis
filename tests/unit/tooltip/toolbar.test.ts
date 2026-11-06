@@ -894,6 +894,22 @@ describe('pinch zoom (visual viewport)', () => {
 });
 
 describe('placement coordinates', () => {
+  it('ignores unit-scale width serialization noise when snapping high-DPI coordinates', () => {
+    Object.defineProperty(window, 'devicePixelRatio', { configurable: true, value: 2 });
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({
+      width: 100.00001,
+      height: 40,
+    } as DOMRect);
+    try {
+      create().show(capture('bank'));
+      for (const value of [panel().style.left, panel().style.top]) {
+        expect((Number.parseFloat(value) * 2) % 1).toBeCloseTo(0, 5);
+      }
+    } finally {
+      Object.defineProperty(window, 'devicePixelRatio', { configurable: true, value: 1 });
+    }
+  });
+
   it('converts viewport pixels back to the host pixels when <html> is zoomed or scaled', () => {
     // Layout size 100x40 (mocked offsetWidth/Height), but the box measures 200x80: a 2x zoom.
     vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({

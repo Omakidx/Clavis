@@ -105,9 +105,9 @@ const STATUSES: StatusCase[] = [
   },
   {
     status: 403,
-    code: 'INVALID_API_KEY',
-    says: "Groq didn't accept your key",
-    action: 'Update key',
+    code: 'NETWORK_ERROR',
+    says: 'Clavis cannot determine why this request was denied',
+    action: null,
   },
   {
     status: 404,
@@ -120,7 +120,7 @@ const STATUSES: StatusCase[] = [
     code: 'TIMEOUT',
     says: 'Groq took too long to answer',
     action: null,
-    title: "Can't connect",
+    title: 'Groq returned an error',
   },
   {
     status: 413,
@@ -131,30 +131,30 @@ const STATUSES: StatusCase[] = [
   {
     status: 500,
     code: 'NETWORK_ERROR',
-    says: "Clavis can't reach Groq",
+    says: 'The service could not complete the request',
     action: null,
-    title: "Can't connect",
+    title: 'Groq returned an error',
   },
   {
     status: 502,
     code: 'NETWORK_ERROR',
-    says: "Clavis can't reach Groq",
+    says: 'The service could not complete the request',
     action: null,
-    title: "Can't connect",
+    title: 'Groq returned an error',
   },
   {
     status: 503,
     code: 'NETWORK_ERROR',
-    says: "Clavis can't reach Groq",
+    says: 'The service could not complete the request',
     action: null,
-    title: "Can't connect",
+    title: 'Groq returned an error',
   },
   {
     status: 429,
     code: 'RATE_LIMITED',
     says: "Groq's rate limit was reached",
     action: null,
-    title: 'Rate limit reached',
+    title: 'Groq returned an error',
   },
 ];
 
@@ -402,8 +402,14 @@ test.describe('the envelope a content script receives', () => {
       const error = (reply as { error: Record<string, unknown> }).error;
       expect(Object.keys(error).sort()).toEqual(expect.arrayContaining(['code', 'message']));
       expect(
-        Object.keys(error).every((k) => ['code', 'message', 'retryAfterMs', 'reason'].includes(k)),
+        Object.keys(error).every((k) =>
+          ['code', 'message', 'retryAfterMs', 'reason', 'httpStatus', 'forbiddenReason'].includes(
+            k,
+          ),
+        ),
       ).toBe(true);
+      expect(error.httpStatus).toBe(code);
+      if (code === 403) expect(error.forbiddenReason).toBe('unknown');
     }
     await world.dispose();
     await dispose();

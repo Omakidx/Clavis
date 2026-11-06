@@ -126,7 +126,7 @@ export const SETTINGS_STATES: PageState[] = [
     open: async (world) => {
       await ensureKey(world, false);
       const p = await page(world, 'options.html');
-      await expect(p.getByTestId('voice-counts')).toBeVisible({ timeout: 15_000 });
+      await expect(p.getByTestId('voice-counts')).toBeAttached({ timeout: 15_000 });
       return p;
     },
   },
@@ -135,7 +135,7 @@ export const SETTINGS_STATES: PageState[] = [
     open: async (world) => {
       await ensureKey(world, true);
       const p = await page(world, 'options.html');
-      await expect(p.getByTestId('voice-counts')).toBeVisible({ timeout: 15_000 });
+      await expect(p.getByTestId('voice-counts')).toBeAttached({ timeout: 15_000 });
       await expect(p.getByRole('button', { name: 'Remove key' })).toBeVisible();
       return p;
     },

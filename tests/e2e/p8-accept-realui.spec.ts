@@ -374,6 +374,7 @@ test.describe('journey 2 with the real browser UI: site access declined, found f
     const settingsHelp = await settings.getByTestId('site-access-help').first().innerText();
     // The button the help names is on this screen, and so is the toolbar setting it mentions.
     await expect(settings.getByRole('button', { name: paths.enableButton })).toBeVisible();
+    await settings.getByRole('link', { name: 'Preferences', exact: true }).click();
     await expect(
       settings.getByRole('group', { name: 'When to show the toolbar' }).getByRole('radio', {
         name: new RegExp(`^${paths.toolbarSetting}`),
