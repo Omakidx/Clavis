@@ -169,8 +169,9 @@ test.describe('stale answers', () => {
     let card = await explainWord(page, 'cartographer');
     await card.waitFor(CARD.ready('core'));
     await selectWord(page, 'river');
-    // The toolbar follows the new selection at once; the old card is gone until Explain is pressed.
-    expect(await card.exists(CARD.card).catch(() => false)).toBe(false);
+    // Selection capture is debounced. Once it processes the new selection, the old card must be
+    // gone before Lookup is pressed; merely seeing the already-visible toolbar is not readiness.
+    await expect.poll(() => card.exists(CARD.card)).toBe(false);
     await tb(page).click('explain');
     card = cardOf(page);
     await card.waitFor(CARD.ready('core'));
