@@ -168,6 +168,9 @@ test.describe('stale answers', () => {
     const { page, dispose } = await h.open();
     let card = await explainWord(page, 'cartographer');
     await card.waitFor(CARD.ready('core'));
+    // The ready DOM can precede the ResizeObserver placement update. Wait until the expanded
+    // card settles so the click on the article cannot land on a moving card control instead.
+    await card.toolbar.stableBox(CARD.card);
     await selectWord(page, 'river');
     // Selection capture is debounced. Once it processes the new selection, the old card must be
     // gone before Lookup is pressed; merely seeing the already-visible toolbar is not readiness.

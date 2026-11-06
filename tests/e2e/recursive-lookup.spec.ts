@@ -80,6 +80,7 @@ async function selectGeneratedWord(
   card: CardProbe,
   word: string,
 ) {
+  await card.toolbar.stableBox(CARD.card);
   const box = await resultWordBox(card, word);
   const offset = await frameOffset(target);
   await page.mouse.dblclick(offset.x + box.x + box.width / 2, offset.y + box.y + box.height / 2);
