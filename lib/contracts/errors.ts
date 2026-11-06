@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { LIMITS } from '../config/constants';
+import { forbiddenReasonSchema } from './setup';
 
 /** Stable machine-readable error codes (architecture §4, requirements §7). */
 export const ERROR_CODES = [
@@ -48,8 +49,8 @@ export const errorReasonSchema = z.enum([
   'no-voice-language',
   // With NO_VOICE: a voice was found but did not start (engine glitch, online voice offline).
   'start-failed',
-  // With NO_VOICE: only online voices exist for this language; by default Listen uses
-  // on-device voices only (D-22), so the user must choose an online voice in Settings.
+  // Retained for compatibility with older callers; Automatic now tries matching online
+  // voices after on-device voices, and reports start-failed if playback cannot start.
   'online-only',
   // With RATE_LIMITED: Clavis's own request throttle (per tab), not Groq's rate limit.
   'local-limit',
@@ -62,5 +63,9 @@ export const errorEnvelopeSchema = z.strictObject({
   message: z.string().max(LIMITS.maxErrorMessageChars),
   retryAfterMs: z.number().int().nonnegative().max(3_600_000).optional(),
   reason: errorReasonSchema.optional(),
+  /** Numeric provider response only; absent when no HTTP response arrived. */
+  httpStatus: z.number().int().min(100).max(599).optional(),
+  /** Fixed 403 category, never provider text or arbitrary error identifiers. */
+  forbiddenReason: forbiddenReasonSchema.optional(),
 });
 export type ErrorEnvelope = z.infer<typeof errorEnvelopeSchema>;

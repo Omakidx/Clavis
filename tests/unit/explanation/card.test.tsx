@@ -227,6 +227,10 @@ describe('core answer', () => {
     expect(panel('core').querySelectorAll('ol li')).toHaveLength(2);
     expect(text).toContain('Other senses exist.');
     expect($('[data-clavis="card-model"]').textContent).toBe('Model: openai/gpt-oss-20b');
+    const selectable = $$('[data-clavis="card-result-text"]').map((element) => element.textContent);
+    expect(selectable).toContain('Sloping ground along the side of a river.');
+    expect(selectable).not.toContain('Definition');
+    expect(selectable).not.toContain('Examples written by AI');
   });
 
   it('renders model text as plain text: HTML, Markdown and links stay literal', async () => {
@@ -341,6 +345,31 @@ describe('error states and their actions (requirements section 7)', () => {
     expect(fake.calls).toHaveLength(2);
   });
 
+  it('shows HTTP 403 reason without claiming a connection failure', async () => {
+    await fail({
+      kind: 'error',
+      code: 'NETWORK_ERROR',
+      httpStatus: 403,
+      forbiddenReason: 'edge_block',
+    });
+    const error = $('[data-clavis="card-error"]');
+    expect(error.textContent).toContain('HTTP 403');
+    expect(error.textContent).toContain('security or browser/IP block');
+    expect(error.textContent).not.toContain("can't reach Groq");
+    expect(error.getAttribute('data-offline')).toBeNull();
+  });
+
+  it('shows HTTP 500 as a provider response and transport failure as a connection issue', async () => {
+    await fail({ kind: 'error', code: 'NETWORK_ERROR', httpStatus: 500 });
+    expect($('[data-clavis="card-error"]').textContent).toContain('HTTP 500');
+    expect($('[data-clavis="card-error"]').textContent).toContain('Try again shortly');
+    unmount?.();
+    root.replaceChildren();
+    await fail({ kind: 'error', code: 'NETWORK_ERROR' });
+    expect($('[data-clavis="card-error"]').textContent).toContain("Can't connect");
+    expect($('[data-clavis="card-error"]').textContent).not.toContain('HTTP');
+  });
+
   it('INVALID_RESPONSE: "Couldn\'t format explanation" and Try again', async () => {
     await fail({ kind: 'error', code: 'INVALID_RESPONSE' });
     expect($('[data-clavis="card-error"]').textContent).toContain("Couldn't format explanation");
@@ -415,13 +444,13 @@ describe('first-send confirmation', () => {
       vi.advanceTimersByTime(ms);
     });
 
-  it('shows the approved copy with Explain and Cancel, and puts keyboard focus on Explain', async () => {
+  it('shows the disclosure with Lookup and Cancel, and puts keyboard focus on Lookup', async () => {
     await prompt();
     const box = $('[data-clavis="card-disclosure"]');
     expect(box.textContent).toContain(
       "Send this to Groq? Clavis will send the selected text and a little of the text around it to Groq to explain it. You'll only be asked once.",
     );
-    expect($('[data-clavis="card-confirm"]').textContent).toBe('Explain');
+    expect($('[data-clavis="card-confirm"]').textContent).toBe('Lookup');
     expect($('[data-clavis="card-cancel"]').textContent).toBe('Cancel');
     expect(document.activeElement).toBe($('[data-clavis="card-confirm"]'));
   });
@@ -730,7 +759,12 @@ describe('text direction', () => {
 describe('Grammar and Translate tabs with both flags forced on (FR-036, FR-037; Grammar ships off, Translate on)', () => {
   const ON = { grammarTab: true, translateTab: true };
 
-  async function flagged(kind: Parameters<typeof makeSnapshot>[0], text: string, language = 'fr') {
+  async function flagged(
+    kind: Parameters<typeof makeSnapshot>[0],
+    text: string,
+    language = 'fr',
+    overrides: Partial<CardHost> = {},
+  ) {
     const fake = createFakeBackend();
     let ids = 0;
     const session = new ExplainSession({
@@ -750,6 +784,7 @@ describe('Grammar and Translate tabs with both flags forced on (FR-036, FR-037; 
       online: () => true,
       copy: vi.fn().mockResolvedValue(true),
       now: () => Date.now(),
+      ...overrides,
     } as unknown as CardHost;
     await act(() => {
       unmount = mountCard(root, { session, host });
@@ -791,6 +826,31 @@ describe('Grammar and Translate tabs with both flags forced on (FR-036, FR-037; 
     );
     await click(tab('translate'));
     expect(fake.calls[2]?.request).toMatchObject({ mode: 'translate', targetLanguage: 'fr' });
+  });
+
+  it('puts a speaker beside translated output and stops it when leaving the tab', async () => {
+    const stop = vi.fn();
+    const speak = vi.fn((_text, _lang, report) => {
+      report({ status: 'starting' });
+      return stop;
+    });
+    const { fake } = await flagged('word', 'bank', 'fr', { speak });
+    await click(tab('translate'));
+    fake.calls[1]?.succeed({
+      translation: { language: 'French', text: 'banque', literal: 'rive' },
+    });
+    await act(() => Promise.resolve());
+    const button = panel('translate').querySelector(
+      '[data-clavis="card-translation-speak"]',
+    ) as HTMLButtonElement;
+    expect(button.parentElement?.parentElement?.textContent).toContain('banque');
+    expect(
+      panel('translate').querySelectorAll('[data-clavis="card-translation-speak"]'),
+    ).toHaveLength(1);
+    await click(button);
+    expect(speak).toHaveBeenCalledWith('banque', 'fr', expect.any(Function));
+    await click(tab('core'));
+    expect(stop).toHaveBeenCalledOnce();
   });
 
   it('labels the translation with its language and separates the literal rendering', async () => {

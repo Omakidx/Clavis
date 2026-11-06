@@ -5,6 +5,7 @@ import type { ClientError } from '../../lib/ui-client/errors';
 import type { ClientResult } from '../../lib/ui-client/request';
 import { openSettingsPage } from '../../lib/ui-client/navigation';
 import { ErrorNotice, LiveStatus } from '../common/ui';
+import { useToast } from '../common/Toast';
 
 type SaveState =
   | { kind: 'idle' }
@@ -32,22 +33,32 @@ export function useSaveStatus<A extends unknown[], T>(
   retry?: () => void,
 ): SaveStatus<A, T> {
   const [state, setState] = useState<SaveState>({ kind: 'idle' });
+  const toast = useToast();
 
   const run = useCallback(
     async (...args: A) => {
       setState({ kind: 'saving' });
+      toast?.show({ content: t('uiSaving'), durationMs: 0 });
       const result = await action(...args);
-      setState(
-        result.ok
-          ? { kind: 'saved', message: savedMessage ?? t('uiSaved') }
-          : { kind: 'error', error: result.error },
-      );
+      if (result.ok) {
+        const message = savedMessage ?? t('uiSaved');
+        setState({ kind: 'saved', message });
+        toast?.show({ content: message, tone: 'success' });
+      } else {
+        setState({ kind: 'error', error: result.error });
+        toast?.show({
+          content: (
+            <ErrorNotice error={result.error} onRetry={retry} onOpenSettings={openSettingsPage} />
+          ),
+          tone: 'danger',
+        });
+      }
       return result;
     },
-    [action, savedMessage],
+    [action, savedMessage, retry, toast],
   );
 
-  const notice = (
+  const notice = toast ? null : (
     <>
       <LiveStatus
         message={

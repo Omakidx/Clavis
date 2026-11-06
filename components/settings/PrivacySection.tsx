@@ -4,6 +4,8 @@ import { api } from '../../lib/ui-client/api';
 import type { ClientError } from '../../lib/ui-client/errors';
 import { CLAVIS_PRIVACY_POLICY_URL } from '../../lib/ui-client/links';
 import { Button, ErrorNotice, ExternalLink, LiveStatus, Notice } from '../common/ui';
+import { SettingsIcon } from '../common/Icons';
+import { useToast } from '../common/Toast';
 import { DisclosureList } from './DisclosureList';
 
 interface PrivacySectionProps {
@@ -13,6 +15,7 @@ interface PrivacySectionProps {
 
 /** Settings: what is sent and when, the key-storage caveat (FR-071) and Clear all data (FR-078). */
 export function PrivacySection({ onCleared }: PrivacySectionProps) {
+  const toast = useToast();
   const headingId = useId();
   const cancelRef = useRef<HTMLButtonElement>(null);
   const headingRef = useRef<HTMLHeadingElement>(null);
@@ -33,16 +36,22 @@ export function PrivacySection({ onCleared }: PrivacySectionProps) {
     setConfirming(false);
     if (result.ok) {
       setDone(true);
+      toast?.show({ content: t('clearDone'), tone: 'success' });
       onCleared();
       headingRef.current?.focus();
     } else {
       setError(result.error);
+      toast?.show({
+        content: <ErrorNotice error={result.error} onRetry={() => setConfirming(true)} />,
+        tone: 'danger',
+      });
     }
   }
 
   return (
     <section className="clavis-section" aria-labelledby={headingId} id="section-privacy">
       <h2 id={headingId} tabIndex={-1} ref={headingRef}>
+        <SettingsIcon name="privacy" />
         {t('privacyTitle')}
       </h2>
       <p>{t('privacyIntro')}</p>
@@ -60,6 +69,7 @@ export function PrivacySection({ onCleared }: PrivacySectionProps) {
         <div
           className="clavis-notice clavis-notice--danger"
           role="alertdialog"
+          aria-busy={busy}
           aria-labelledby={`${headingId}-confirm`}
           aria-describedby={`${headingId}-confirm-body`}
         >
@@ -86,8 +96,8 @@ export function PrivacySection({ onCleared }: PrivacySectionProps) {
           </Button>
         </div>
       )}
-      <LiveStatus message={done ? t('clearDone') : null} tone="success" />
-      {error ? <ErrorNotice error={error} onRetry={() => setConfirming(true)} /> : null}
+      {!toast ? <LiveStatus message={done ? t('clearDone') : null} tone="success" /> : null}
+      {!toast && error ? <ErrorNotice error={error} onRetry={() => setConfirming(true)} /> : null}
     </section>
   );
 }

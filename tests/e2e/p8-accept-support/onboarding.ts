@@ -54,8 +54,7 @@ export async function walkOnboarding(
   }
   await next(page).click();
 
-  // 4 Get a key, 5 Connect
-  await page.getByRole('button', { name: 'I have my key' }).click();
+  // 4 Get and connect a key
   if (options.key === 'connect') {
     await page.getByLabel('Your Groq key', { exact: true }).fill(ACCEPT_KEY);
     await page.getByRole('button', { name: 'Connect', exact: true }).click();
@@ -67,7 +66,7 @@ export async function walkOnboarding(
     await page.getByRole('button', { name: 'Set up later' }).click();
   }
 
-  // 6 Preferences (they save as they change; nothing to do), 7 Practice
+  // 5 Preferences (they save as they change; nothing to do), 6 Practice
   await expect(page.getByRole('heading', { level: 2 })).toHaveText('Choose your preferences');
   await next(page).click();
   await expect(page.getByRole('heading', { level: 2 })).toHaveText('Try it on a practice page');

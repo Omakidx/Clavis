@@ -8,6 +8,8 @@ import type { SettingsHook } from '../../lib/ui-client/use-settings';
 import { useResource } from '../../lib/ui-client/use-resource';
 import type { SiteAccessStatus } from '../../lib/contracts/setup';
 import { Button, LiveStatus } from '../common/ui';
+import { SettingsIcon } from '../common/Icons';
+import { useToast } from '../common/Toast';
 import { DisabledSites } from './DisabledSites';
 import { ResourceGate } from './ResourceGate';
 import { SiteAccessHelp } from './SiteAccessHelp';
@@ -30,6 +32,7 @@ const OUTCOME_TEXT = {
 
 /** Settings: website access (FR-009) and the per-site disable list. */
 export function SiteAccessSection({ settings, access: injected }: SiteAccessSectionProps) {
+  const toast = useToast();
   const headingId = useId();
   const own = useSiteAccess();
   const access = injected ?? own;
@@ -49,9 +52,14 @@ export function SiteAccessSection({ settings, access: injected }: SiteAccessSect
 
   function enable() {
     // The Chrome prompt must be requested synchronously from this click (no await before it).
+    toast?.show({ content: t('toolbarSiteAccessPending'), durationMs: 0 });
     access.grant((result) => {
       void (async () => {
         setOutcome(result);
+        toast?.show({
+          content: t(OUTCOME_TEXT[result]),
+          tone: result === 'granted' ? 'success' : 'warning',
+        });
         if (result === 'granted') await api.updateOnboarding({ siteAccessChoice: 'granted' });
         else if (result === 'denied') await api.updateOnboarding({ siteAccessChoice: 'declined' });
         refresh();
@@ -62,13 +70,25 @@ export function SiteAccessSection({ settings, access: injected }: SiteAccessSect
   async function remove() {
     const removed = await access.revoke();
     setOutcome(removed ? 'removed' : 'remove-failed');
+    toast?.show({
+      content: t(OUTCOME_TEXT[removed ? 'removed' : 'remove-failed']),
+      tone: removed ? 'success' : 'warning',
+    });
     if (removed) await api.updateOnboarding({ siteAccessChoice: 'declined' });
     refresh();
   }
 
   return (
-    <section className="clavis-section" aria-labelledby={headingId} id="section-site-access">
-      <h2 id={headingId}>{t('siteTitle')}</h2>
+    <section
+      className="clavis-section"
+      aria-labelledby={headingId}
+      aria-busy={access.requestState === 'pending'}
+      id="section-site-access"
+    >
+      <h2 id={headingId} tabIndex={-1}>
+        <SettingsIcon name="website" />
+        {t('siteTitle')}
+      </h2>
 
       <ResourceGate resource={status}>
         {(info: SiteAccessStatus) => (
@@ -106,16 +126,18 @@ export function SiteAccessSection({ settings, access: injected }: SiteAccessSect
         )}
       </ResourceGate>
 
-      <LiveStatus
-        message={
-          access.requestState === 'pending'
-            ? t('toolbarSiteAccessPending')
-            : outcome === null
-              ? null
-              : t(OUTCOME_TEXT[outcome])
-        }
-        tone={outcome === 'granted' || outcome === 'removed' ? 'success' : 'info'}
-      />
+      {!toast ? (
+        <LiveStatus
+          message={
+            access.requestState === 'pending'
+              ? t('toolbarSiteAccessPending')
+              : outcome === null
+                ? null
+                : t(OUTCOME_TEXT[outcome])
+          }
+          tone={outcome === 'granted' || outcome === 'removed' ? 'success' : 'info'}
+        />
+      ) : null}
 
       <ResourceGate resource={settings.resource}>
         {(snapshot) => (

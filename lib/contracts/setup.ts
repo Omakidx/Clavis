@@ -37,6 +37,8 @@ export const MAX_DISABLED_SITES = 500;
 /** User preferences (non-secret). Stored in chrome.storage.local by the background. */
 export const preferencesSchema = z.strictObject({
   explanationLanguage: languageTagSchema,
+  /** Translate target; absent follows explanationLanguage for existing users. */
+  translationLanguage: languageTagSchema.optional(),
   readingLevel: readingLevelSchema,
   tooltipBehavior: tooltipBehaviorSchema,
   ttsRate: ttsRateSchema,
@@ -61,6 +63,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
 export const preferencesPatchSchema = z
   .strictObject({
     explanationLanguage: languageTagSchema.optional(),
+    translationLanguage: languageTagSchema.nullable().optional(),
     readingLevel: readingLevelSchema.optional(),
     tooltipBehavior: tooltipBehaviorSchema.optional(),
     ttsRate: ttsRateSchema.optional(),
@@ -106,6 +109,8 @@ export const publicSettingsSchema = z.strictObject({
   hasKey: z.boolean(),
   disclosureAccepted: z.boolean(),
   explanationLanguage: languageTagSchema,
+  /** Translate target; absent follows explanationLanguage for existing users. */
+  translationLanguage: languageTagSchema.optional(),
   readingLevel: readingLevelSchema,
   tooltipBehavior: tooltipBehaviorSchema,
   ttsRate: ttsRateSchema,
@@ -125,6 +130,27 @@ export type ModelInfo = z.infer<typeof modelInfoSchema>;
 export const keyVerificationSchema = z.enum(['never', 'valid', 'invalid', 'unverified']);
 export type KeyVerification = z.infer<typeof keyVerificationSchema>;
 
+/** Fixed classification of a 403 key-check response; never provider text or arbitrary codes. */
+export const forbiddenReasonSchema = z.enum([
+  'model_permission_org',
+  'model_permission_project',
+  'model_permission',
+  'permission_restriction',
+  'region_block',
+  'edge_block',
+  'unknown',
+]);
+export type ForbiddenReason = z.infer<typeof forbiddenReasonSchema>;
+
+/** Keyless reachability after an authenticated models request returned 403. */
+export const accessProbeSchema = z.enum([
+  'auth-required',
+  'forbidden',
+  'unreachable',
+  'other-response',
+]);
+export type AccessProbe = z.infer<typeof accessProbeSchema>;
+
 /**
  * Key status for extension pages only (privileged route). Shows at most the last
  * four characters (secret boundary rule 5), never the key.
@@ -135,6 +161,10 @@ export const keyStatusSchema = z.strictObject({
   last4: z.string().length(4).nullable(),
   verification: keyVerificationSchema,
   verifiedAt: z.number().int().nonnegative().nullable(),
+  /** Numeric HTTP response from the latest failed verification; absent for network failures. */
+  verificationHttpStatus: z.number().int().min(100).max(599).optional(),
+  forbiddenReason: forbiddenReasonSchema.optional(),
+  accessProbe: accessProbeSchema.optional(),
   /** Models available to the key at the last successful check (empty if never checked). */
   models: z.array(modelInfoSchema).max(200),
 });
@@ -145,7 +175,7 @@ export const aiStatusSchema = z.strictObject({
   state: z.enum([
     'setup_required', // no key
     'disclosure_required', // key present, disclosure not acknowledged
-    'invalid_key', // last check said 401/403
+    'invalid_key', // last check said 401
     'ready', // key present (verified or not yet checked)
     'storage_unavailable', // storage lockdown failed; key routes refused
   ]),

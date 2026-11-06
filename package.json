@@ -2,7 +2,7 @@
   "name": "clavis",
   "description": "Understand and pronounce selected text in webpages and PDFs.",
   "private": true,
-  "version": "1.0.0",
+  "version": "1.0.10",
   "license": "MIT",
   "type": "module",
   "engines": {

@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { browser } from 'wxt/browser';
-import { Button, ErrorNotice, Notice } from '../../components/common/ui';
+import { Button, ErrorNotice, LiveStatus, Notice } from '../../components/common/ui';
 import { Page } from '../../components/common/Page';
 import { SiteAccessHelp } from '../../components/settings/SiteAccessHelp';
 import { t } from '../../lib/i18n';
@@ -14,6 +14,7 @@ import {
 } from '../../lib/ui-client/navigation';
 import { useResource } from '../../lib/ui-client/use-resource';
 import { GROQ_STATUS, isPdfTabUrl } from './status';
+import './popup.css';
 
 function openReader() {
   openExtensionPage('/reader.html');
@@ -88,119 +89,137 @@ export function App() {
   const { status } = useSiteAccess();
   const ai = useResource(api.getAiStatus);
   const [inject, setInject] = useState<InjectState>('idle');
+  const injecting = useRef(false);
   const onPdfTab = isPdfTabUrl(useActiveTabUrl());
 
   function onExplainHere() {
+    if (injecting.current) return;
+    injecting.current = true;
     setInject('busy');
     explainOnThisPage().then(
       (next) => {
+        injecting.current = false;
         setInject(next);
         if (next === 'idle') window.close();
       },
-      () => setInject('failed'),
+      () => {
+        injecting.current = false;
+        setInject('failed');
+      },
     );
   }
 
   const aiState = ai.state;
   const groq = aiState.status === 'ready' ? GROQ_STATUS[aiState.data.state] : null;
+  const fixVariant = onPdfTab ? 'default' : 'primary';
   const fixAction =
     groq?.action === 'connect' ? (
-      <Button variant="primary" onClick={() => openSection('key')}>
+      <Button variant={fixVariant} onClick={() => openSection('key')}>
         {t('uiConnectGroq')}
       </Button>
     ) : groq?.action === 'update-key' ? (
-      <Button variant="primary" onClick={() => openSection('key')}>
+      <Button variant={fixVariant} onClick={() => openSection('key')}>
         {t('uiUpdateKey')}
       </Button>
     ) : groq?.action === 'review' ? (
-      <Button variant="primary" onClick={openSetup}>
+      <Button variant={fixVariant} onClick={openSetup}>
         {t('popupReviewSetup')}
       </Button>
     ) : null;
-  // Exactly one primary button: the fix for what is broken, else the way to explain on this page,
-  // else the reader.
-  const injectPrimary = fixAction === null && !onPdfTab && status === 'not-granted';
-  const readerPrimary = fixAction === null && !injectPrimary;
 
   return (
     <Page title={t('extName')} size="narrow">
-      <dl className="clavis-facts" aria-label={t('popupStatusLabel')} data-testid="popup-status">
-        <dt>{t('popupGroqLabel')}</dt>
-        <dd data-testid="popup-groq">
-          {aiState.status === 'loading' ? (
-            t('popupGroqChecking')
-          ) : groq === null ? (
-            t('popupGroqUnknown')
+      <div className="clavis-popup">
+        <section className="clavis-popup__actions" aria-label={t('popupActionsLabel')}>
+          {onPdfTab ? (
+            <Button variant="primary" onClick={openReader}>
+              {t('popupOpenReader')}
+            </Button>
           ) : (
-            <span className={`clavis-badge clavis-badge--${groq.tone}`}>{t(groq.text)}</span>
+            <>
+              {fixAction}
+              <Button
+                variant={fixAction === null ? 'primary' : 'default'}
+                disabled={inject === 'busy'}
+                onClick={onExplainHere}
+              >
+                {inject === 'busy' ? t('popupInjectBusy') : t('popupInjectButton')}
+              </Button>
+              <Button onClick={openReader}>{t('popupOpenReader')}</Button>
+            </>
           )}
-        </dd>
-        <dt>{t('popupSiteLabel')}</dt>
-        <dd data-testid="popup-site">
-          {status === 'unknown'
-            ? t('popupSiteChecking')
-            : status === 'granted'
-              ? t('popupSiteOn')
-              : t('popupSiteOff')}
-        </dd>
-      </dl>
+          {onPdfTab ? fixAction : null}
+          {onPdfTab ? null : <p className="clavis-popup__hint">{t('popupInjectHint')}</p>}
+        </section>
 
-      {aiState.status === 'error' ? (
-        <ErrorNotice error={aiState.error} onRetry={ai.reload} onOpenSettings={openSettings} />
-      ) : null}
+        <LiveStatus
+          message={
+            inject === 'idle'
+              ? null
+              : t(inject === 'busy' ? 'popupInjectBusy' : INJECT_MESSAGE[inject])
+          }
+          tone={inject === 'busy' ? 'info' : 'warning'}
+        />
 
-      {groq !== null && groq.notice.length > 0 ? (
-        <Notice tone={groq.tone === 'danger' ? 'danger' : 'warning'}>
-          {groq.notice.map((key) => (
-            <p key={key}>{t(key)}</p>
-          ))}
-          {fixAction === null ? null : <div className="clavis-actions">{fixAction}</div>}
-        </Notice>
-      ) : null}
+        <dl className="clavis-facts" aria-label={t('popupStatusLabel')} data-testid="popup-status">
+          <dt>{t('popupGroqLabel')}</dt>
+          <dd data-testid="popup-groq">
+            {aiState.status === 'loading' ? (
+              t('popupGroqChecking')
+            ) : groq === null ? (
+              t('popupGroqUnknown')
+            ) : (
+              <span className={`clavis-badge clavis-badge--${groq.tone}`}>{t(groq.text)}</span>
+            )}
+          </dd>
+          <dt>{t('popupSiteLabel')}</dt>
+          <dd data-testid="popup-site">
+            {status === 'unknown'
+              ? t('popupSiteChecking')
+              : status === 'granted'
+                ? t('popupSiteOn')
+                : t('popupSiteOff')}
+          </dd>
+        </dl>
 
-      {onPdfTab ? (
-        <Notice testId="popup-pdf-help">
-          <h2 className="clavis-notice__title">{t('popupPdfTitle')}</h2>
-          <p>{t('popupPdfBody')}</p>
-          <div className="clavis-actions">
+        {aiState.status === 'error' ? (
+          <ErrorNotice error={aiState.error} onRetry={ai.reload} onOpenSettings={openSettings} />
+        ) : null}
+
+        {groq !== null && groq.notice.length > 0 ? (
+          <Notice tone={groq.tone === 'danger' ? 'danger' : 'warning'}>
+            {groq.notice.map((key) => (
+              <p key={key}>{t(key)}</p>
+            ))}
+          </Notice>
+        ) : null}
+
+        {onPdfTab ? (
+          <Notice testId="popup-pdf-help">
+            <h2 className="clavis-notice__title">{t('popupPdfTitle')}</h2>
+            <p>{t('popupPdfBody')}</p>
             <Button variant="link" onClick={() => openSection('pdfHelp')}>
               {t('popupPdfHelp')}
             </Button>
-          </div>
-        </Notice>
-      ) : null}
-
-      <div className="clavis-actions">
-        {status === 'not-granted' && !onPdfTab ? (
-          <>
-            <Button
-              variant={injectPrimary ? 'primary' : 'default'}
-              disabled={inject === 'busy'}
-              onClick={onExplainHere}
-            >
-              {t('popupInjectButton')}
-            </Button>
-            <p className="clavis-muted">{t('popupInjectHint')}</p>
-            <div className="clavis-live" role="status">
-              {inject === 'idle' || inject === 'busy' ? null : <p>{t(INJECT_MESSAGE[inject])}</p>}
-            </div>
-          </>
+          </Notice>
         ) : null}
-        <Button variant={readerPrimary ? 'primary' : 'default'} onClick={openReader}>
-          {t('popupOpenReader')}
-        </Button>
-        <Button onClick={openSettings}>{t('popupSettings')}</Button>
-      </div>
 
-      {status === 'not-granted' ? (
-        <details className="clavis-disclosure" data-testid="popup-site-help">
-          <summary>{t('siteHelpTitle')}</summary>
-          <SiteAccessHelp bare />
-          <div className="clavis-actions">
-            <Button onClick={() => openSection('site')}>{t('siteHelpOpenSettings')}</Button>
-          </div>
-        </details>
-      ) : null}
+        {status === 'not-granted' ? (
+          <details className="clavis-disclosure" data-testid="popup-site-help">
+            <summary>{t('siteHelpTitle')}</summary>
+            <SiteAccessHelp bare />
+            <div className="clavis-actions">
+              <Button onClick={() => openSection('site')}>{t('siteHelpOpenSettings')}</Button>
+            </div>
+          </details>
+        ) : null}
+
+        <footer className="clavis-popup__footer">
+          <Button variant="link" onClick={openSettings}>
+            {t('popupSettings')}
+          </Button>
+        </footer>
+      </div>
     </Page>
   );
 }

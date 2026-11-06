@@ -66,7 +66,7 @@ test('Alt+Shift+E in the reader opens the toolbar with focus, without injecting 
 
   await tb(page).waitShown();
   // Keyboard users land inside the toolbar.
-  await expect.poll(() => tb(page).focusedAction()).toBe('listen');
+  await expect.poll(() => tb(page).focusedAction()).toBe('explain');
 });
 
 test('a reader tab with no selection is told so quietly: no toolbar, nothing injected', async ({

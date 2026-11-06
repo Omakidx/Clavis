@@ -225,16 +225,16 @@ describe('Listen states (FR-020..FR-024)', () => {
     expect(q('[data-action="voice-settings"]')).toBeNull();
   });
 
-  it('says so on EVERY playback with an online voice, and not for an on-device voice', () => {
+  it('keeps playback free of visible labels for online and on-device voices', () => {
     create().show(capture('bank'));
     button('listen').click();
     play(true);
-    expect(text('[data-clavis="listen-note"]')).toBe('speechRemoteNote');
+    expect(q('[data-clavis="listen-note"]')).toBeNull();
     report({ status: 'ended' });
     expect(q('[data-clavis="listen-note"]')).toBeNull();
     button('listen').click();
     play(true);
-    expect(text('[data-clavis="listen-note"]')).toBe('speechRemoteNote');
+    expect(q('[data-clavis="listen-note"]')).toBeNull();
     report({ status: 'ended' });
     button('listen').click();
     play(false);
@@ -455,7 +455,7 @@ describe('toolbar with the real Listen controller (what each NO_VOICE reason sho
     button('listen').click();
     await vi.advanceTimersByTimeAsync(10);
     expect(button('listen').textContent).toBe('speechStop');
-    expect(text('[data-clavis="listen-note"]')).toBe('speechRemoteNote');
+    expect(q('[data-clavis="listen-note"]')).toBeNull();
     controller.handleEvent({ v: 1, type: 'TTS_EVENT', requestId: REQUEST_ID, state: 'ended' });
     await vi.advanceTimersByTimeAsync(10);
     expect(button('listen').textContent).toBe('speechReplay');

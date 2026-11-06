@@ -169,6 +169,9 @@ export function createFakeBackend(options: FakeBackendOptions = {}) {
           hasKey: state.key !== null,
           disclosureAccepted: state.onboarding.disclosureAcceptedAt !== null,
           explanationLanguage: p.explanationLanguage,
+          ...(p.translationLanguage === undefined
+            ? {}
+            : { translationLanguage: p.translationLanguage }),
           readingLevel: p.readingLevel,
           tooltipBehavior: p.tooltipBehavior,
           ttsRate: p.ttsRate,

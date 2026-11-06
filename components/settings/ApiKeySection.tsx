@@ -6,8 +6,10 @@ import type { KeyStatusHook } from '../../lib/ui-client/use-key-status';
 import type { ClientError } from '../../lib/ui-client/errors';
 import { GROQ_KEYS_URL } from '../../lib/ui-client/links';
 import { Button, ErrorNotice, ExternalLink, LiveStatus, Notice } from '../common/ui';
-import { KeyConnectForm, KeyOutcomeNotice } from './KeyConnectForm';
+import { useToast } from '../common/Toast';
+import { KeyConnectForm, KeyOutcomeNotice, KeyVerificationResponse } from './KeyConnectForm';
 import { ResourceGate } from './ResourceGate';
+import { GroqIcon, InfoIcon } from './SettingsIcon';
 
 const STATUS_TEXT = {
   valid: 'keyStatusValid',
@@ -32,10 +34,12 @@ function formatChecked(verifiedAt: number | null): string {
 
 interface ApiKeySectionProps {
   keys: KeyStatusHook;
+  active?: boolean;
 }
 
 /** Settings: key status, test, change and remove (FR-004, FR-007, FR-071). */
-export function ApiKeySection({ keys }: ApiKeySectionProps) {
+export function ApiKeySection({ keys, active = true }: ApiKeySectionProps) {
+  const toast = useToast();
   const headingId = useId();
   const headingRef = useRef<HTMLHeadingElement>(null);
   const confirmCancelRef = useRef<HTMLButtonElement>(null);
@@ -50,10 +54,30 @@ export function ApiKeySection({ keys }: ApiKeySectionProps) {
     if (confirming) confirmCancelRef.current?.focus();
   }, [confirming]);
 
+  useEffect(() => {
+    if (active) return;
+    const frame = window.requestAnimationFrame(() => {
+      setChanging(false);
+      setConfirming(false);
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [active]);
+
   async function runTest() {
     setTestOutcome(null);
     setRemoved(false);
-    setTestOutcome(await keys.test());
+    toast?.show({ content: t('keyResultChecking'), durationMs: 0 });
+    const outcome = await keys.test();
+    setTestOutcome(outcome);
+    toast?.show({
+      content: <KeyOutcomeNotice outcome={outcome} onRetry={() => void runTest()} />,
+      tone:
+        outcome.kind === 'valid'
+          ? 'success'
+          : outcome.kind === 'invalid' || outcome.kind === 'error'
+            ? 'danger'
+            : 'warning',
+    });
   }
 
   async function runRemove() {
@@ -62,20 +86,31 @@ export function ApiKeySection({ keys }: ApiKeySectionProps) {
     setConfirming(false);
     if (result.ok) {
       setRemoved(true);
+      toast?.show({ content: t('keyRemoved'), tone: 'success' });
       setChanging(false);
       setTestOutcome(null);
       // The button that had focus is gone; keep keyboard users in this section.
       headingRef.current?.focus();
     } else {
       setRemoveError(result.error);
+      toast?.show({
+        content: <ErrorNotice error={result.error} onRetry={() => setConfirming(true)} />,
+        tone: 'danger',
+      });
     }
   }
 
   const busy = keys.busy !== 'idle';
 
   return (
-    <section className="clavis-section" aria-labelledby={headingId} id="section-key">
+    <section
+      className="clavis-section"
+      aria-labelledby={headingId}
+      aria-busy={busy}
+      id="section-key"
+    >
       <h2 id={headingId} tabIndex={-1} ref={headingRef}>
+        <GroqIcon />
         {t('keyTitle')}
       </h2>
 
@@ -103,6 +138,20 @@ export function ApiKeySection({ keys }: ApiKeySectionProps) {
                   </dd>
                   <dt>{t('keyFactChecked')}</dt>
                   <dd>{formatChecked(status.verifiedAt)}</dd>
+                  {(status.verificationHttpStatus !== undefined ||
+                    status.verification === 'unverified') && (
+                    <>
+                      <dt>{t('keyFactResponse')}</dt>
+                      <dd>
+                        <KeyVerificationResponse
+                          status={status.verificationHttpStatus}
+                          reason={status.forbiddenReason}
+                          probe={status.accessProbe}
+                          showCopy
+                        />
+                      </dd>
+                    </>
+                  )}
                 </dl>
 
                 {status.verification === 'invalid' ? (
@@ -151,15 +200,17 @@ export function ApiKeySection({ keys }: ApiKeySectionProps) {
                   </div>
                 )}
 
-                <div className="clavis-live" role="status" aria-live="polite">
-                  {testOutcome !== null && testOutcome.kind !== 'error' ? (
-                    <KeyOutcomeNotice outcome={testOutcome} />
-                  ) : null}
-                </div>
-                {testOutcome?.kind === 'error' ? (
+                {!toast && (
+                  <div className="clavis-live" role="status" aria-live="polite">
+                    {testOutcome !== null && testOutcome.kind !== 'error' ? (
+                      <KeyOutcomeNotice outcome={testOutcome} />
+                    ) : null}
+                  </div>
+                )}
+                {!toast && testOutcome?.kind === 'error' ? (
                   <KeyOutcomeNotice outcome={testOutcome} onRetry={() => void runTest()} />
                 ) : null}
-                {removeError ? (
+                {!toast && removeError ? (
                   <ErrorNotice error={removeError} onRetry={() => setConfirming(true)} />
                 ) : null}
               </>
@@ -168,34 +219,52 @@ export function ApiKeySection({ keys }: ApiKeySectionProps) {
                 <Notice>
                   <p>{t('keyNone')}</p>
                   <p>{t('keyNoneHint')}</p>
+                  <p>
+                    <ExternalLink href={GROQ_KEYS_URL}>{t('keyGetLink')}</ExternalLink>
+                  </p>
                 </Notice>
               </>
             )}
 
-            <LiveStatus message={removed ? t('keyRemoved') : null} tone="success" />
+            {!toast ? (
+              <LiveStatus message={removed ? t('keyRemoved') : null} tone="success" />
+            ) : null}
 
             {!status.hasKey || changing ? (
               <div className="clavis-stack">
-                <h3>{status.hasKey ? t('keyChange') : t('uiConnectGroq')}</h3>
-                <KeyConnectForm
-                  busy={keys.busy === 'connecting'}
-                  onConnect={async (apiKey, storage) => {
-                    setRemoved(false);
-                    setTestOutcome(null);
-                    const outcome = await keys.connect(apiKey, storage);
-                    if (outcome.kind !== 'error') {
-                      setChanging(false);
-                      // The form closes (or disappears once a key exists): show the result here.
-                      setTestOutcome(outcome);
-                    }
-                    return outcome;
-                  }}
-                />
+                <div className="clavis-key-form-heading">
+                  <h3>{status.hasKey ? t('keyChange') : t('uiConnectGroq')}</h3>
+                  {status.hasKey ? (
+                    <Button disabled={busy} onClick={() => setChanging(false)}>
+                      {t('uiCancel')}
+                    </Button>
+                  ) : null}
+                </div>
+                {active ? (
+                  <KeyConnectForm
+                    busy={keys.busy === 'connecting'}
+                    onConnect={async (apiKey, storage) => {
+                      setRemoved(false);
+                      setTestOutcome(null);
+                      const outcome = await keys.connect(apiKey, storage);
+                      if (outcome.kind !== 'error') {
+                        setChanging(false);
+                        // The form closes (or disappears once a key exists): show the result here.
+                        setTestOutcome(outcome);
+                        window.requestAnimationFrame(() => headingRef.current?.focus());
+                      }
+                      return outcome;
+                    }}
+                  />
+                ) : null}
               </div>
             ) : null}
 
             <Notice tone="warning">
-              <p>{t('keyNotEncrypted')}</p>
+              <p className="clavis-key-storage-note">
+                <InfoIcon />
+                <span>{t('keyNotEncrypted')}</span>
+              </p>
             </Notice>
           </>
         )}

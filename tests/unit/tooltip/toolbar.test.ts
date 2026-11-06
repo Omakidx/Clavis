@@ -112,12 +112,21 @@ afterEach(() => {
 });
 
 describe('toolbar shell', () => {
-  it('renders Listen and Explain inside a CLOSED shadow root, above the selection', () => {
+  it('renders Lookup, Speak and speed in order inside a CLOSED shadow root', () => {
     create().show(capture('bank'));
     expect(shadowInits).toEqual([{ mode: 'closed' }]);
     expect(host().shadowRoot).toBeNull();
     expect(button('listen').textContent).toBe('toolbarListen');
     expect(button('explain').textContent).toBe('toolbarExplain');
+    expect(
+      Array.from(shadow().querySelectorAll('[role="toolbar"] button'), (item) =>
+        item.getAttribute('data-action'),
+      ),
+    ).toEqual(['explain', 'listen', 'slow']);
+    expect(button('explain').querySelector('[data-icon="lookup"] path')).not.toBeNull();
+    expect(button('listen').querySelector('[data-icon="speak"] path')).not.toBeNull();
+    expect(button('slow').getAttribute('aria-label')).toBe('speechSpeedToggle');
+    expect(button('slow').getAttribute('aria-pressed')).toBe('false');
     expect(panel().hidden).toBe(false);
     expect(panel().style.top).toBe('252px');
     expect(panel().style.left).toBe('280px');
@@ -180,7 +189,7 @@ describe('toolbar shell', () => {
       shadow().activeElement?.dispatchEvent(
         new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }),
       );
-      expect(shadow().activeElement).toBe(button('listen'));
+      expect(shadow().activeElement).toBe(button('explain'));
     });
   });
 
@@ -236,7 +245,7 @@ describe('toolbar shell', () => {
     const handle = create();
     handle.show(capture('bank'));
     handle.focus();
-    expect(shadow().activeElement).toBe(button('listen'));
+    expect(shadow().activeElement).toBe(button('explain'));
     expect(handle.isInteracting()).toBe(true);
   });
 
@@ -248,15 +257,15 @@ describe('toolbar shell', () => {
       shadow().activeElement?.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true }));
     };
     press('ArrowRight');
+    expect(shadow().activeElement).toBe(button('listen'));
+    press('ArrowRight');
     expect(shadow().activeElement).toBe(button('slow'));
     press('ArrowRight');
     expect(shadow().activeElement).toBe(button('explain'));
-    press('ArrowRight');
-    expect(shadow().activeElement).toBe(button('listen'));
     press('End');
-    expect(shadow().activeElement).toBe(button('explain'));
+    expect(shadow().activeElement).toBe(button('slow'));
     press('Home');
-    expect(shadow().activeElement).toBe(button('listen'));
+    expect(shadow().activeElement).toBe(button('explain'));
   });
 
   it('shows the next selection with a clean card and a fresh snapshot', () => {
@@ -378,7 +387,7 @@ describe('over-limit selection (FR-016, requirements 4.2)', () => {
     expect(shadow().activeElement).toBe(button('trim'));
     press('Enter');
     button('trim').click();
-    expect(shadow().activeElement).toBe(button('listen'));
+    expect(shadow().activeElement).toBe(button('explain'));
   });
 
   it('a new selection starts over: no trimmed preview from the previous one', () => {
@@ -707,7 +716,7 @@ describe('keyboard and focus (FR-016)', () => {
     const handle = create();
     handle.show(capture('bank'));
     handle.focus();
-    expect(shadow().activeElement).toBe(button('listen'));
+    expect(shadow().activeElement).toBe(button('explain'));
     press('Escape');
     expect(panel().hidden).toBe(true);
     expect(document.activeElement).toBe(link);
@@ -734,7 +743,7 @@ describe('keyboard and focus (FR-016)', () => {
     expect(panel().hidden).toBe(false);
   });
 
-  it('focus() lands on the first action in every mode (Listen, or the one trim action)', () => {
+  it('focus() lands on the first action in every mode (Lookup, or the one trim action)', () => {
     const handle = create();
     handle.show(captureLong());
     handle.focus();
@@ -747,9 +756,9 @@ describe('keyboard and focus (FR-016)', () => {
     handle.show(capture('bank'));
     handle.focus();
     press('ArrowLeft');
-    expect(shadow().activeElement).toBe(button('slow'));
-    press('ArrowRight');
     expect(shadow().activeElement).toBe(button('listen'));
+    press('ArrowRight');
+    expect(shadow().activeElement).toBe(button('explain'));
   });
 
   it('every button is a native button with a visible name', () => {
@@ -1044,6 +1053,51 @@ describe('card surface (the separately loaded explanation card, Phase 5)', () =>
     expect(calls.at(-1)).toMatchObject({ action: 'dismiss', context: { reason: 'escape' } });
   });
 
+  it('retains interaction for selected card output after pointer grace expires', () => {
+    outcome = () => new Promise<void>(() => undefined);
+    const handle = create();
+    handle.show(capture('bank'));
+    button('explain').click();
+    const element = surfaceOf()?.open() as HTMLElement;
+    const leaf = document.createElement('p');
+    leaf.textContent = 'riverbank';
+    element.append(leaf);
+    const selected = document.createRange();
+    selected.selectNodeContents(leaf);
+    vi.spyOn(document, 'getSelection').mockReturnValue({
+      rangeCount: 1,
+      getRangeAt: () => selected,
+      getComposedRanges: () => [selected],
+    } as unknown as Selection);
+    vi.advanceTimersByTime(1_000);
+    expect(handle.isInteracting()).toBe(true);
+    selected.collapse(true);
+    expect(handle.isInteracting()).toBe(false);
+    handle.hide();
+    expect(handle.isInteracting()).toBe(false);
+  });
+
+  it('speaks translated output through Listen with target language and without page context', () => {
+    const handle = create();
+    handle.show(capture('bank'));
+    button('explain').click();
+    const surface = surfaceOf()!;
+    surface.open();
+    const reports: unknown[] = [];
+    const stop = surface.speak!('banque', 'fr', (report) => reports.push(report));
+    const spoken = calls.at(-1)!.context as RunContext;
+    expect(calls.at(-1)!.action).toBe('listen');
+    expect(spoken.snapshot.text).toBe('banque');
+    expect(spoken.snapshot).not.toHaveProperty('contextBefore');
+    expect(spoken.listen).toMatchObject({ lang: 'fr', slow: undefined });
+    spoken.listen!.report({ status: 'playing', slow: false, remote: false });
+    expect(reports).toContainEqual({ status: 'playing', slow: false, remote: false });
+    expect(surface.speakerIcon!()?.getAttribute('data-icon')).toBe('speak');
+    stop();
+    expect(spoken.signal.aborted).toBe(true);
+    expect(reports.at(-1)).toEqual({ status: 'idle' });
+  });
+
   it('a new selection discards the card', () => {
     outcome = () => new Promise<void>(() => undefined);
     const handle = create();
@@ -1108,13 +1162,13 @@ describe('card surface (the separately loaded explanation card, Phase 5)', () =>
       expect(shadow().activeElement).toBe(first);
     });
 
-    it('the toolbar arrow group is only Listen and Explain, not the card controls', () => {
+    it('the toolbar arrow group excludes card controls', () => {
       openWithControls();
       button('explain').focus();
       press('ArrowRight');
       expect(shadow().activeElement).toBe(button('listen'));
       press('End');
-      expect(shadow().activeElement).toBe(button('explain'));
+      expect(shadow().activeElement).toBe(button('slow'));
     });
   });
 });

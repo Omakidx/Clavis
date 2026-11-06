@@ -42,7 +42,7 @@ test.afterAll(async () => {
 test.afterEach(async () => {
   script.handler = undefined;
   script.seen.length = 0;
-  // A 401/403 flags the stored key as rejected (FR-072); store it again so every test starts valid.
+  // A 401 flags the stored key as rejected (FR-072); store it again so every test starts valid.
   await send(h.options, { v: 1, type: 'SET_API_KEY', apiKey: FAKE_KEY, storage: 'local' });
 });
 
@@ -369,7 +369,7 @@ test.describe('the envelope a content script receives', () => {
     const expected: [number, string][] = [
       [400, 'MODEL_UNAVAILABLE'],
       [401, 'INVALID_API_KEY'],
-      [403, 'INVALID_API_KEY'],
+      [403, 'NETWORK_ERROR'],
       [404, 'MODEL_UNAVAILABLE'],
       [408, 'TIMEOUT'],
       [413, 'SELECTION_TOO_LONG'],

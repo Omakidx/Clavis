@@ -7,8 +7,8 @@ import {
   messageReplySchema,
   publicSettingsSchema,
 } from '../../../lib/contracts';
-import { MODEL_CANDIDATES } from '../../../lib/config/constants';
-import { createAiHandlers } from '../../../lib/router/handlers/ai';
+import { RECOMMENDED_MODEL } from '../../../lib/config/constants';
+import { createAiHandlers, effectiveModel } from '../../../lib/router/handlers/ai';
 import { createKeyService } from '../../../lib/router/handlers/key';
 import { createAiGuard } from '../../../lib/router/limiter';
 import { createApiKeyStore, createSettingsStore } from '../../../lib/storage';
@@ -35,6 +35,11 @@ const status = (h: Harness, sender = contentSender()) =>
   h.call(PUBLIC_MESSAGES['GET_AI_STATUS'], sender);
 const options = pageSender('/options.html');
 
+it('uses the working recommended model only when no explicit choice is saved', () => {
+  expect(effectiveModel(undefined)).toBe('openai/gpt-oss-20b');
+  expect(effectiveModel('another-explicit-model')).toBe('another-explicit-model');
+});
+
 describe('GET_AI_STATUS', () => {
   it('walks storage_unavailable, setup_required, disclosure_required, invalid_key, ready', async () => {
     const locked = createHarness({ lockedDown: false });
@@ -46,13 +51,13 @@ describe('GET_AI_STATUS', () => {
     await h.call(KEY_MESSAGES['SET_API_KEY'], options);
     expect(await status(h)).toEqual({
       ok: true,
-      data: { state: 'disclosure_required', model: MODEL_CANDIDATES.quick },
+      data: { state: 'disclosure_required', model: RECOMMENDED_MODEL },
     });
 
     await h.call(SETTINGS_MESSAGES['ACCEPT_DISCLOSURE'], options);
     expect(await status(h)).toEqual({
       ok: true,
-      data: { state: 'ready', model: MODEL_CANDIDATES.quick },
+      data: { state: 'ready', model: RECOMMENDED_MODEL },
     });
 
     h.provider.listModels.mockRejectedValue(failWith('INVALID_API_KEY', 401));
@@ -210,7 +215,7 @@ describe('AI_EXPLAIN', () => {
     expect(h.provider.explain).toHaveBeenCalledTimes(1);
     const [request, options_] = h.provider.explain.mock.calls[0]!;
     expect(request.snapshot.text).toBe('bank');
-    expect(options_).toMatchObject({ apiKey: FAKE_KEY, model: MODEL_CANDIDATES.quick });
+    expect(options_).toMatchObject({ apiKey: FAKE_KEY, model: RECOMMENDED_MODEL });
     expect(options_.signal).toBeInstanceOf(AbortSignal);
     expect(JSON.stringify(reply)).not.toContain(FAKE_KEY);
   });
@@ -524,12 +529,12 @@ describe('AI_EXPLAIN through the real GroqProvider with a mocked fetch', () => {
     });
   });
 
-  it('a 403 on the key check is invalid', async () => {
+  it('a 403 on the key check leaves the key unverified', async () => {
     const fetchMock = vi.fn(() => Promise.resolve(json({ error: { message: 'forbidden' } }, 403)));
     const { keyService } = build(fetchMock as never);
     expect(await keyService.set(FAKE_KEY, 'local')).toMatchObject({
       ok: true,
-      data: { verification: 'invalid' },
+      data: { verification: 'unverified', verificationHttpStatus: 403 },
     });
   });
 });

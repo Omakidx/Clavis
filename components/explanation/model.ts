@@ -193,10 +193,10 @@ export function readExplainResult(value: unknown): ExplainResult | null {
 export type Block =
   | { kind: 'title'; text: string }
   | { kind: 'paragraph'; text: string }
-  | { kind: 'field'; label: string; text: string }
+  | { kind: 'field'; label: string; text: string; lookup?: false; speak?: true }
   /** `generated`: model-written example sentences, labelled as such (FR-032). */
   | { kind: 'list'; label: string; items: string[]; ordered: boolean }
-  | { kind: 'note'; label: string; text: string };
+  | { kind: 'note'; label: string; text: string; lookup?: false };
 
 export function resultBlocks(result: ExplainResult): Block[] {
   const blocks: Block[] = [{ kind: 'title', text: result.title }];
@@ -225,6 +225,7 @@ export function resultBlocks(result: ExplainResult): Block[] {
         blocks.push({ kind: 'paragraph', text: result.etymology.overview });
         blocks.push({
           kind: 'note',
+          lookup: false,
           label: t('cardNote'),
           text:
             result.etymology.confidence === 'known'
@@ -239,7 +240,7 @@ export function resultBlocks(result: ExplainResult): Block[] {
         if (list !== undefined && list.length > 0) {
           blocks.push({ kind: 'list', label, items: list, ordered: false });
         } else {
-          blocks.push({ kind: 'field', label, text: none });
+          blocks.push({ kind: 'field', label, text: none, lookup: false });
         }
       };
       related(t('cardSynonyms'), result.synonyms);
@@ -254,7 +255,12 @@ export function resultBlocks(result: ExplainResult): Block[] {
       break;
     case 'translate':
       if (result.translation !== undefined) {
-        field(t('cardTranslation', result.translation.language), result.translation.text);
+        blocks.push({
+          kind: 'field',
+          label: t('cardTranslation', result.translation.language),
+          text: result.translation.text,
+          speak: true,
+        });
         field(t('cardLiteral'), result.translation.literal);
       } else {
         blocks.push({ kind: 'paragraph', text: result.summary });

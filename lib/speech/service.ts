@@ -12,7 +12,7 @@ import {
 } from './types';
 import { findNamedVoice, hasUsableVoice, sameLanguage, selectVoice } from './voice-selection';
 
-/** Voices tried per request: the saved/explicit one, then one best match. */
+/** At most two start attempts per request, across local and online voices. */
 const MAX_ATTEMPTS = 2;
 
 /** Resolves `undefined` instead of `promise`'s value when `ms` pass first. */
@@ -43,8 +43,8 @@ export interface SpeechServiceOptions {
   /** Overall budget of one `speak()`: lookup and all attempts together. */
   speakDeadlineMs?: number;
   /**
-   * Language of the system/UI. Only used when a request names no language, to prefer an
-   * on-device voice that matches it.
+   * Language of the system/UI. Only used when a request names no language, to prefer a
+   * voice that matches it.
    */
   defaultLanguage?: string | undefined;
   /**
@@ -163,15 +163,14 @@ export class SpeechService {
    *
    * Time bound: the whole call (lookup plus every start attempt) shares `speakDeadlineMs`.
    *
-   * Voice choice (never a voice for another language, FR-024; on-device only unless the user chose
-   * a network voice, D-22):
+   * Voice choice (never a voice for another language, FR-024):
    * 1. `voiceName`: exactly that voice. Missing: NO_VOICE.
    * 2. `preferredVoice`: that voice if it still exists and speaks `lang` (or no `lang` is known,
    *    or the voice reports no language); otherwise fall through, so a removed or mismatched saved
    *    voice never blocks Listen.
-   * 3. Best ON-DEVICE voice for `lang` (exact tag, then same language), skipping a voice that
-   *    already failed. Without `lang`, an on-device voice of the system language, else the first
-   *    on-device voice. Network voices are never used here.
+   * 3. Best local voice for `lang` (exact tag, then same language), skipping one that failed.
+   *    Without `lang`, prefer the system language. If a matching local voice is unavailable or
+   *    fails to start, try a matching online voice within the same deadline and attempt limit.
    */
   async speak(input: SpeakInput): Promise<SpeakResult> {
     const request = validate(input);
@@ -204,10 +203,26 @@ export class SpeechService {
     /** Voices that already failed to start in this call. */
     const failed = new Set<string>();
     let attempts = 0;
-    const attempt = async (voice: SpeechVoice): Promise<SpeakResult | undefined> => {
-      const budget = Math.min(this.startTimeoutMs, remaining());
-      if (budget <= 0 || attempts >= MAX_ATTEMPTS) return undefined;
+    let lastAttemptWasRemote = false;
+    const hasOnlineAlternative = (voice: SpeechVoice): boolean =>
+      !voice.remote &&
+      this.bestVoice(
+        all.filter((candidate) => candidate.remote && candidate.name !== voice.name),
+        request.lang,
+      ) !== undefined;
+    const attempt = async (
+      voice: SpeechVoice,
+      reserveForOnline = false,
+    ): Promise<SpeakResult | undefined> => {
+      const timeLeft = remaining();
+      if (timeLeft <= 0 || attempts >= MAX_ATTEMPTS) return undefined;
+      // When this local voice is allowed to fall back online, leave the second attempt time
+      // even if the local engine never reports start. Explicit voices keep their full budget.
+      const startupCap = reserveForOnline ? Math.max(1, Math.floor(timeLeft / 2)) : timeLeft;
+      const budget = Math.min(this.startTimeoutMs, startupCap);
+      if (budget <= 0) return undefined;
       attempts++;
+      lastAttemptWasRemote = voice.remote;
       try {
         return await this.startOn(voice, request, budget);
       } catch (error) {
@@ -232,7 +247,7 @@ export class SpeechService {
           voice.lang === '' ||
           sameLanguage(voice.lang, request.lang));
       if (voice !== undefined && fits) {
-        const result = await attempt(voice);
+        const result = await attempt(voice, !explicit && hasOnlineAlternative(voice));
         if (result !== undefined) return result;
         // An explicit voice that does not start is an error; a saved one falls back to a match.
         if (explicit) {
@@ -261,15 +276,23 @@ export class SpeechService {
     }
 
     for (;;) {
+      if (attempts >= MAX_ATTEMPTS || remaining() <= 0) break;
       const open = all.filter((voice) => !failed.has(voice.name));
-      const voice = this.bestLocalVoice(
+      const local = this.bestVoice(
         open.filter((candidate) => !candidate.remote),
         request.lang,
       );
+      const online = this.bestVoice(
+        open.filter((candidate) => candidate.remote),
+        request.lang,
+      );
+      // Reserve the second attempt for a matching online voice after a local failure.
+      // If a saved online voice failed first, prefer local on the remaining attempt.
+      const voice =
+        attempts === 0 || lastAttemptWasRemote || online === undefined ? (local ?? online) : online;
       if (voice === undefined) break;
-      const result = await attempt(voice);
+      const result = await attempt(voice, attempts === 0 && hasOnlineAlternative(voice));
       if (result !== undefined) return result;
-      if (attempts >= MAX_ATTEMPTS || remaining() <= 0) break;
     }
 
     if (failed.size > 0 || attempts > 0) {
@@ -278,19 +301,6 @@ export class SpeechService {
         'A voice was found but it never started speaking.',
         'speechStartFailed',
         'start-failed',
-      );
-    }
-    // Network voices exist for this language, but Listen does not send text off the device.
-    const online = this.bestLocalVoice(
-      all.filter((voice) => voice.remote),
-      request.lang,
-    );
-    if (online !== undefined) {
-      throw new SpeechError(
-        'NO_VOICE',
-        'Only online voices exist for this language.',
-        'speechNoVoiceForLanguage',
-        'online-only',
       );
     }
     if (all.length > 0 && request.lang !== undefined) {
@@ -309,8 +319,8 @@ export class SpeechService {
     );
   }
 
-  /** Best voice of `voices` (all on-device) for `lang`; without `lang` the system-language voice, else the first. */
-  private bestLocalVoice(
+  /** Best voice in one locality for `lang`; without `lang`, the system language, then the first. */
+  private bestVoice(
     voices: readonly SpeechVoice[],
     lang: string | undefined,
   ): SpeechVoice | undefined {

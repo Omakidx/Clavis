@@ -36,8 +36,8 @@
     "description": "Disclosure bullet explaining that selecting text sends nothing anywhere (FR-017). Approved copy."
   },
   "disclosureListen": {
-    "message": "Listen uses the voices on your computer. Nothing is sent to Groq.",
-    "description": "Disclosure bullet explaining that the Listen action is local. Listen is the name of a toolbar button. Approved copy."
+    "message": "Listen tries a matching on-device voice first, then an online voice if needed. Online voices send the selected text to their provider. Nothing is sent to Groq.",
+    "description": "Disclosure bullet explaining local-first voice selection, online fallback and where the text goes. Listen is the name of a toolbar button."
   },
   "disclosureExplain": {
     "message": "Explain sends the text you selected, up to 1,000 characters of the text around it, and your chosen language to Groq, using your own API key. Groq handles it under its own terms and privacy policy.",
@@ -48,7 +48,7 @@
     "description": "Link text placed after the Explain disclosure bullet; points to Groq's privacy policy."
   },
   "disclosurePdf": {
-    "message": "PDFs you open are read inside your browser and never uploaded. Only text you select and explain is sent.",
+    "message": "PDFs you open are read inside your browser and never uploaded. Selected text can be sent when you ask for an explanation or use an online voice.",
     "description": "Disclosure bullet explaining how PDFs are handled locally. Approved copy."
   },
   "disclosureNoServer": {
@@ -64,8 +64,8 @@
     "description": "Confirmation shown inside the card the first time Explain is used if the disclosure was never acknowledged. Starts with a question that acts as its title."
   },
   "firstSendConfirm": {
-    "message": "Explain",
-    "description": "Button that confirms sending the selected text to Groq for the first time."
+    "message": "Lookup",
+    "description": "Button that confirms sending the selected text to Groq for the first time; matches the toolbar action."
   },
   "firstSendCancel": {
     "message": "Cancel",
@@ -76,7 +76,7 @@
     "description": "Heading of the optional all-sites access section on the onboarding page (FR-009)."
   },
   "siteAccessBody": {
-    "message": "To show the toolbar automatically, Chrome will ask you to let Clavis read and change data on websites. Clavis uses this only to notice when you select text and to show its toolbar. It does not read pages in the background, and nothing leaves your device until you click Explain.",
+    "message": "To show the toolbar automatically, Chrome will ask you to let Clavis read and change data on websites. Clavis uses this only to notice when you select text and to show its toolbar. It does not read pages in the background. Text leaves your device only when you ask for an explanation or use an online voice.",
     "description": "Explains why Chrome will show a permission prompt for website access. Approved copy; do not weaken."
   },
   "siteAccessGrant": {
@@ -109,11 +109,23 @@
   },
   "popupInjectButton": {
     "message": "Explain on this page",
-    "description": "Popup button shown when website access was not granted. Runs Clavis once on the current tab so the user can explain the text they selected there (FR-018)."
+    "description": "Popup button that runs Clavis once on the current web tab so the user can explain selected text there (FR-018)."
+  },
+  "popupInjectBusy": {
+    "message": "Opening Explain…",
+    "description": "Popup button and status while Clavis asks the current tab to show Explain."
+  },
+  "popupActionsLabel": {
+    "message": "Quick actions",
+    "description": "Accessible name of the popup's main action group."
+  },
+  "popupNoKeyNotice": {
+    "message": "Explain needs a Groq key. Listen and the PDF reader work without one.",
+    "description": "Short popup notice when no Groq key is connected; clarifies that setup is optional for listening and reading PDFs."
   },
   "popupInjectHint": {
-    "message": "Select some text on the page first, then choose this button.",
-    "description": "Hint under the popup button that runs Clavis on the current tab without website access."
+    "message": "Select text on the page, then choose Explain on this page.",
+    "description": "Hint under the popup's main actions for explaining selected text on the current tab."
   },
   "popupInjectNoSelection": {
     "message": "No text is selected on the page. Select some text and try again.",
@@ -136,15 +148,15 @@
     "description": "Accessible name of the small toolbar that appears next to selected text on a web page."
   },
   "toolbarListen": {
-    "message": "Listen",
-    "description": "Toolbar button that reads the selected text aloud. Listen is also the name used in the privacy disclosure."
+    "message": "Speak",
+    "description": "Toolbar button that reads the selected text aloud; called Listen in the privacy disclosure."
   },
   "toolbarExplain": {
-    "message": "Explain",
-    "description": "Toolbar button that explains the selected text. Explain is also the name used in the privacy disclosure."
+    "message": "Lookup",
+    "description": "Toolbar button that explains the selected text; called Explain in the privacy disclosure."
   },
   "toolbarCardPlaceholder": {
-    "message": "Clavis couldn't show the explanation. Press Explain to try again.",
+    "message": "Clavis couldn't show the explanation. Press Lookup to try again.",
     "description": "State line in the toolbar card when the Explain action finished without drawing its explanation card."
   },
   "toolbarWorking": {
@@ -495,6 +507,10 @@
     "message": "Saved.",
     "description": "Confirmation announced after a setting was saved."
   },
+  "uiDismissNotification": {
+    "message": "Dismiss notification",
+    "description": "Accessible name of the close button on a temporary Settings notification."
+  },
   "uiOpenSettings": {
     "message": "Open settings",
     "description": "Button that opens the Clavis settings page."
@@ -513,7 +529,7 @@
   },
   "errInvalidApiKey": {
     "message": "Groq didn't accept your key. Check that you copied the whole key, or create a new one on the Groq keys page.",
-    "description": "Error shown when Groq rejects the API key (HTTP 401 or 403). Groq is the AI provider name."
+    "description": "Error shown when Groq rejects the API key (HTTP 401). Groq is the AI provider name."
   },
   "errNetwork": {
     "message": "Clavis can't reach Groq. Check your internet connection and try again.",
@@ -591,7 +607,7 @@
   },
   "onbStepOf": {
     "message": "Step $CURRENT$ of $TOTAL$",
-    "description": "Position in the setup wizard, for example Step 2 of 8.",
+    "description": "Position in the setup wizard, for example Step 2 of 7.",
     "placeholders": { "CURRENT": { "content": "$1" }, "TOTAL": { "content": "$2" } }
   },
   "onbStepPurpose": {
@@ -605,10 +621,6 @@
   "onbStepAccess": {
     "message": "Website access",
     "description": "Short name of the setup step about website access, shown in the progress list."
-  },
-  "onbStepGetKey": {
-    "message": "Get a key",
-    "description": "Short name of the setup step that explains how to get a Groq key, shown in the progress list."
   },
   "onbStepConnect": {
     "message": "Connect",
@@ -643,7 +655,7 @@
     "description": "Intro paragraph of the first setup step."
   },
   "onbPurposeListen": {
-    "message": "Listen reads your selection aloud using the voices on your computer.",
+    "message": "Listen reads your selection aloud, trying an on-device voice first and an online voice if needed.",
     "description": "Bullet in the first setup step. Listen is the name of a toolbar button."
   },
   "onbPurposeExplain": {
@@ -670,33 +682,25 @@
     "message": "You can change this at any time in Settings.",
     "description": "Reminder under the website access choice."
   },
-  "onbGetKeyTitle": {
-    "message": "Get your Groq key",
-    "description": "Heading of the setup step that explains how to get a Groq key."
-  },
   "onbGetKeyIntro": {
-    "message": "Explain needs an API key from your own Groq account. Clavis has no key of its own and no server.",
-    "description": "Intro paragraph of the Groq key step."
+    "message": "Explain uses a key from your Groq account. Need one?",
+    "description": "Short introduction to getting a Groq key on the connection step."
   },
   "onbGetKeyStep1": {
-    "message": "Open the Groq keys page and sign in or create an account.",
-    "description": "First instruction in the Groq key step."
+    "message": "Sign in or create an account.",
+    "description": "First instruction beside the Groq keys page link on the connection step."
   },
   "onbGetKeyStep2": {
-    "message": "Choose Create API Key, give it any name, and copy the key Groq shows you.",
-    "description": "Second instruction in the Groq key step. Create API Key is the name of a button on the Groq website."
-  },
-  "onbGetKeyStep3": {
-    "message": "Come back to this tab and paste the key in the next step.",
-    "description": "Third instruction in the Groq key step."
+    "message": "Create an API key there, copy it, and paste it below.",
+    "description": "Second instruction on the connection step."
   },
   "onbGetKeyLink": {
     "message": "Open the Groq keys page",
     "description": "Link text that opens https://console.groq.com/keys in a new tab."
   },
-  "onbHaveKey": {
-    "message": "I have my key",
-    "description": "Button that moves from the Groq key instructions to the step where the key is pasted."
+  "onbKeyStepsSummary": {
+    "message": "How to get a key",
+    "description": "Expands short numbered instructions on the onboarding connection step."
   },
   "onbSkipKey": {
     "message": "Set up later",
@@ -840,8 +844,8 @@
     "description": "Message after Groq rejected the key."
   },
   "keyResultUnverified": {
-    "message": "Your key is saved, but Clavis couldn't reach Groq to check it. Check your internet connection, then choose Test connection. Explain will try the key when you use it.",
-    "description": "Message when the key was saved but the connection check failed because of a network problem."
+    "message": "Your key is saved, but the check could not confirm access. Choose Test connection to retry. Lookup will try the key when you use it.",
+    "description": "Message when Groq access could not be confirmed, including permission and network failures."
   },
   "keyResultChecking": {
     "message": "Checking your key with Groq…",
@@ -880,6 +884,10 @@
     "message": "No Groq key is connected.",
     "description": "Status in Settings when there is no saved key."
   },
+  "keyGetLink": {
+    "message": "Get a Groq key",
+    "description": "Link to Groq's key page when no key is connected."
+  },
   "keyNoneHint": {
     "message": "Explain needs a key. Listen and the PDF reader work without one.",
     "description": "Hint when there is no saved key."
@@ -900,6 +908,96 @@
     "message": "Last checked",
     "description": "Label of the row that shows when the key was last verified."
   },
+  "keyFactResponse": {
+    "message": "Last check",
+    "description": "Label for the HTTP response code or missing response from the latest failed key check."
+  },
+  "keyHttpStatus": {
+    "message": "Groq returned HTTP $STATUS$.",
+    "description": "Safe numeric HTTP response from the latest failed key check; $STATUS$ is a three-digit status code.",
+    "placeholders": { "STATUS": { "content": "$1" } }
+  },
+  "keyNoHttpResponse": {
+    "message": "No HTTP response (network or timeout).",
+    "description": "The latest key check failed before a Groq HTTP response arrived."
+  },
+  "keyHttpModelOrg": {
+    "message": "Groq reports that your organization blocks this model. Ask the organization owner to review model limits.",
+    "description": "Fixed help for a documented organization-level model permission code."
+  },
+  "keyHttpModelProject": {
+    "message": "Groq reports that your project blocks this model. Ask a project admin to review model limits.",
+    "description": "Fixed help for a documented project-level model permission code."
+  },
+  "keyHttpModelPermission": {
+    "message": "Groq reports blocked model access. Review model permissions for the key's project.",
+    "description": "Fixed help for a documented generic model permission code."
+  },
+  "keyHttpPermissionRestriction": {
+    "message": "Groq reports a permission restriction but did not identify the setting. Check access for the key's project and organization.",
+    "description": "Fixed help for a Groq permissions_error type without a more specific allowlisted code."
+  },
+  "keyHttpRegionBlock": {
+    "message": "A Cloudflare response indicates a region block. Contact Groq support if this is unexpected.",
+    "description": "Fixed help for a 403 Cloudflare error 1009 response."
+  },
+  "keyHttpEdgeBlock": {
+    "message": "A Cloudflare response indicates a security or browser/IP block. Contact Groq support with the time of this check.",
+    "description": "Fixed help for a 403 Cloudflare 1010 or 1020 response."
+  },
+  "keyHttpUnknown": {
+    "message": "Clavis cannot determine why this request was denied. Your key remains saved. Check Groq API access for its project or contact Groq support.",
+    "description": "Fixed help when a 403 response does not match a known safe marker; does not claim a cause."
+  },
+  "keyProbeForbidden": {
+    "message": "A request without an API key was also denied (HTTP 403). This refusal is independent of the saved key; browser, network, or upstream access policy needs checking.",
+    "description": "Safe comparison conclusion when an unauthenticated request also receives HTTP 403."
+  },
+  "keyProbeAuthRequired": {
+    "message": "Groq returned HTTP 401 without a key as expected, but HTTP 403 with the saved key. Authentication, account, or request policy may differ; this does not prove the key is invalid.",
+    "description": "Safe comparison conclusion when the unauthenticated request gets HTTP 401."
+  },
+  "keyProbeUnreachable": {
+    "message": "The comparison request got no HTTP response. The comparison is inconclusive.",
+    "description": "Safe comparison conclusion when the unauthenticated request has no HTTP response."
+  },
+  "keyProbeOtherResponse": {
+    "message": "The comparison response was unexpected. The comparison is inconclusive.",
+    "description": "Safe comparison conclusion when the unauthenticated request gets a response other than HTTP 401 or 403."
+  },
+  "keyCopyDiagnostics": {
+    "message": "Copy diagnostics",
+    "description": "Copies only fixed connection diagnostic fields without a key, last four characters, or provider text."
+  },
+  "keyDiagnosticsCopied": {
+    "message": "Diagnostics copied.",
+    "description": "Confirmation after copying safe key-connection diagnostics."
+  },
+  "keyDiagnosticsCopyFailed": {
+    "message": "Clipboard unavailable. You can copy the status shown above.",
+    "description": "Feedback when safe key-connection diagnostics could not be copied."
+  },
+  "keyDiagnosticsReport": {
+    "message": "Clavis connection diagnostics\nHTTP: $STATUS$\nUnauthenticated comparison: $PROBE$\n403 category: $REASON$",
+    "description": "Fixed clipboard report. Contains only numeric HTTP status and allowlisted categories, never key or provider text.",
+    "placeholders": {
+      "STATUS": { "content": "$1" },
+      "PROBE": { "content": "$2" },
+      "REASON": { "content": "$3" }
+    }
+  },
+  "cardErrHttpTitle": {
+    "message": "Groq returned an error",
+    "description": "Heading for an explanation failure with an actual HTTP response from Groq or its edge."
+  },
+  "cardErrHttpServer": {
+    "message": "The service could not complete the request. Try again shortly.",
+    "description": "Guidance for a Groq HTTP 5xx response; distinct from a missing network response."
+  },
+  "cardErrHttpOther": {
+    "message": "The request did not complete. Try again, or check Groq access if it continues.",
+    "description": "Neutral guidance for an HTTP response mapped to NETWORK_ERROR that is neither 403 nor a 5xx."
+  },
   "keyEnding": {
     "message": "Ending in $LAST4$",
     "description": "Shows only the last four characters of the saved key. $LAST4$ is four characters.",
@@ -914,8 +1012,8 @@
     "description": "Key status: Groq rejected the key."
   },
   "keyStatusUnverified": {
-    "message": "Saved, but not verified (no connection)",
-    "description": "Key status: the key is saved but could not be checked because of a network problem."
+    "message": "Saved, but not verified",
+    "description": "Key status: access could not be confirmed; the cause may be permissions, network, or another failure."
   },
   "keyStatusNever": {
     "message": "Saved, not checked yet",
@@ -952,6 +1050,14 @@
   "prefLanguageHint": {
     "message": "Explanations are written in this language.",
     "description": "Hint under the explanation language drop-down."
+  },
+  "prefTranslationLanguage": {
+    "message": "Translation language",
+    "description": "Label of the drop-down for the Translate tab's target language."
+  },
+  "prefTranslationLanguageHint": {
+    "message": "When you open Translate from a selection, Clavis translates into this language.",
+    "description": "Hint under the translation language drop-down."
   },
   "prefVoiceLanguage": {
     "message": "Voice language",
@@ -1300,7 +1406,7 @@
     "description": "Heading of the voice limitations in Settings > Help."
   },
   "helpVoicesBody": {
-    "message": "Listen uses the voices installed on your computer, so the languages and accents you get depend on your system. Some systems, including many Linux setups, have no voice until you install one. Online voices send the selected text to their provider and are used only if you choose one in Voice settings.",
+    "message": "Listen uses the voices your device reports, so available languages and accents depend on your system. Automatic tries a matching on-device voice first, then a matching online voice if no local voice is available or can start. Online voices send the selected text to their provider.",
     "description": "Help: truthful voice limitations (D-22). Voice settings is the name of a Settings section."
   },
   "popupPdfTitle": {
@@ -1324,7 +1430,7 @@
     "description": "Link in the reader's empty state that opens the PDF help in Settings."
   },
   "voiceLimits": {
-    "message": "Which voices and languages you can use depends on your operating system. Clavis lists only the voices your device reports and uses a voice only for a language it speaks. A voice marked online sends the selected text to that voice's provider, and Clavis uses one only if you choose it here.",
+    "message": "Which voices and languages you can use depends on your operating system. Clavis lists only the voices your device reports and uses a voice only for a language it speaks. Automatic tries on-device voices first, then online if needed. A voice marked online sends the selected text to that voice's provider.",
     "description": "Voice section: truthful limits (D-22, FR-024, FR-025)."
   },
   "voiceSummary": {
@@ -1343,6 +1449,18 @@
   "optionsNavLabel": {
     "message": "Settings sections",
     "description": "Accessible name of the navigation list that jumps between settings sections."
+  },
+  "optionsGroupConnection": {
+    "message": "Connection",
+    "description": "Settings navigation group for the Groq key and model."
+  },
+  "optionsGroupPrivacyHelp": {
+    "message": "Privacy & help",
+    "description": "Settings navigation group for privacy controls and help."
+  },
+  "optionsAutoSaveHint": {
+    "message": "Changes save automatically.",
+    "description": "Explains that Settings preference changes are saved as soon as a control changes."
   },
   "popupGroqLabel": {
     "message": "Groq",
@@ -1405,11 +1523,11 @@
     "description": "Heading and tab title of the practice page."
   },
   "practiceIntro": {
-    "message": "Try Clavis here. Select a word or a sentence in the article with your mouse, then choose Listen or Explain in the toolbar that appears.",
-    "description": "Intro on the practice page. Listen and Explain are names of toolbar buttons."
+    "message": "Try Clavis here. Select a word or sentence in the article, then choose Lookup or Speak in the toolbar that appears.",
+    "description": "Intro on the practice page. Lookup and Speak are toolbar actions."
   },
   "practiceNoKey": {
-    "message": "No Groq key yet? Listen works without one. Explain will show you how to connect Groq.",
+    "message": "No Groq key yet? Speak works without one. Lookup will show you how to connect Groq.",
     "description": "Note on the practice page."
   },
   "practiceTryTitle": {
@@ -1417,11 +1535,11 @@
     "description": "Heading of the list of practice suggestions."
   },
   "practiceTry1": {
-    "message": "Select the word bank in the first paragraph and choose Explain. Then select bank in the last paragraph and compare the two answers.",
+    "message": "Select the word bank in the first paragraph and choose Lookup. Then select bank in the last paragraph and compare the two answers.",
     "description": "Practice suggestion. bank is a word to select in the article."
   },
   "practiceTry2": {
-    "message": "Select the whole sentence She finally broke the ice. and choose Explain. Is it about ice, or about something else?",
+    "message": "Select the whole sentence She finally broke the ice. and choose Lookup. Is it about ice, or about something else?",
     "description": "Practice suggestion. The quoted sentence appears in the article."
   },
   "practiceTry3": {
@@ -1488,6 +1606,22 @@
     "message": "Explanation of $TEXT$",
     "description": "Accessible name of the explanation card. $TEXT$ is the selected text, shortened.",
     "placeholders": { "TEXT": { "content": "$1" } }
+  },
+  "cardSpeakTranslation": {
+    "message": "Listen to translation",
+    "description": "Accessible label for the speaker beside translated text; uses saved speech preferences."
+  },
+  "cardBack": {
+    "message": "Back",
+    "description": "Return to the previous cached explanation layer."
+  },
+  "cardLookup": {
+    "message": "Lookup",
+    "description": "Explain selected model-written text in a new layer of the same card."
+  },
+  "cardLookupOverLimit": {
+    "message": "That selection is too long to look up. Select a shorter part of the answer.",
+    "description": "Shown when selected model-written text exceeds the explanation character limit; no partial text is sent."
   },
   "cardKindWord": {
     "message": "Word",
@@ -1703,8 +1837,12 @@
     "description": "Label of the toolbar Listen button after the audio finished; pressing it reads the same text again."
   },
   "speechSlow": {
-    "message": "Slow",
-    "description": "Label of the toolbar toggle that makes Listen read at a slower speed (pressed = slow). Applies to the next playback."
+    "message": "0.75×",
+    "description": "Compact visible label of the toolbar speed toggle. When pressed, the next Speak playback uses 0.75× speed."
+  },
+  "speechSpeedToggle": {
+    "message": "Slower speech, 0.75×",
+    "description": "Stable accessible label of the toolbar speed toggle; its pressed state says whether slower playback is active."
   },
   "speechRemoteNote": {
     "message": "This voice sends the text to an online service.",
@@ -1727,7 +1865,7 @@
     "description": "Heading of the Voice section in Settings, where the user picks a voice for Listen and sees which voices exist on this device."
   },
   "voiceIntro": {
-    "message": "Listen reads selected text aloud with the voices on this computer. Nothing is sent to Groq.",
+    "message": "Listen reads selected text aloud using on-device or online voices. Nothing is sent to Groq.",
     "description": "Intro under the Voice heading in Settings. Listen is the name of a toolbar button."
   },
   "voiceDevice": {
@@ -1747,7 +1885,7 @@
     "description": "Option in the voice drop-down: Clavis picks the best voice for the language."
   },
   "voiceChooserHint": {
-    "message": "Automatic picks the best voice on this device for the language of the text.",
+    "message": "Automatic tries a matching on-device voice first, then an online voice if needed. Online voices send the text to their provider.",
     "description": "Hint under the voice drop-down."
   },
   "voiceLanguageFilter": {
@@ -1811,7 +1949,7 @@
   },
   "speechOnlineOnly": {
     "message": "Only online voices are available for this language. To use one, choose it in Voice settings.",
-    "description": "Message when Listen found voices for the language but all are online services, which Clavis only uses when the user chooses one explicitly (privacy). Followed by a Voice settings button."
+    "description": "Compatibility message for an older speech engine reporting online-only voices. Automatic now tries matching online voices after on-device voices."
   },
   "cardOpenPanel": {
     "message": "Open in side panel",

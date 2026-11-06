@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { browser } from 'wxt/browser';
 import { DoneStep } from '../../../components/onboarding/steps/DoneStep';
 import { Wizard } from '../../../components/onboarding/Wizard';
 import { useKeyStatus } from '../../../lib/ui-client/use-key-status';
@@ -37,11 +38,22 @@ const heading = () => screen.getByRole('heading', { level: 2 });
 afterEach(() => cleanup());
 
 describe('wizard navigation', () => {
+  it('renders a requested preview step immediately without advancing earlier steps', () => {
+    installCatalog();
+    backend = createFakeBackend();
+    installBackend(backend);
+    installPermissions({ granted: false, answer: true });
+    render(<Wizard initialStep="practice" />);
+    expect(heading()).toHaveTextContent(text('onbPracticeTitle'));
+    expect(screen.queryByText(text('onbPurposeTitle'))).toBeNull();
+    expect(screen.getByRole('listitem', { current: 'step' })).toHaveTextContent('Practice');
+  });
+
   it('starts at the purpose step with a progress list and moves focus to each heading', async () => {
     const { user } = setup();
     expect(heading()).toHaveTextContent(text('onbPurposeTitle'));
     const progress = screen.getByRole('navigation', { name: 'Setup progress' });
-    expect(within(progress).getAllByRole('listitem')).toHaveLength(8);
+    expect(within(progress).getAllByRole('listitem')).toHaveLength(7);
     expect(within(progress).getByRole('listitem', { current: 'step' })).toHaveTextContent(
       'Welcome',
     );
@@ -133,7 +145,7 @@ describe('website access step (FR-009, UJ-02b)', () => {
     expect(perms.request).not.toHaveBeenCalled();
     await waitFor(() => expect(backend.state.onboarding.siteAccessChoice).toBe('granted'));
     await user.click(await screen.findByRole('button', { name: 'Next' }));
-    expect(heading()).toHaveTextContent(text('onbGetKeyTitle'));
+    expect(heading()).toHaveTextContent(text('onbConnectTitle'));
   });
 
   it('stores "declined" when the Chrome prompt is refused and keeps the extension usable', async () => {
@@ -145,13 +157,16 @@ describe('website access step (FR-009, UJ-02b)', () => {
   });
 });
 
-async function toConnect(user: ReturnType<typeof userEvent.setup>) {
+async function toConnectWithoutInput(user: ReturnType<typeof userEvent.setup>) {
   await user.click(next());
   await user.click(await screen.findByRole('button', { name: 'I understand' }));
   await user.click(await screen.findByRole('button', { name: 'Next' }));
   await user.click(await screen.findByRole('button', { name: text('siteAccessSkip') }));
   await user.click(await screen.findByRole('button', { name: 'Next' }));
-  await user.click(await screen.findByRole('button', { name: 'I have my key' }));
+}
+
+async function toConnect(user: ReturnType<typeof userEvent.setup>) {
+  await toConnectWithoutInput(user);
   await screen.findByLabelText('Your Groq key');
 }
 
@@ -167,8 +182,10 @@ describe('Groq key steps (FR-003, FR-004, UJ-05)', () => {
     expect(link).toHaveAttribute('href', 'https://console.groq.com/keys');
     expect(link).toHaveAttribute('target', '_blank');
     expect(link.getAttribute('rel')).toContain('noopener');
-    expect(screen.getByText(text('keyWarning'))).toBeVisible();
-    expect(screen.getByText(text('onbGetKeyStep3'))).toBeVisible();
+    expect(screen.getByLabelText('Your Groq key')).toBeVisible();
+    await user.click(screen.getByText(text('onbKeyStepsSummary')));
+    expect(screen.getByText(text('onbGetKeyStep2'))).toBeVisible();
+    expect(screen.getByText(/Never paste your key into a website/)).toBeVisible();
   });
 
   it('can be skipped with "Set up later", and setup still finishes', async () => {
@@ -252,6 +269,63 @@ describe('Groq key steps (FR-003, FR-004, UJ-05)', () => {
     expect(input.getAttribute('value')).toBeNull();
   });
 
+  it('clears and masks an unfinished key after Back and return', async () => {
+    const { user } = setup();
+    await toConnect(user);
+    const input = screen.getByLabelText('Your Groq key');
+    await user.type(input, FAKE_KEY);
+    await user.click(screen.getByRole('button', { name: 'Show key' }));
+    expect(input).toHaveAttribute('type', 'text');
+    await user.click(screen.getByRole('button', { name: 'Back' }));
+    expect(heading()).toHaveTextContent(text('siteAccessTitle'));
+    expect(input).not.toBeInTheDocument();
+    await user.click(next());
+    const fresh = screen.getByLabelText('Your Groq key');
+    expect(fresh).toHaveValue('');
+    expect(fresh).toHaveAttribute('type', 'password');
+  });
+
+  it('keeps Back and Set up later disabled while a connection is pending', async () => {
+    const { user } = setup();
+    await toConnect(user);
+    await user.type(screen.getByLabelText('Your Groq key'), FAKE_KEY);
+    let finishSave: (reply: unknown) => void = () => undefined;
+    vi.mocked(browser.runtime.sendMessage).mockImplementation(((message: unknown) => {
+      if ((message as { type?: string }).type === 'SET_API_KEY') {
+        return new Promise<unknown>((resolve) => {
+          finishSave = resolve;
+        });
+      }
+      return Promise.resolve(backend.handle(message));
+    }) as typeof browser.runtime.sendMessage);
+    await user.click(screen.getByRole('button', { name: 'Connect' }));
+    expect(screen.getByRole('button', { name: 'Back' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Set up later' })).toBeDisabled();
+    expect(screen.getByLabelText('Your Groq key')).toBeDisabled();
+    expect(screen.queryByRole('button', { name: 'Continue' })).toBeNull();
+    await act(async () => {
+      finishSave(backend.handle({ v: 1, type: 'SET_API_KEY', apiKey: FAKE_KEY, storage: 'local' }));
+    });
+    expect(await screen.findByRole('button', { name: 'Continue' })).toBeEnabled();
+  });
+
+  it.each([
+    ['invalid', /Groq didn't accept this key/],
+    ['offline', /check could not confirm access/],
+  ] as const)('shows a pre-existing %s key honestly', async (groq, message) => {
+    installCatalog();
+    backend = createFakeBackend({ key: { value: FAKE_KEY, storage: 'local' }, groq });
+    backend.handle({ v: 1, type: 'TEST_API_KEY' });
+    installBackend(backend);
+    installPermissions({ granted: false });
+    const user = userEvent.setup();
+    render(<Wizard />);
+    await toConnectWithoutInput(user);
+    expect(await screen.findByText(message)).toBeVisible();
+    expect(screen.queryByText(/Connected\. Groq accepted/)).toBeNull();
+    expect(screen.getByRole('button', { name: 'Continue' })).toBeVisible();
+  });
+
   it('shows a working key, shows only the last four, and never echoes the key', async () => {
     const { user } = setup({ groq: 'valid' });
     await toConnect(user);
@@ -273,7 +347,7 @@ describe('Groq key steps (FR-003, FR-004, UJ-05)', () => {
     await user.type(screen.getByLabelText('Your Groq key'), FAKE_KEY);
     await user.click(screen.getByRole('button', { name: 'Connect' }));
     expect(await screen.findByText(/Groq didn't accept this key/)).toBeVisible();
-    expect(screen.queryByText(/couldn't reach Groq/)).toBeNull();
+    expect(screen.queryByText(/check could not confirm access/)).toBeNull();
     expect(document.body.textContent).not.toContain(FAKE_KEY);
     await user.click(screen.getByRole('button', { name: 'Change key' }));
     const input = screen.getByLabelText('Your Groq key') as HTMLInputElement;
@@ -286,7 +360,7 @@ describe('Groq key steps (FR-003, FR-004, UJ-05)', () => {
     await toConnect(user);
     await user.type(screen.getByLabelText('Your Groq key'), FAKE_KEY);
     await user.click(screen.getByRole('button', { name: 'Connect' }));
-    expect(await screen.findByText(/couldn't reach Groq to check it/)).toBeVisible();
+    expect(await screen.findByText(/check could not confirm access/)).toBeVisible();
     expect(screen.queryByText(/Groq didn't accept this key/)).toBeNull();
     expect(document.body.textContent).not.toContain(FAKE_KEY);
   });
@@ -363,7 +437,6 @@ describe('preferences step (FR-006, FR-005)', () => {
     await user.click(await screen.findByRole('button', { name: 'Next' }));
     await user.click(await screen.findByRole('button', { name: text('siteAccessSkip') }));
     await user.click(await screen.findByRole('button', { name: 'Next' }));
-    await user.click(await screen.findByRole('button', { name: 'I have my key' }));
     await user.click(await screen.findByRole('button', { name: 'Continue' }));
     const select = (await screen.findByLabelText('Model used for Explain')) as HTMLSelectElement;
     expect(Array.from(select.options).map((o) => o.value)).toEqual([
@@ -396,7 +469,6 @@ describe('finish step and website access', () => {
         settings={settings}
         keys={keys}
         skipKey={() => undefined}
-        goTo={() => undefined}
         focusNext={() => undefined}
       />
     );
@@ -416,5 +488,20 @@ describe('finish step and website access', () => {
     installPermissions({ granted: false });
     render(<DoneHarness />);
     expect(await screen.findByTestId('site-access-help')).toBeVisible();
+  });
+
+  it.each([
+    ['invalid', 'Not accepted by Groq'],
+    ['offline', 'Saved, but not verified'],
+  ] as const)('summarizes a %s key without claiming it works', async (groq, expected) => {
+    installCatalog();
+    backend = createFakeBackend({ key: { value: FAKE_KEY, storage: 'local' }, groq });
+    backend.handle({ v: 1, type: 'TEST_API_KEY' });
+    installBackend(backend);
+    installPermissions({ granted: false });
+    render(<DoneHarness />);
+    const summary = await screen.findByTestId('setup-summary');
+    expect(within(summary).getByText(expected)).toBeVisible();
+    expect(within(summary).queryByText('Connected')).toBeNull();
   });
 });

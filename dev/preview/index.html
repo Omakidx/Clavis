@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Clavis design preview</title>
+    <link rel="stylesheet" href="./gallery.css" />
+    <link rel="icon" type="image/svg+xml" href="/brand/clavis-icon.svg" />
+  </head>
+  <body>
+    <header class="bar">
+      <h1>
+        <span class="clavis-logo" aria-hidden="true"
+          ><img src="/brand/clavis-logo.svg" alt="" width="249" height="105.222" /></span
+        ><span class="sr">Clavis design preview</span>
+      </h1>
+      <fieldset class="seg" aria-label="Color scheme">
+        <legend class="sr">Color scheme</legend>
+      </fieldset>
+      <button type="button" id="reload">Reload frame</button>
+      <a
+        id="standalone"
+        href="#"
+        target="_blank"
+        rel="noopener"
+        aria-label="Open preview in a new tab"
+        title="Open preview in a new tab"
+        ><svg
+          xmlns="http://www.w3.org/2000/svg"
+          width="24"
+          height="24"
+          viewBox="0 0 24 24"
+          fill="none"
+          aria-hidden="true"
+        >
+          <path
+            d="M12 2C6.48 2 2 6.48 2 12C2 17.52 6.48 22 12 22C17.52 22 22 17.52 22 12"
+            stroke="currentColor"
+            stroke-width="1.5"
+            stroke-miterlimit="10"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          />
+          <path
+            d="M13 11L21.2 2.80005"
+            stroke="currentColor"
+            stroke-width="1.5"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          />
+          <path
+            d="M21.9999 6.83V2H17.1699"
+            stroke="currentColor"
+            stroke-width="1.5"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          /></svg
+      ></a>
+    </header>
+    <div class="layout">
+      <nav id="nav" aria-label="Screens"></nav>
+      <main id="stage" class="stage"></main>
+    </div>
+    <script type="module" src="./gallery.ts"></script>
+  </body>
+</html>

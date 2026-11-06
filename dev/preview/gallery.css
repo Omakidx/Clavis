@@ -1,0 +1,248 @@
+@import '../../components/common/tokens.css';
+@import '../../components/common/logo.css';
+
+:root {
+  color-scheme: light;
+  --panel: rgb(255 255 255 / 28%);
+  --line: var(--border);
+  --sel: #ffebc4;
+}
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --bg: #20221b;
+  --panel: rgb(255 255 255 / 4%);
+  --fg: #f6f7eb;
+  --muted: #b9beac;
+  --line: #414536;
+  --surface: #303329;
+  --sel: #624619;
+}
+* {
+  box-sizing: border-box;
+}
+html,
+body {
+  height: 100%;
+  margin: 0;
+}
+body {
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  color: var(--fg);
+  font: 13px/1.45 var(--font);
+}
+.sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+.bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  padding: 12px 16px;
+  background: var(--panel);
+  backdrop-filter: blur(16px);
+}
+.bar h1 {
+  font-size: 14px;
+  font-weight: 600;
+  margin: 0;
+}
+.bar label {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.note {
+  color: var(--muted);
+  font-size: 11px;
+  flex: 1 1 100%;
+}
+select,
+button,
+.bar a {
+  font: inherit;
+  color: var(--fg);
+  background: var(--panel);
+  border: 0;
+  border-radius: 999px;
+  padding: 6px 12px;
+  text-decoration: none;
+  cursor: pointer;
+  min-height: 30px;
+}
+.bar select {
+  border: 1px solid var(--line);
+  background: var(--bg);
+  padding-block: 4px;
+}
+.bar a {
+  display: inline-flex;
+  align-items: center;
+  background: linear-gradient(135deg, #fca311, #ffbc4c);
+  color: #292314;
+}
+button:hover {
+  background: var(--surface);
+}
+button svg {
+  width: 18px;
+  height: 18px;
+  flex: none;
+}
+button:focus-visible,
+a:focus-visible,
+select:focus-visible {
+  outline: none;
+  background-color: var(--surface);
+}
+.seg {
+  display: flex;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  gap: 4px;
+}
+.seg button,
+#reload {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 30px;
+  padding: 6px;
+}
+.seg button[aria-pressed='true'],
+.seg button[aria-checked='true'] {
+  background: var(--sel);
+}
+.layout {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+}
+nav {
+  flex: 0 0 220px;
+  overflow: auto;
+  padding: 4px 12px 20px;
+  background: var(--panel);
+  scrollbar-width: thin;
+  scrollbar-color: rgb(93 98 85 / 25%) transparent;
+}
+nav h2 {
+  margin: 16px 10px 5px;
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+nav a {
+  display: block;
+  padding: 6px 10px;
+  border-radius: 10px;
+  color: var(--fg);
+  text-decoration: none;
+  font-size: 14px;
+  transition: background-color 160ms ease;
+}
+nav a:hover {
+  background: var(--surface);
+}
+nav a[aria-current='page'] {
+  background: var(--sel);
+  font-weight: 500;
+}
+.stage {
+  flex: 1;
+  min-width: 0;
+  overflow: auto;
+  padding: 12px;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  scrollbar-width: thin;
+}
+.stage iframe {
+  border: 0;
+  border-radius: 16px;
+  background: var(--bg);
+  max-width: 100%;
+}
+@media (max-width: 720px) {
+  .bar {
+    padding: 10px 12px;
+    gap: 7px 10px;
+  }
+  .bar h1 {
+    flex: 1 1 100%;
+  }
+  .layout {
+    flex-direction: column;
+  }
+  nav {
+    flex: 0 0 auto;
+    max-height: 24vh;
+    padding-block: 0 8px;
+  }
+  .stage {
+    padding: 8px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  nav a {
+    transition: none;
+  }
+}
+
+#standalone {
+  margin-left: 0;
+  width: 32px;
+  height: 32px;
+  padding: 6px;
+  justify-content: center;
+  background: transparent;
+  color: var(--fg);
+}
+#standalone svg {
+  width: 20px;
+  height: 20px;
+}
+#standalone:hover {
+  background: var(--surface);
+}
+
+.bar h1 {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.bar .clavis-logo {
+  width: 78px;
+  height: 22px;
+}
+.bar .clavis-logo img {
+  width: 78px;
+  transform: translateY(-10.8px) scaleY(0.84);
+  transform-origin: center 10.8px;
+}
+
+.bar .seg {
+  margin-inline-start: auto;
+}
+@media (max-width: 720px) {
+  .bar h1 {
+    flex: 0 0 auto;
+  }
+}
+
+.bar .clavis-logo img {
+  filter: invert(20%);
+}

@@ -47,47 +47,62 @@ const VOICES = [
   { voiceName: 'Test Voix FR', lang: 'fr-FR', remote: false, eventTypes: ['start', 'end'] },
 ];
 
-async function installScriptedTts(voices: typeof VOICES): Promise<void> {
-  await ext.serviceWorker.evaluate((list) => {
-    const g = globalThis as unknown as {
-      chrome: { tts: Record<string, unknown> };
-      __tts?: unknown;
-    };
-    const state = {
-      voices: list,
-      calls: [] as { voiceName?: string; lang?: string; rate?: number; chars: number }[],
-      current: undefined as undefined | ((e: { type: string }) => void),
-    };
-    g.__tts = state;
-    g.chrome.tts['getVoices'] = () => Promise.resolve(state.voices);
-    g.chrome.tts['speak'] = (
-      text: string,
-      opts: {
-        voiceName?: string;
-        lang?: string;
-        rate?: number;
-        onEvent: (e: { type: string }) => void;
-      },
-    ) => {
-      state.calls.push({
-        ...(opts.voiceName === undefined ? {} : { voiceName: opts.voiceName }),
-        ...(opts.lang === undefined ? {} : { lang: opts.lang }),
-        ...(opts.rate === undefined ? {} : { rate: opts.rate }),
-        chars: text.length,
-      });
-      state.current = opts.onEvent;
-      const mine = opts.onEvent;
-      setTimeout(() => {
-        if (state.current === mine) mine({ type: 'start' });
-      }, 5);
-      return Promise.resolve();
-    };
-    g.chrome.tts['stop'] = () => {
-      const current = state.current;
-      state.current = undefined;
-      current?.({ type: 'interrupted' });
-    };
-  }, voices);
+async function installScriptedTts(
+  voices: typeof VOICES,
+  options: { failStartVoiceNames?: string[] } = {},
+): Promise<void> {
+  await ext.serviceWorker.evaluate(
+    (input) => {
+      const list = input.voices;
+      const g = globalThis as unknown as {
+        chrome: { tts: Record<string, unknown> };
+        __tts?: unknown;
+      };
+      const state = {
+        voices: list,
+        calls: [] as { voiceName?: string; lang?: string; rate?: number; chars: number }[],
+        current: undefined as undefined | ((e: { type: string }) => void),
+        failStartVoiceNames: [] as string[],
+      };
+      g.__tts = state;
+      state.failStartVoiceNames = input.failStartVoiceNames;
+      g.chrome.tts['getVoices'] = () => Promise.resolve(state.voices);
+      g.chrome.tts['speak'] = (
+        text: string,
+        opts: {
+          voiceName?: string;
+          lang?: string;
+          rate?: number;
+          onEvent: (e: { type: string }) => void;
+        },
+      ) => {
+        state.calls.push({
+          ...(opts.voiceName === undefined ? {} : { voiceName: opts.voiceName }),
+          ...(opts.lang === undefined ? {} : { lang: opts.lang }),
+          ...(opts.rate === undefined ? {} : { rate: opts.rate }),
+          chars: text.length,
+        });
+        state.current = opts.onEvent;
+        const mine = opts.onEvent;
+        setTimeout(() => {
+          if (state.current !== mine) return;
+          if (opts.voiceName !== undefined && state.failStartVoiceNames.includes(opts.voiceName)) {
+            state.current = undefined;
+            mine({ type: 'error' });
+            return;
+          }
+          mine({ type: 'start' });
+        }, 5);
+        return Promise.resolve();
+      };
+      g.chrome.tts['stop'] = () => {
+        const current = state.current;
+        state.current = undefined;
+        current?.({ type: 'interrupted' });
+      };
+    },
+    { voices, failStartVoiceNames: options.failStartVoiceNames ?? [] },
+  );
 }
 
 /** The scripted audio finished (what `end` means to Chrome). */
@@ -340,26 +355,24 @@ test.describe('voice choice with real preferences in storage', () => {
     expect(await ttsCalls()).toHaveLength(0);
   });
 
-  test('Listen uses on-device voices only (D-22); a network voice only when the user chose it', async () => {
+  test('Automatic uses a matching online voice when no local voice exists and reports that it is online', async () => {
     await installScriptedTts([
       { voiceName: 'Net Voice', lang: 'en-US', remote: true, eventTypes: ['start', 'end'] },
     ]);
-    // Only a network voice exists: nothing is spoken and nothing leaves the device.
-    expect(await speakFrom(worldA, speakMessage(WORD, { lang: 'en-US' }))).toMatchObject({
-      ok: false,
-      error: { code: 'NO_VOICE' },
+    const automatic = await speakFrom(worldA, speakMessage(WORD, { lang: 'en-US' }));
+    expect(automatic).toMatchObject({
+      ok: true,
+      data: { state: 'started', voiceName: 'Net Voice', remote: true },
     });
-    expect(await speakFrom(worldA, speakMessage(WORD))).toMatchObject({
-      ok: false,
-      error: { code: 'NO_VOICE' },
-    });
-    expect(await ttsCalls()).toHaveLength(0);
+    expect(await ttsCalls()).toEqual([
+      { voiceName: 'Net Voice', lang: 'en-US', rate: 1, chars: WORD.length },
+    ]);
     // GET_VOICES still lists it (as remote) so Settings can offer it as an explicit choice.
     const report = (await sendFromPage(options, { v: 1, type: 'GET_VOICES' })) as VoicesReply;
     expect(report.data?.engines.chromeTts.voices).toEqual([
       { name: 'Net Voice', lang: 'en-US', engine: 'chrome-tts', remote: true },
     ]);
-    // An explicit choice (Test voice) or the saved voice is allowed, and reported as remote.
+    // Explicit choices still work, and report the same online disclosure signal.
     expect(
       await sendFromPage(options, speakMessage(WORD, { voiceName: 'Net Voice' })),
     ).toMatchObject({ ok: true, data: { voiceName: 'Net Voice', remote: true } });
@@ -368,6 +381,22 @@ test.describe('voice choice with real preferences in storage', () => {
       ok: true,
       data: { voiceName: 'Net Voice', remote: true },
     });
+  });
+
+  test('Automatic retries with a matching online voice after a local voice fails to start', async () => {
+    await installScriptedTts(
+      [
+        { voiceName: 'Net Voice', lang: 'en-US', remote: true, eventTypes: ['start', 'end'] },
+        { voiceName: 'Local Voice', lang: 'en-US', remote: false, eventTypes: ['start', 'end'] },
+      ],
+      { failStartVoiceNames: ['Local Voice'] },
+    );
+    const reply = await speakFrom(worldA, speakMessage(WORD, { lang: 'en-US' }));
+    expect(reply).toMatchObject({
+      ok: true,
+      data: { state: 'started', voiceName: 'Net Voice', remote: true },
+    });
+    expect((await ttsCalls()).map((call) => call.voiceName)).toEqual(['Local Voice', 'Net Voice']);
   });
 
   test('a local voice is chosen over a network voice of the same language', async () => {

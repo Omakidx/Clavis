@@ -165,7 +165,9 @@ test.describe('popup fallback (toolbar-icon path)', () => {
   test('shows "Explain on this page" while site access is not granted', async () => {
     const popup = await openExtensionPage('popup');
     await expect(popup.getByRole('button', { name: 'Explain on this page' })).toBeVisible();
-    await expect(popup.getByText('Select some text on the page first')).toBeVisible();
+    await expect(
+      popup.getByText('Select text on the page, then choose Explain on this page.'),
+    ).toBeVisible();
     await popup.close();
   });
 

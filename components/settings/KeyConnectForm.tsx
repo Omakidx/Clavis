@@ -1,10 +1,12 @@
 import { useId, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import type { KeyStorage } from '../../lib/contracts/key-storage';
+import type { AccessProbe, ForbiddenReason } from '../../lib/contracts/setup';
 import { t } from '../../lib/i18n';
 import { checkKeyInput, looksLikeGroqKey, type KeyOutcome } from '../../lib/ui-client/key-flow';
 import { openSettingsPage } from '../../lib/ui-client/navigation';
 import { Button, ErrorNotice } from '../common/ui';
+import { useToast } from '../common/Toast';
 
 /** Approved copy is "Label — explanation": show the label strongly, keep the whole text intact. */
 function splitChoice(text: string): { label: string; rest: string } {
@@ -15,6 +17,68 @@ function splitChoice(text: string): { label: string; rest: string } {
 interface KeyOutcomeNoticeProps {
   outcome: KeyOutcome;
   onRetry?: (() => void) | undefined;
+}
+
+const FORBIDDEN_REASON_MESSAGE = {
+  model_permission_org: 'keyHttpModelOrg',
+  model_permission_project: 'keyHttpModelProject',
+  model_permission: 'keyHttpModelPermission',
+  permission_restriction: 'keyHttpPermissionRestriction',
+  region_block: 'keyHttpRegionBlock',
+  edge_block: 'keyHttpEdgeBlock',
+  unknown: 'keyHttpUnknown',
+} as const satisfies Record<ForbiddenReason, string>;
+
+const ACCESS_PROBE_MESSAGE = {
+  'auth-required': 'keyProbeAuthRequired',
+  forbidden: 'keyProbeForbidden',
+  unreachable: 'keyProbeUnreachable',
+  'other-response': 'keyProbeOtherResponse',
+} as const satisfies Record<AccessProbe, string>;
+
+export function KeyVerificationResponse({
+  status,
+  reason,
+  probe,
+  showCopy = false,
+}: {
+  status: number | undefined;
+  reason?: ForbiddenReason | undefined;
+  probe?: AccessProbe | undefined;
+  showCopy?: boolean;
+}) {
+  const [copyState, setCopyState] = useState<'copied' | 'unavailable' | null>(null);
+  async function copyDiagnostics() {
+    if (status !== 403 || probe === undefined) return;
+    const report = t('keyDiagnosticsReport', [String(status), probe, reason ?? 'unknown']);
+    try {
+      if (navigator.clipboard?.writeText === undefined) throw new Error('Clipboard unavailable');
+      await navigator.clipboard.writeText(report);
+      setCopyState('copied');
+    } catch {
+      setCopyState('unavailable');
+    }
+  }
+
+  return (
+    <>
+      <span>
+        {status === undefined ? t('keyNoHttpResponse') : t('keyHttpStatus', String(status))}
+      </span>
+      {status === 403 ? <span> {t(FORBIDDEN_REASON_MESSAGE[reason ?? 'unknown'])}</span> : null}
+      {status === 403 && probe !== undefined ? (
+        <span> {t(ACCESS_PROBE_MESSAGE[probe])}</span>
+      ) : null}
+      {showCopy && status === 403 && probe !== undefined ? (
+        <Button onClick={() => void copyDiagnostics()}>{t('keyCopyDiagnostics')}</Button>
+      ) : null}
+      {copyState !== null ? (
+        <span role="status">
+          {t(copyState === 'copied' ? 'keyDiagnosticsCopied' : 'keyDiagnosticsCopyFailed')}
+        </span>
+      ) : null}
+    </>
+  );
 }
 
 /** The result of connecting or testing a key. Valid, rejected and unreachable look different. */
@@ -38,6 +102,15 @@ export function KeyOutcomeNotice({ outcome, onRetry }: KeyOutcomeNoticeProps) {
     return (
       <div className="clavis-notice clavis-notice--danger" data-outcome="invalid">
         <p>{t('keyResultInvalid')}</p>
+        {outcome.status?.verificationHttpStatus !== undefined ? (
+          <p>
+            <KeyVerificationResponse
+              status={outcome.status.verificationHttpStatus}
+              reason={outcome.status.forbiddenReason}
+              probe={outcome.status.accessProbe}
+            />
+          </p>
+        ) : null}
       </div>
     );
   }
@@ -45,6 +118,13 @@ export function KeyOutcomeNotice({ outcome, onRetry }: KeyOutcomeNoticeProps) {
     return (
       <div className="clavis-notice clavis-notice--warning" data-outcome="unverified">
         <p>{t('keyResultUnverified')}</p>
+        <p>
+          <KeyVerificationResponse
+            status={outcome.status?.verificationHttpStatus}
+            reason={outcome.status?.forbiddenReason}
+            probe={outcome.status?.accessProbe}
+          />
+        </p>
       </div>
     );
   }
@@ -73,6 +153,7 @@ interface KeyConnectFormProps {
  * back, logged or put in a URL.
  */
 export function KeyConnectForm({ onConnect, busy, onOutcome }: KeyConnectFormProps) {
+  const toast = useToast();
   const inputId = useId();
   const hintId = useId();
   const errorId = useId();
@@ -94,6 +175,7 @@ export function KeyConnectForm({ onConnect, busy, onOutcome }: KeyConnectFormPro
     }
     setProblem(null);
     setOutcome(null);
+    toast?.show({ content: t('keyResultChecking'), durationMs: 0 });
     const result = await onConnect(checked.value, storage);
     // Handed over (saved, rejected or unreachable): do not keep the secret in the page.
     if (result.kind !== 'error') {
@@ -102,6 +184,15 @@ export function KeyConnectForm({ onConnect, busy, onOutcome }: KeyConnectFormPro
       setShown(false);
     }
     setOutcome(result);
+    toast?.show({
+      content: <KeyOutcomeNotice outcome={result} />,
+      tone:
+        result.kind === 'valid'
+          ? 'success'
+          : result.kind === 'invalid' || result.kind === 'error'
+            ? 'danger'
+            : 'warning',
+    });
     onOutcome?.(result);
   }
 
@@ -185,16 +276,18 @@ export function KeyConnectForm({ onConnect, busy, onOutcome }: KeyConnectFormPro
         </Button>
       </div>
 
-      <div className="clavis-live" role="status" aria-live="polite">
-        {busy ? (
-          <div className="clavis-notice">
-            <p>{t('keyResultChecking')}</p>
-          </div>
-        ) : outcome && outcome.kind !== 'error' ? (
-          <KeyOutcomeNotice outcome={outcome} />
-        ) : null}
-      </div>
-      {!busy && outcome?.kind === 'error' ? <KeyOutcomeNotice outcome={outcome} /> : null}
+      {toast ? null : (
+        <div className="clavis-live" role="status" aria-live="polite">
+          {busy ? (
+            <div className="clavis-notice">
+              <p>{t('keyResultChecking')}</p>
+            </div>
+          ) : outcome && outcome.kind !== 'error' ? (
+            <KeyOutcomeNotice outcome={outcome} />
+          ) : null}
+        </div>
+      )}
+      {!toast && !busy && outcome?.kind === 'error' ? <KeyOutcomeNotice outcome={outcome} /> : null}
     </form>
   );
 }

@@ -38,6 +38,47 @@ describe('interpretReply', () => {
       code: 'INTERNAL_ERROR',
     });
   });
+  it('keeps only bounded HTTP status and allowlisted 403 reason', () => {
+    expect(
+      interpretReply({
+        ok: false,
+        error: {
+          code: 'NETWORK_ERROR',
+          message: 'secret',
+          httpStatus: 403,
+          forbiddenReason: 'edge_block',
+          providerCode: 'secret',
+        },
+      }),
+    ).toEqual({
+      kind: 'error',
+      code: 'NETWORK_ERROR',
+      httpStatus: 403,
+      forbiddenReason: 'edge_block',
+    });
+    expect(
+      interpretReply({
+        ok: false,
+        error: {
+          code: 'NETWORK_ERROR',
+          message: 'secret',
+          httpStatus: 500,
+          forbiddenReason: 'edge_block',
+        },
+      }),
+    ).toEqual({ kind: 'error', code: 'NETWORK_ERROR', httpStatus: 500 });
+    expect(
+      interpretReply({
+        ok: false,
+        error: {
+          code: 'NETWORK_ERROR',
+          message: 'secret',
+          httpStatus: '403',
+          forbiddenReason: 'unknown',
+        },
+      }),
+    ).toEqual({ kind: 'error', code: 'NETWORK_ERROR' });
+  });
   it('keeps the "local-limit" reason of Clavis own throttle, for RATE_LIMITED only', () => {
     expect(
       interpretReply({
@@ -136,7 +177,7 @@ describe('createBackend', () => {
     backend.cancel('abc');
     expect(await backend.openSettings('model')).toBe(true);
     expect(await backend.openSettings()).toBe(true);
-    expect(await backend.explanationLanguage()).toBe('fr');
+    expect(await backend.translationLanguage()).toBe('fr');
     expect(send.mock.calls.map((call) => call[0])).toEqual([
       { v: 1, type: 'AI_CANCEL', requestId: 'abc' },
       { v: 1, type: 'OPEN_SETTINGS', section: 'model' },
@@ -144,6 +185,21 @@ describe('createBackend', () => {
       { v: 1, type: 'GET_PUBLIC_SETTINGS' },
     ]);
   });
+  it('uses the saved translation target independently of the explanation language', async () => {
+    const send = vi.fn().mockResolvedValue({
+      ok: true,
+      data: { explanationLanguage: 'en', translationLanguage: 'ja' },
+    });
+    expect(await createBackend(send).translationLanguage()).toBe('ja');
+    expect(send).toHaveBeenCalledWith({ v: 1, type: 'GET_PUBLIC_SETTINGS' });
+  });
+
+  it('returns no translation target when settings could not be read', async () => {
+    expect(
+      await createBackend(vi.fn().mockResolvedValue(undefined)).translationLanguage(),
+    ).toBeUndefined();
+  });
+
   it('reports a failed OPEN_SETTINGS as false', async () => {
     const send = vi
       .fn()

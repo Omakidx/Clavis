@@ -9,7 +9,6 @@ import type { StepContext } from './StepTypes';
 import { ConnectStep } from './steps/ConnectStep';
 import { DisclosureStep } from './steps/DisclosureStep';
 import { DoneStep } from './steps/DoneStep';
-import { GetKeyStep } from './steps/GetKeyStep';
 import { PracticeStep } from './steps/PracticeStep';
 import { PreferencesStep } from './steps/PreferencesStep';
 import { PurposeStep } from './steps/PurposeStep';
@@ -20,7 +19,6 @@ const BODY: Record<StepId, (context: StepContext) => ReactNode> = {
   purpose: () => <PurposeStep />,
   disclosure: (context) => <DisclosureStep {...context} />,
   access: (context) => <SiteAccessStep {...context} />,
-  'get-key': (context) => <GetKeyStep {...context} />,
   connect: (context) => <ConnectStep {...context} />,
   preferences: (context) => <PreferencesStep {...context} />,
   practice: (context) => <PracticeStep {...context} />,
@@ -28,20 +26,20 @@ const BODY: Record<StepId, (context: StepContext) => ReactNode> = {
 };
 
 /**
- * The first-run wizard (UJ-01): purpose, data disclosure, website access, Groq key, connect,
+ * The first-run wizard (UJ-01): purpose, data disclosure, website access, Groq connection,
  * preferences, practice, done. Back and Next are always real buttons; focus moves to each
  * step's heading; one step at a time keeps the page usable at 200% zoom.
  */
-export function Wizard() {
+export function Wizard({ initialStep = 'purpose' }: { initialStep?: StepId }) {
   const settings = useSettings();
   const keys = useKeyStatus();
-  const [step, setStep] = useState<StepId>('purpose');
+  const [step, setStep] = useState<StepId>(initialStep);
   const [keySkipped, setKeySkipped] = useState(false);
   const headingRef = useRef<HTMLHeadingElement>(null);
   const nextRef = useRef<HTMLButtonElement>(null);
   const [nextFocusRequests, setNextFocusRequests] = useState(0);
 
-  useFocusOnChange(headingRef, step);
+  useFocusOnChange(headingRef, step, true);
 
   const settingsState = settings.resource.state;
   const keyState = keys.resource.state;
@@ -64,10 +62,10 @@ export function Wizard() {
     setStep('preferences');
   }, []);
 
-  const context: StepContext = { settings, keys, skipKey, goTo: setStep, focusNext };
+  const context: StepContext = { settings, keys, skipKey, focusNext };
   const index = STEPS.indexOf(step);
-  const nextLabel =
-    step === 'get-key' ? null : step === 'connect' ? t('onbConnectContinue') : t('uiNext');
+  const nextLabel = step === 'connect' ? t('onbConnectContinue') : t('uiNext');
+  const connectionBusy = step === 'connect' && keys.busy !== 'idle';
 
   return (
     <div className="clavis-wizard">
@@ -82,10 +80,17 @@ export function Wizard() {
         {BODY[step](context)}
         <div className="clavis-actions clavis-wizard__nav">
           {step === 'purpose' ? null : (
-            <Button onClick={() => setStep(previousStep(step))}>{t('uiBack')}</Button>
+            <Button disabled={connectionBusy} onClick={() => setStep(previousStep(step))}>
+              {t('uiBack')}
+            </Button>
           )}
-          {advanceable && nextLabel !== null ? (
-            <Button variant="primary" ref={nextRef} onClick={() => setStep(nextStep(step))}>
+          {advanceable ? (
+            <Button
+              variant="primary"
+              ref={nextRef}
+              disabled={connectionBusy}
+              onClick={() => setStep(nextStep(step))}
+            >
               {nextLabel}
             </Button>
           ) : null}

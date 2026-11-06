@@ -18,7 +18,7 @@ Saves your settings (explanation language, reading level, voice, speed, model, s
 
 ### tts
 
-The **Listen** button reads the selected text aloud with the voices on the user's device through `chrome.tts`. Settings uses `chrome.tts.getVoices` to list the available voices. An online voice is used only if the user chooses one in Settings, and it is labelled as online.
+The **Listen** button reads the selected text aloud with the voices on the user's device through `chrome.tts`. Settings uses `chrome.tts.getVoices` to list the available voices. Automatic tries a matching on-device voice first, then a matching online voice if needed. A user can also choose a specific online voice in Settings. Online voices send selected text to their provider and playback is labelled online.
 
 ### scripting
 
@@ -42,7 +42,7 @@ The only server Clavis contacts. The extension's background worker sends the Exp
 
 ### Optional host permissions: http://*/* and https://*/*
 
-Requested only when the user clicks **Enable on websites** during setup or in Settings. It is not requested at install. It lets the toolbar appear automatically when the user selects text. The script only notices selections on the device. It reads nothing in the background, and nothing is sent anywhere until the user clicks Explain. The user can decline it and still use Clavis, or remove it at any time in Settings or on `chrome://extensions`.
+Requested only when the user clicks **Enable on websites** during setup or in Settings. It is not requested at install. It lets the toolbar appear automatically when the user selects text. The script only notices selections on the device. It reads nothing in the background, and nothing is sent until the user asks for an explanation or starts Listen with an online voice. The user can decline it and still use Clavis, or remove it at any time in Settings or on `chrome://extensions`.
 
 ## Remote code
 
@@ -66,11 +66,11 @@ Chrome Web Store asks which user data the extension collects. "Collect" here inc
 | User activity | No | No analytics, clicks or keystrokes are recorded or sent. |
 | Website content | **Yes** | The text the user selects and up to 1,000 characters of nearby text are sent to Groq only when the user asks for an explanation. Never sent when text is only selected. Not stored. Not sent to the publisher. Text from password fields, form inputs and editable areas is never sent. |
 
-Clavis sends website content only to Groq to provide the explanation the user requested. If the user chooses an online voice, the selected text for Listen goes to that voice's provider. By default Listen is on-device. Mention this in the description of "Website content" if the dashboard has room.
+Clavis sends website content to Groq only to provide the explanation the user requested. Automatic Listen tries a matching on-device voice first, then an online voice if needed. Online playback sends the selected text to that voice's provider; this also applies when the user chooses an online voice explicitly. Mention this in the description of "Website content" if the dashboard has room.
 
 ### Certifications (tick all three)
 
-- I do not sell or transfer user data to third parties, outside of the approved use cases. Clavis transfers data only to Groq, and to an online voice provider if the user picks one, to provide the feature the user requested.
+- I do not sell or transfer user data to third parties, outside of the approved use cases. Clavis transfers data only to Groq, and to an online voice provider when Automatic falls back to one or the user chooses one, to provide the feature the user requested.
 - I do not use or transfer user data for purposes that are unrelated to my item's single purpose.
 - I do not use or transfer user data to determine creditworthiness or for lending purposes.
 
@@ -80,7 +80,7 @@ Paste into the "Notes for reviewers" field.
 
 - **Test without website access.** Install the extension and skip the website-access step. On any web page, select text, right-click and choose **Explain with Clavis**. You can also press Alt+Shift+E, or click the Clavis icon and choose **Explain on this page**. The optional all-sites permission is requested only from the button **Enable on websites**.
 - **Explain needs a Groq key.** Clavis has no server and ships no key. To test Explain, paste your own Groq API key (a free key from `https://console.groq.com/keys` is enough) in setup or Settings. Without a key, Explain asks you to connect Groq.
-- **Listen depends on installed voices.** Listen uses the voices on the computer. Some systems, including many Linux setups, have no voice installed, and Clavis then says no voice is available. Online voices are used only if chosen in Settings → Voice.
+- **Listen depends on the voices reported by Chrome.** Automatic tries a matching on-device voice first, then a matching online voice if no local voice is available or can start. Online voices send the selected text to their provider and playback is marked online. If no voice matches the language, Clavis shows a no-voice message.
 - **PDFs.** Click the Clavis icon, choose **Open PDF reader**, then choose a PDF from the computer. Chrome's built-in PDF viewer is not supported. PDFs are read in the browser and never uploaded.
 - **PDF.js bundle.** The bundled PDF.js code contains a Node-only code path that refers to `@napi-rs/canvas` (it uses `process.getBuiltinModule`). It is dead code in the browser: it never runs in the browser, and no such module is part of the package.
 - **Minimum Chrome version** is 147 (PDF.js 6 needs it).

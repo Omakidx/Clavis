@@ -192,7 +192,7 @@ export function createListenController(overrides: Partial<ListenDeps> = {}): Lis
         if (now() === 'done') return;
         const rate = listenRate(surface.slow, prefs.rate);
         slow = rate < TTS_RATES.normal;
-        const lang = prefs.lang ?? snapshot.languageHint;
+        const lang = surface.lang ?? prefs.lang ?? snapshot.languageHint;
         runs.set(requestId, terminal);
         sent = true;
         const reply = await call({

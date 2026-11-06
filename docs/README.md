@@ -11,6 +11,8 @@ The product's single purpose is **helping users understand what they read, in co
 
 ## Documentation map
 
+Installing the extension? Start with the **[Chrome setup guide](setup.md)** or the [repository README](../README.md).
+
 | File | Read it for |
 | --- | --- |
 | **[README.md](README.md)** | Product overview, developer quick-start, everyday workflows, release overview |

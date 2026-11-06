@@ -463,6 +463,6 @@ test.describe('Keyboard path', () => {
       { v: 1, type: 'CLAVIS_OPEN_SELECTION', focus: true },
     );
     expect(reply).toMatchObject({ ok: true, shown: true });
-    await expect.poll(() => tb(page).focusedAction()).toBe('listen');
+    await expect.poll(() => tb(page).focusedAction()).toBe('explain');
   });
 });

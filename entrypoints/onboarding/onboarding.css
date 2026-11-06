@@ -1,0 +1,119 @@
+.clavis-onboarding .clavis-progress {
+  gap: 6px;
+  align-items: center;
+}
+
+.clavis-onboarding .clavis-wizard__panel {
+  margin-bottom: 0;
+  padding: 0;
+}
+
+.clavis-onboarding__key-guide {
+  margin-bottom: var(--space-4);
+  padding: var(--space-2) 0;
+}
+
+.clavis-onboarding__key-guide p {
+  margin-bottom: 0;
+}
+
+.clavis-onboarding__key-guide summary {
+  min-height: var(--target);
+  padding: var(--space-2) 0;
+  color: var(--link);
+  cursor: pointer;
+}
+
+.clavis-onboarding__key-guide details[open] ol {
+  margin-top: var(--space-2);
+  margin-bottom: 0;
+}
+
+.clavis-onboarding .clavis-wizard__nav {
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--border);
+}
+
+@media (max-width: 42rem) {
+  .clavis-onboarding .clavis-wizard__panel {
+    padding: 0;
+  }
+
+  .clavis-onboarding__key-guide {
+    padding: var(--space-2) 0;
+  }
+}
+
+.clavis-onboarding .clavis-progress__item {
+  min-height: 32px;
+  gap: 6px;
+  padding: 4px 9px 4px 5px;
+  border: 0;
+  background: transparent;
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.25;
+  white-space: nowrap;
+}
+
+.clavis-onboarding .clavis-progress__number {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  align-self: center;
+  box-sizing: border-box;
+  padding: 1px 0 0;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  width: 22px;
+  height: 22px;
+  flex: 0 0 22px;
+  border: 0;
+  background: var(--surface);
+  font-size: 11px;
+}
+
+.clavis-onboarding .clavis-progress__number:has(svg) {
+  padding: 0;
+}
+
+.clavis-onboarding .clavis-progress__number svg {
+  width: 13px;
+  height: 13px;
+}
+
+.clavis-onboarding .clavis-progress__item--current {
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+  color: var(--fg);
+  font-weight: 500;
+}
+
+.clavis-onboarding .clavis-progress__item--current .clavis-progress__number {
+  background: var(--accent);
+  color: var(--accent-fg);
+}
+
+@media (max-width: 40rem) {
+  .clavis-onboarding .clavis-progress__item:not(.clavis-progress__item--current) {
+    padding: 5px;
+  }
+}
+
+.clavis-onboarding .clavis-wizard__nav > .clavis-button--primary {
+  margin-inline-start: auto;
+}
+
+/* Step changes and progress updates appear immediately. */
+.clavis-onboarding .clavis-wizard,
+.clavis-onboarding .clavis-wizard__panel,
+.clavis-onboarding .clavis-progress,
+.clavis-onboarding .clavis-progress * {
+  animation: none;
+  transition: none;
+  scroll-behavior: auto;
+}
+
+html:has(.clavis-onboarding) {
+  scrollbar-gutter: stable;
+  scroll-behavior: auto;
+}

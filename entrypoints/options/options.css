@@ -1,0 +1,398 @@
+.clavis-page--wide:has(.clavis-settings) {
+  max-width: 72rem;
+  padding: var(--space-4);
+  font-size: 1rem;
+}
+
+.clavis-page:has(.clavis-settings) .clavis-page__title {
+  margin-bottom: var(--space-4);
+  font-size: 1.6rem;
+}
+
+.clavis-settings {
+  display: grid;
+  grid-template-columns: minmax(12rem, 13rem) minmax(0, 1fr);
+  align-items: start;
+  gap: var(--space-5);
+}
+
+.clavis-settings__nav {
+  position: sticky;
+  top: var(--space-5);
+}
+
+.clavis-page .clavis-settings__nav-list {
+  display: grid;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.clavis-page .clavis-settings__nav-list li {
+  margin: 0;
+}
+
+.clavis-page .clavis-settings__nav-list a {
+  display: flex;
+  align-items: center;
+  min-height: 34px;
+  padding: 6px var(--space-3);
+  gap: 9px;
+  font-size: 0.95rem;
+  border-radius: 10px;
+  border: 0;
+  transition: background-color 160ms ease;
+  color: var(--fg);
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.clavis-page .clavis-settings__nav-list a:hover {
+  background: var(--surface);
+}
+
+.clavis-page .clavis-settings__nav-list a[aria-current='page'] {
+  background: #ffebc4;
+  color: var(--fg);
+  font-weight: 500;
+}
+
+.clavis-settings__content {
+  min-width: 0;
+}
+
+.clavis-settings__content > [hidden] {
+  display: none;
+}
+
+.clavis-settings .clavis-section {
+  margin-bottom: var(--space-5);
+  padding: var(--space-5);
+}
+
+.clavis-settings .clavis-section h2 {
+  margin-bottom: var(--space-3);
+  font-size: 1.2rem;
+}
+
+.clavis-settings .clavis-section:last-child {
+  margin-bottom: 0;
+}
+
+.clavis-settings .clavis-facts {
+  grid-template-columns: minmax(5rem, max-content) minmax(0, 1fr);
+  gap: var(--space-1) var(--space-3);
+  margin-bottom: var(--space-4);
+  font-size: 0.9rem;
+}
+
+.clavis-settings .clavis-facts dt,
+.clavis-settings .clavis-facts dd {
+  margin-bottom: 0;
+  padding-block: 0;
+}
+
+.clavis-settings .clavis-key-form-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.clavis-settings .clavis-key-form-heading h3 {
+  margin: 0;
+}
+
+.clavis-settings .clavis-fieldset,
+.clavis-settings .clavis-field {
+  max-width: 38rem;
+}
+
+@media (max-width: 42rem) {
+  .clavis-page:has(.clavis-settings) {
+    padding: var(--space-4) var(--space-3);
+  }
+
+  .clavis-page:has(.clavis-settings) .clavis-page__title {
+    margin-bottom: var(--space-3);
+    font-size: 1.6rem;
+  }
+
+  .clavis-settings {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-4);
+  }
+
+  .clavis-settings__nav {
+    position: static;
+  }
+
+  .clavis-page .clavis-settings__nav-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .clavis-page .clavis-settings__nav-list a {
+    height: 100%;
+    font-size: 0.95rem;
+  }
+
+  .clavis-settings .clavis-section {
+    padding: var(--space-4);
+  }
+}
+
+@media (forced-colors: active) {
+  .clavis-page .clavis-settings__nav-list a[aria-current='page'] {
+    outline: 2px solid Highlight;
+    outline-offset: -2px;
+    box-shadow: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .clavis-page .clavis-settings__nav-list a {
+    transition: none;
+  }
+}
+
+/* Sections share the page surface; spacing alone separates each settings group. */
+.clavis-settings .clavis-section {
+  padding: 0;
+  margin-bottom: var(--space-6);
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  backdrop-filter: none;
+  box-shadow: none;
+}
+
+.clavis-settings .clavis-facts {
+  font-size: 0.95rem;
+  gap: 3px var(--space-3);
+}
+
+.clavis-settings .clavis-facts dd {
+  font-weight: 400;
+}
+
+.clavis-settings .clavis-badge {
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+
+@media (pointer: coarse) {
+  .clavis-settings .clavis-button {
+    min-height: 40px;
+  }
+}
+
+@media (forced-colors: active) {
+  .clavis-settings .clavis-notice,
+  .clavis-settings .clavis-button {
+    background: Canvas;
+    color: CanvasText;
+    box-shadow: none;
+    backdrop-filter: none;
+    outline: 1px solid CanvasText;
+  }
+}
+
+.clavis-settings-icon {
+  width: 18px;
+  height: 18px;
+  flex: none;
+}
+
+.clavis-groq-icon {
+  display: block;
+  width: 24px;
+  height: 24px;
+  flex: none;
+  border-radius: 6px;
+}
+
+.clavis-settings .clavis-section > h2:has(:is(.clavis-settings-icon, .clavis-groq-icon)) {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.clavis-key-storage-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.clavis-info-icon {
+  width: 18px;
+  height: 18px;
+  margin-top: 2px;
+  flex: none;
+  color: #805000;
+}
+
+/* Action feedback floats outside the settings layout, so saves never move the controls. */
+.clavis-toast-host {
+  position: fixed;
+  z-index: 1000;
+  right: max(12px, env(safe-area-inset-right));
+  bottom: max(12px, env(safe-area-inset-bottom));
+  width: min(320px, calc(100vw - 24px));
+  pointer-events: none;
+}
+
+.clavis-toast {
+  display: grid;
+  grid-template-columns: 26px minmax(0, 1fr) 22px;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 0;
+  border-radius: 18px;
+  background: rgb(252 253 247 / 97%);
+  color: var(--fg);
+  box-shadow: none;
+  backdrop-filter: blur(14px) saturate(135%);
+  font-size: 12px;
+  line-height: 1.4;
+  pointer-events: auto;
+  overflow-wrap: anywhere;
+  animation: clavis-toast-enter 220ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.clavis-toast--success {
+  background: color-mix(in srgb, var(--success-bg) 25%, var(--bg));
+}
+.clavis-toast--warning {
+  background: color-mix(in srgb, var(--warning-bg) 25%, var(--bg));
+}
+.clavis-toast--danger {
+  background: color-mix(in srgb, var(--danger-bg) 25%, var(--bg));
+}
+
+.clavis-toast__content p {
+  margin: 0;
+}
+.clavis-toast__content p + p {
+  margin-top: 3px;
+  font-size: 11px;
+  color: var(--muted);
+}
+.clavis-toast__content .clavis-notice {
+  padding: 0;
+  border: 0;
+  background: none;
+  box-shadow: none;
+  backdrop-filter: none;
+}
+.clavis-toast__content .clavis-actions {
+  margin-top: var(--space-2);
+}
+.clavis-toast__content .clavis-button {
+  min-height: 32px;
+}
+
+.clavis-toast__close {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--fg);
+  font: inherit;
+  font-size: 1.25rem;
+  line-height: 1;
+  cursor: pointer;
+}
+.clavis-toast__close:hover {
+  background: var(--surface);
+}
+.clavis-toast__close:focus-visible {
+  background: var(--surface);
+  opacity: 1;
+}
+
+@media (forced-colors: active) {
+  .clavis-toast {
+    background: Canvas;
+    color: CanvasText;
+    border-color: CanvasText;
+    backdrop-filter: none;
+  }
+  .clavis-toast__close {
+    color: CanvasText;
+  }
+}
+
+#section-model .clavis-select {
+  width: min(100%, 340px);
+}
+
+/* The preview's explicit dark-mode switch applies to the same Settings surfaces. */
+.clavis-toast__symbol {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--info-bg);
+  color: var(--link);
+}
+
+.clavis-toast__symbol svg,
+.clavis-toast__close svg {
+  width: 15px;
+  height: 15px;
+}
+
+.clavis-toast--success .clavis-toast__symbol {
+  background: var(--success-bg);
+  color: var(--success);
+}
+
+.clavis-toast--danger .clavis-toast__symbol {
+  background: var(--danger-bg);
+  color: var(--danger);
+}
+
+.clavis-toast--warning .clavis-toast__symbol {
+  background: var(--warning-bg);
+  color: var(--warning);
+}
+
+.clavis-toast__close {
+  color: var(--muted);
+  opacity: 0.65;
+  transition:
+    opacity 140ms ease,
+    background-color 140ms ease;
+}
+
+.clavis-toast__close:hover {
+  opacity: 1;
+}
+
+@keyframes clavis-toast-enter {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .clavis-toast {
+    animation: none;
+  }
+  .clavis-toast__close {
+    transition: none;
+  }
+}

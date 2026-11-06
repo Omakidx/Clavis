@@ -2,6 +2,7 @@ import { GroqError } from '../../ai/errors';
 import type { GroqModel } from '../../ai/groq';
 import {
   modelIdSchema,
+  type AccessProbe,
   type KeyStatus,
   type KeyStorage,
   type MessageReply,
@@ -14,6 +15,8 @@ import { failure, success } from '../replies';
 /** The only provider calls the key lifecycle needs. */
 export interface KeyProvider {
   listModels(apiKey: string, signal?: AbortSignal): Promise<GroqModel[]>;
+  /** Optional for older providers and test doubles. Sends no key. */
+  probeUnauthenticatedAccess?(): Promise<AccessProbe>;
 }
 
 export interface KeyServiceDeps {
@@ -47,7 +50,7 @@ export function toModelInfos(models: readonly GroqModel[]): ModelInfo[] {
 
 /**
  * Run the key check (FR-004, architecture §6): list the models with the key.
- * 200 -> valid; 401/403 -> invalid; anything else (network, timeout, 429, 5xx, bad body)
+ * 200 -> valid; 401 -> invalid; anything else (403, network, timeout, 429, 5xx, bad body)
  * -> unverified, which is "connection not verified", NEVER "invalid key".
  */
 export async function checkKey(
@@ -59,10 +62,34 @@ export async function checkKey(
     const models = await provider.listModels(apiKey);
     return { verification: 'valid', models: toModelInfos(models), at: now() };
   } catch (error) {
-    if (error instanceof GroqError && error.code === 'INVALID_API_KEY') {
-      return { verification: 'invalid' };
+    if (
+      error instanceof GroqError &&
+      error.code === 'INVALID_API_KEY' &&
+      (error.status === undefined || error.status === 401)
+    ) {
+      return {
+        verification: 'invalid',
+        ...(error.status !== undefined ? { verificationHttpStatus: error.status } : {}),
+      };
     }
-    return { verification: 'unverified' };
+    let accessProbe: AccessProbe | undefined;
+    if (error instanceof GroqError && error.status === 403 && provider.probeUnauthenticatedAccess) {
+      try {
+        accessProbe = await provider.probeUnauthenticatedAccess();
+      } catch {
+        accessProbe = 'unreachable';
+      }
+    }
+    return {
+      verification: 'unverified',
+      ...(error instanceof GroqError && error.status !== undefined
+        ? { verificationHttpStatus: error.status }
+        : {}),
+      ...(error instanceof GroqError && error.forbiddenReason !== undefined
+        ? { forbiddenReason: error.forbiddenReason }
+        : {}),
+      ...(accessProbe === undefined ? {} : { accessProbe }),
+    };
   }
 }
 
@@ -74,7 +101,7 @@ export interface KeyService {
   test(): Promise<MessageReply<KeyStatus>>;
   remove(): Promise<MessageReply<KeyStatus>>;
   /**
-   * An AI request came back 401/403: mark the key invalid so the UI prompts for a new one
+   * An AI request came back 401: mark the key invalid so the UI prompts for a new one
    * (FR-072). Keeps every setting. No-op if the key has changed since.
    */
   markInvalid(apiKey: string): Promise<void>;

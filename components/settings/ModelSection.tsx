@@ -3,6 +3,7 @@ import { t } from '../../lib/i18n';
 import type { KeyStatusHook } from '../../lib/ui-client/use-key-status';
 import type { SettingsHook } from '../../lib/ui-client/use-settings';
 import { ModelField } from './ModelField';
+import { SettingsIcon } from '../common/Icons';
 import { ResourceGate } from './ResourceGate';
 import { useSaveStatus } from './use-save-status';
 import type { PreferencesPatch } from '../../lib/contracts/setup';
@@ -21,7 +22,10 @@ export function ModelSection({ settings, keys }: ModelSectionProps) {
 
   return (
     <section className="clavis-section" aria-labelledby={headingId} id="section-model">
-      <h2 id={headingId}>{t('modelTitle')}</h2>
+      <h2 id={headingId} tabIndex={-1}>
+        <SettingsIcon name="preferences" />
+        {t('modelTitle')}
+      </h2>
       <ResourceGate resource={settings.resource}>
         {(snapshot) => (
           <>

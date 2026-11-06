@@ -75,6 +75,19 @@ describe('preferences', () => {
     expect(onboardingStateSchema.safeParse(DEFAULT_ONBOARDING).success).toBe(true);
   });
 
+  it('accepts an optional translation target and validates its language tag', () => {
+    expect(preferencesSchema.parse(DEFAULT_PREFERENCES).translationLanguage).toBeUndefined();
+    expect(
+      preferencesSchema.parse({ ...DEFAULT_PREFERENCES, translationLanguage: 'ja' })
+        .translationLanguage,
+    ).toBe('ja');
+    expect(preferencesPatchSchema.safeParse({ translationLanguage: 'pt-BR' }).success).toBe(true);
+    expect(preferencesPatchSchema.safeParse({ translationLanguage: null }).success).toBe(true);
+    for (const translationLanguage of ['', 'not a language', 42]) {
+      expect(preferencesPatchSchema.safeParse({ translationLanguage }).success).toBe(false);
+    }
+  });
+
   it('patch: at least one field, null clears optional fields only', () => {
     expect(preferencesPatchSchema.safeParse({}).success).toBe(false);
     expect(preferencesPatchSchema.safeParse({ ttsLang: null, model: null }).success).toBe(true);
@@ -121,13 +134,25 @@ describe('key, AI and site-access status', () => {
     expect(keyStatusSchema.safeParse({ ...status, last4: '12345' }).success).toBe(false);
     expect(keyStatusSchema.safeParse({ ...status, apiKey: 'gsk_x' }).success).toBe(false);
     expect(Object.keys(keyStatusSchema.shape).sort()).toEqual([
+      'accessProbe',
+      'forbiddenReason',
       'hasKey',
       'last4',
       'models',
       'storage',
       'verification',
+      'verificationHttpStatus',
       'verifiedAt',
     ]);
+  });
+
+  it('accepts only the four fixed keyless access probe outcomes', () => {
+    for (const accessProbe of ['auth-required', 'forbidden', 'unreachable', 'other-response']) {
+      expect(keyStatusSchema.safeParse({ ...status, accessProbe }).success).toBe(true);
+    }
+    expect(
+      keyStatusSchema.safeParse({ ...status, accessProbe: 'raw-provider-message' }).success,
+    ).toBe(false);
   });
 
   it('keeps the storage choice to local or session, never sync', () => {

@@ -32,7 +32,9 @@ test('the popup sends a missing key straight to Settings > Groq API key', async 
 }) => {
   const { page } = await openExtensionPage(context, extensionId, 'popup');
   await expect(page.getByTestId('popup-groq')).toHaveText('Setup needed');
-  await expect(page.getByText('Connect your Groq key to use Explain.')).toBeVisible();
+  await expect(
+    page.getByText('Explain needs a Groq key. Listen and the PDF reader work without one.'),
+  ).toBeVisible();
   const opened = context.waitForEvent('page');
   await page.getByRole('button', { name: 'Connect Groq' }).click();
   const settings = await opened;
@@ -46,6 +48,10 @@ test('Settings > Website access explains the paths that work without access', as
   extensionId,
 }) => {
   const { page } = await openExtensionPage(context, extensionId, 'options');
+  await page
+    .getByRole('navigation', { name: 'Settings sections' })
+    .getByRole('link', { name: 'Website access' })
+    .click();
   const help = page.getByTestId('site-access-help');
   await expect(help).toBeVisible();
   await expect(help).toContainText('right-click it and choose Explain with Clavis');
@@ -54,19 +60,38 @@ test('Settings > Website access explains the paths that work without access', as
   await expect(help).toContainText('set Site access to On all sites');
 });
 
-test('keyboard focus is always visible on the popup and Settings', async ({
+test('keyboard focus uses the page surface cue without an outline ring', async ({
   context,
   extensionId,
 }) => {
   for (const name of ['popup', 'options'] as const) {
     const { page } = await openExtensionPage(context, extensionId, name);
     await page.keyboard.press('Tab');
-    const ring = await page.evaluate(() => {
-      const style = getComputedStyle(document.activeElement as Element);
-      return { style: style.outlineStyle, width: parseFloat(style.outlineWidth) };
+    const focus = await page.evaluate(async () => {
+      const active = document.activeElement as HTMLElement;
+      const style = getComputedStyle(active);
+      const surface = () =>
+        [
+          style.backgroundColor,
+          style.backgroundImage,
+          style.boxShadow,
+          style.textDecorationLine,
+        ].join('|');
+      const focusedSurface = surface();
+      const visible = active.matches(':focus-visible');
+      const outline = style.outlineStyle;
+      active.blur();
+      await new Promise((resolve) => window.setTimeout(resolve, 200));
+      return {
+        visible,
+        outline,
+        focusedSurface,
+        restingSurface: surface(),
+      };
     });
-    expect(ring.style, name).not.toBe('none');
-    expect(ring.width, name).toBeGreaterThanOrEqual(2);
+    expect(focus.visible, name).toBe(true);
+    expect(focus.outline, name).toBe('none');
+    expect(focus.focusedSurface, name).not.toBe(focus.restingSurface);
   }
 });
 
@@ -87,6 +112,10 @@ test('text from files and pages keeps its own direction (dir="auto")', async ({
   await openFixtureReady(page, 'text-1page.pdf');
   await expect(page.getByTestId('file-name')).toHaveAttribute('dir', 'auto');
   const options = await openExtensionPage(context, extensionId, 'options');
+  await options.page
+    .getByRole('navigation', { name: 'Settings sections' })
+    .getByRole('link', { name: 'Website access' })
+    .click();
   await options.page.getByLabel('Website address').fill('bücher.example');
   await options.page.getByRole('button', { name: 'Add website' }).click();
   await expect(options.page.locator('.clavis-site-row__host')).toHaveAttribute('dir', 'auto');

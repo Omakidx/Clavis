@@ -19,14 +19,14 @@
 
 /* Colours are variables so dark mode and high contrast only re-declare them. */
 .panel {
-  --bar: #1b1f24;
-  --on-bar: #fff;
-  --hover: #38414c;
-  --ring: #8db3ff;
-  --surface: #fff;
-  --line: #d0d7de;
-  --ink: #1b1f24;
-  --muted: #4a5360;
+  --bar: #f6f7eb;
+  --on-bar: #292314;
+  --hover: #ffce79;
+  --ring: #805000;
+  --surface: #f6f7eb;
+  --line: #dce0cf;
+  --ink: #252820;
+  --muted: #5d6255;
   position: fixed;
   left: 0;
   top: 0;
@@ -37,7 +37,7 @@
   width: max-content;
   max-width: min(352px, calc(100vw - 16px));
   font:
-    14px/1.4 system-ui,
+    13px/1.5 system-ui,
     sans-serif;
   color: var(--ink);
   pointer-events: auto;
@@ -69,21 +69,46 @@
   width: max-content;
   background: var(--bar);
   border: 1px solid transparent;
-  border-radius: 8px;
-  box-shadow: 0 2px 8px rgb(0 0 0 / 35%);
+  border-radius: 16px;
+  box-shadow: 0 2px 8px rgb(50 45 25 / 8%);
 }
 
 .button {
   box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
   min-width: 44px;
   min-height: 32px;
   padding: 4px 12px;
   border: 1px solid transparent;
-  border-radius: 6px;
-  background: transparent;
+  border-radius: 999px;
+  background: #fca311;
   color: var(--on-bar);
   font: inherit;
   cursor: pointer;
+  white-space: nowrap;
+}
+
+.toolbar-icon {
+  display: block;
+  width: 18px;
+  height: 18px;
+  flex: none;
+}
+
+.button--speak {
+  background: rgb(255 255 255 / 40%);
+  border-color: var(--line);
+}
+
+.button--speed {
+  min-width: 58px;
+  padding-inline: 10px;
+  background: transparent;
+  border-color: var(--line);
+  font-variant-numeric: tabular-nums;
 }
 
 .button:hover,
@@ -99,7 +124,7 @@
 /* Stop (Listen is playing) and the Slow toggle when it is on. A border keeps "on" visible without colour. */
 .button[data-state='playing'],
 .button[aria-pressed='true'] {
-  background: var(--hover);
+  background: #ffebc4;
   border-color: currentColor;
 }
 
@@ -129,8 +154,8 @@
 
 .button:focus-visible,
 .card__text--scroll:focus-visible {
-  outline: 2px solid var(--ring);
-  outline-offset: 1px;
+  outline: none;
+  background: var(--hover);
 }
 
 /* The notice's Close button sits on the card, not on the dark bar. */
@@ -150,8 +175,8 @@
   padding: 10px 12px;
   background: var(--surface);
   border: 1px solid var(--line);
-  border-radius: 8px;
-  box-shadow: 0 2px 8px rgb(0 0 0 / 25%);
+  border-radius: 16px;
+  box-shadow: 0 2px 8px rgb(50 45 25 / 8%);
 }
 
 .card p {
@@ -188,22 +213,10 @@
   white-space: nowrap;
 }
 
-@media (prefers-color-scheme: dark) {
-  .panel {
-    --bar: #e8ecf1;
-    --on-bar: #14181d;
-    --hover: #c3ccd6;
-    --ring: #0b57d0;
-    --surface: #1d232b;
-    --line: #38414c;
-    --ink: #e8ecf1;
-    --muted: #a8b3c0;
-  }
-}
-
 /* High contrast: the browser forces system colours and drops shadows; keep a visible hover. */
 @media (forced-colors: active) {
   .button:hover,
+  .button:focus-visible,
   .button[data-state='working'],
   .button[data-state='playing'],
   .button[aria-pressed='true'] {

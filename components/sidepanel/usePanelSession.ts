@@ -41,7 +41,7 @@ export function usePanelSession(
       // The Translate tab needs the language; only when that tab is switched on.
       const language =
         handoff.targetLanguage ??
-        (FEATURES.translateTab ? await backend.explanationLanguage() : undefined);
+        (FEATURES.translateTab ? await backend.translationLanguage() : undefined);
       if (cancelled) return;
       existing?.destroy();
       const next = new ExplainSession({

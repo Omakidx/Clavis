@@ -55,24 +55,22 @@ test('onboarding: every step', async () => {
   await sweep(page, 'onboarding 3 website access');
   await page.getByRole('button', { name: "Not now — I'll use right-click instead" }).click();
   await next.click();
-  await sweep(page, 'onboarding 4 get a key');
-  await page.getByRole('button', { name: 'I have my key' }).click();
-  await sweep(page, 'onboarding 5 connect');
+  await sweep(page, 'onboarding 4 get and connect a key');
   await page.getByLabel('Your Groq key', { exact: true }).fill(ACCEPT_KEY);
   await page.getByRole('button', { name: 'Connect', exact: true }).click();
   await expect(page.locator('[data-outcome]')).toHaveAttribute('data-outcome', 'valid', {
     timeout: 20_000,
   });
-  await sweep(page, 'onboarding 5 connected');
+  await sweep(page, 'onboarding 4 connected');
   await page.getByRole('button', { name: 'Continue' }).click();
-  await sweep(page, 'onboarding 6 preferences');
+  await sweep(page, 'onboarding 5 preferences');
   await next.click();
-  await sweep(page, 'onboarding 7 practice');
+  await sweep(page, 'onboarding 6 practice');
   await next.click();
-  await sweep(page, 'onboarding 8 done, access declined (shows the help)');
+  await sweep(page, 'onboarding 7 done, access declined (shows the help)');
   await page.getByRole('button', { name: 'Finish setup' }).click();
   await expect(page.getByText('Setup is complete.')).toBeVisible();
-  await sweep(page, 'onboarding 8 finished');
+  await sweep(page, 'onboarding 7 finished');
 });
 
 test('popup: connected, site access off with its help open, and on a tab that looks like a PDF', async () => {

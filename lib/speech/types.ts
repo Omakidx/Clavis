@@ -7,7 +7,7 @@ export interface SpeechVoice {
   name: string;
   /** BCP-47-ish tag as reported by the engine; empty string when the engine gave none. */
   lang: string;
-  /** Network voice: higher latency, and the text leaves the device (requirements §4.3, D-22). */
+  /** Network voice: higher latency, and the text leaves the device. */
   remote: boolean;
   engine: SpeechEngineId;
   /** chrome.tts only: event types the voice promises to send. Absent means unknown. */
@@ -97,8 +97,7 @@ export type SpeechMessageKey =
  * Why a NO_VOICE happened, for the caller to turn into advice:
  * - `no-voices`: no engine has any usable voice (on Linux: speech-dispatcher is missing).
  * - `no-language-match`: voices exist, none for this language (never substituted, FR-024).
- * - `online-only`: the only voices for this language are network voices, which Listen does not
- *   use unless the user chose one (D-22, the text would leave the device).
+ * - `online-only`: retained for older replies; Automatic now tries matching online voices.
  * - `start-failed`: a voice was found but never started speaking.
  * - `voice-missing`: the explicitly requested voice is not installed.
  */

@@ -103,15 +103,19 @@ export function ErrorNotice({ error, onRetry, onOpenSettings }: ErrorNoticeProps
  * browser's own initial focus applies). Used for wizard step headings so screen-reader and
  * keyboard users land on the new content.
  */
-export function useFocusOnChange(ref: RefObject<HTMLElement | null>, trigger: unknown): void {
+export function useFocusOnChange(
+  ref: RefObject<HTMLElement | null>,
+  trigger: unknown,
+  preventScroll = false,
+): void {
   const first = useRef(true);
   useEffect(() => {
     if (first.current) {
       first.current = false;
       return;
     }
-    ref.current?.focus();
-  }, [ref, trigger]);
+    ref.current?.focus({ preventScroll });
+  }, [ref, trigger, preventScroll]);
 }
 
 interface ExternalLinkProps {

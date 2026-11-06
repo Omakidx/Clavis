@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
+import { GroqError } from '../../../lib/ai/errors';
 import { keyStatusSchema, messageReplySchema } from '../../../lib/contracts';
-import { toModelInfos } from '../../../lib/router/handlers/key';
+import { checkKey, toModelInfos } from '../../../lib/router/handlers/key';
 import { STORAGE_KEYS } from '../../../lib/storage';
 import { FAKE_KEY, KEY_MESSAGES, MODELS, createHarness, failWith, pageSender } from './harness';
 
@@ -41,13 +42,19 @@ describe('SET_API_KEY', () => {
     expect(h.provider.listModels).toHaveBeenCalledWith(FAKE_KEY);
   });
 
-  it('401/403 from Groq: stored but marked invalid, verification cleared (FR-072)', async () => {
+  it('401 from Groq: stored but marked invalid, verification cleared (FR-072)', async () => {
     const h = createHarness();
     h.provider.listModels.mockRejectedValue(failWith('INVALID_API_KEY', 401));
     const reply = keyReply.parse(await h.call(setKey('local'), options));
     expect(reply).toMatchObject({
       ok: true,
-      data: { hasKey: true, verification: 'invalid', verifiedAt: null, models: [] },
+      data: {
+        hasKey: true,
+        verification: 'invalid',
+        verifiedAt: null,
+        models: [],
+        verificationHttpStatus: 401,
+      },
     });
     // The key is kept so the user can see "invalid", fix or replace it.
     expect((await status(h)).hasKey).toBe(true);
@@ -135,12 +142,141 @@ describe('TEST_API_KEY', () => {
       { v: 1, type: 'UPDATE_PREFERENCES', patch: { explanationLanguage: 'fr' } },
       options,
     );
-    h.provider.listModels.mockRejectedValue(failWith('INVALID_API_KEY', 403));
+    h.provider.listModels.mockRejectedValue(failWith('INVALID_API_KEY', 401));
     const reply = keyReply.parse(await h.call(KEY_MESSAGES['TEST_API_KEY'], options));
     expect(reply).toMatchObject({
       data: { verification: 'invalid', verifiedAt: null, models: [] },
     });
     expect(await h.settingsStore.getPreferences()).toMatchObject({ explanationLanguage: 'fr' });
+  });
+
+  it('a generic 403 keeps the key and known models, and exposes only its HTTP status', async () => {
+    const h = createHarness({ now: () => 50 });
+    await h.call(setKey('local'), options);
+    h.provider.listModels.mockRejectedValue(failWith('NETWORK_ERROR', 403));
+    const reply = keyReply.parse(await h.call(KEY_MESSAGES['TEST_API_KEY'], options));
+    expect(reply).toMatchObject({
+      ok: true,
+      data: {
+        hasKey: true,
+        verification: 'unverified',
+        verificationHttpStatus: 403,
+        verifiedAt: 50,
+        models: toModelInfos(MODELS),
+      },
+    });
+    expect(await status(h)).toMatchObject({ verificationHttpStatus: 403 });
+    expect(JSON.stringify(reply)).not.toContain(FAKE_KEY);
+  });
+
+  it('runs one keyless probe only after 403 and persists its fixed result', async () => {
+    const h = createHarness();
+    const probe = vi.fn().mockResolvedValue('auth-required' as const);
+    Object.assign(h.provider, { probeUnauthenticatedAccess: probe });
+    h.provider.listModels.mockRejectedValue(failWith('NETWORK_ERROR', 403));
+    const reply = keyReply.parse(await h.call(setKey('local'), options));
+    expect(reply).toMatchObject({
+      data: {
+        verification: 'unverified',
+        verificationHttpStatus: 403,
+        accessProbe: 'auth-required',
+      },
+    });
+    expect(probe).toHaveBeenCalledTimes(1);
+    expect(probe.mock.calls[0]).toEqual([]);
+    expect(await status(h)).toMatchObject({ accessProbe: 'auth-required' });
+
+    h.provider.listModels.mockRejectedValueOnce(failWith('INVALID_API_KEY', 401));
+    const invalid = keyReply.parse(await h.call(KEY_MESSAGES['TEST_API_KEY'], options));
+    expect(invalid).toMatchObject({ data: { verification: 'invalid' } });
+    if (!invalid.ok) throw new Error('invalid key reply failed');
+    expect(invalid.data).not.toHaveProperty('accessProbe');
+    expect(probe).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not mark a 403 invalid even if a provider uses the invalid-key code', async () => {
+    const probe = vi.fn().mockResolvedValue('forbidden' as const);
+    const result = await checkKey(
+      {
+        listModels: vi.fn().mockRejectedValue(failWith('INVALID_API_KEY', 403)),
+        probeUnauthenticatedAccess: probe,
+      },
+      FAKE_KEY,
+      Date.now,
+    );
+    expect(result).toMatchObject({ verification: 'unverified', accessProbe: 'forbidden' });
+    expect(probe).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not attach a late keyless probe to a replacement key', async () => {
+    const h = createHarness();
+    await h.call(setKey('local'), options);
+    let enteredProbe: () => void = () => undefined;
+    const entered = new Promise<void>((resolve) => (enteredProbe = resolve));
+    let releaseProbe: (value: 'forbidden') => void = () => undefined;
+    const pendingProbe = new Promise<'forbidden'>((resolve) => (releaseProbe = resolve));
+    Object.assign(h.provider, {
+      probeUnauthenticatedAccess: vi.fn(() => {
+        enteredProbe();
+        return pendingProbe;
+      }),
+    });
+    h.provider.listModels.mockRejectedValueOnce(failWith('NETWORK_ERROR', 403));
+    const oldCheck = h.call(KEY_MESSAGES['TEST_API_KEY'], options);
+    await entered;
+    await h.call(setKey('local', 'gsk_TESTreplacement00000000000007777'), options);
+    releaseProbe('forbidden');
+    const reply = keyReply.parse(await oldCheck);
+    expect(reply).toMatchObject({ data: { verification: 'valid', last4: '7777' } });
+    if (!reply.ok) throw new Error('replacement key reply failed');
+    expect(reply.data).not.toHaveProperty('accessProbe');
+    expect(await status(h)).not.toHaveProperty('accessProbe');
+  });
+
+  it('records unreachable if an optional keyless probe throws, but never probes non-403 errors', async () => {
+    const probe = vi.fn().mockRejectedValue(new Error(`private ${FAKE_KEY}`));
+    const first = await checkKey(
+      {
+        listModels: vi.fn().mockRejectedValue(failWith('NETWORK_ERROR', 403)),
+        probeUnauthenticatedAccess: probe,
+      },
+      FAKE_KEY,
+      Date.now,
+    );
+    expect(first).toMatchObject({ verification: 'unverified', accessProbe: 'unreachable' });
+    expect(probe).toHaveBeenCalledTimes(1);
+    for (const error of [
+      failWith('INVALID_API_KEY', 401),
+      failWith('NETWORK_ERROR', 429),
+      new TypeError('offline'),
+    ]) {
+      const result = await checkKey(
+        { listModels: vi.fn().mockRejectedValue(error), probeUnauthenticatedAccess: probe },
+        FAKE_KEY,
+        Date.now,
+      );
+      expect(result).not.toHaveProperty('accessProbe');
+    }
+    expect(probe).toHaveBeenCalledTimes(1);
+  });
+
+  it('passes only a fixed 403 reason through the privileged status', async () => {
+    const h = createHarness();
+    await h.call(setKey('local'), options);
+    h.provider.listModels.mockRejectedValue(
+      new GroqError('NETWORK_ERROR', { status: 403, forbiddenReason: 'edge_block' }),
+    );
+    const reply = keyReply.parse(await h.call(KEY_MESSAGES['TEST_API_KEY'], options));
+    expect(reply).toMatchObject({
+      ok: true,
+      data: {
+        verification: 'unverified',
+        verificationHttpStatus: 403,
+        forbiddenReason: 'edge_block',
+      },
+    });
+    expect(JSON.stringify(reply)).not.toContain(FAKE_KEY);
+    expect(JSON.stringify(reply)).not.toContain('Cloudflare Error 1010');
   });
 
   it('discards a check that finished after the key was replaced', async () => {

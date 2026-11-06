@@ -131,7 +131,9 @@ export function Reader() {
     >
       <header className="reader__header" inert={pendingLink !== null}>
         <div className="reader__heading">
-          <h1 className="reader__title">{t('readerTitle')}</h1>
+          <h1 className="reader__title">
+            <span>{t('readerTitle')}</span>
+          </h1>
           {name === '' ? null : (
             <span className="reader__file" title={name} dir="auto" data-testid="file-name">
               {name}

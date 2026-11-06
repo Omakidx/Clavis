@@ -16,12 +16,11 @@ const facts = (patch: Partial<WizardFacts> = {}): WizardFacts => ({
 });
 
 describe('wizard step logic', () => {
-  it('runs purpose, disclosure, access, key, connect, preferences, practice, done', () => {
+  it('runs seven steps with getting and connecting a key together', () => {
     expect(STEPS).toEqual([
       'purpose',
       'disclosure',
       'access',
-      'get-key',
       'connect',
       'preferences',
       'practice',
@@ -31,6 +30,7 @@ describe('wizard step logic', () => {
     expect(previousStep('purpose')).toBe('purpose');
     expect(nextStep('purpose')).toBe('disclosure');
     expect(previousStep('access')).toBe('disclosure');
+    expect(previousStep('connect')).toBe('access');
   });
 
   it('cannot leave the disclosure before it is acknowledged (FR-002)', () => {
@@ -57,7 +57,6 @@ describe('wizard step logic', () => {
   });
 
   it('lets setup finish without a key (UJ-05)', () => {
-    expect(canAdvance('get-key', facts())).toBe(true);
     expect(canAdvance('connect', facts())).toBe(false);
     expect(canAdvance('connect', facts({ keySkipped: true }))).toBe(true);
     expect(canAdvance('connect', facts({ hasKey: true }))).toBe(true);

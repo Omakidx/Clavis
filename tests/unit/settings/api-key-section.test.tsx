@@ -1,8 +1,12 @@
 // @vitest-environment jsdom
 import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ApiKeySection } from '../../../components/settings/ApiKeySection';
+import {
+  KeyOutcomeNotice,
+  KeyVerificationResponse,
+} from '../../../components/settings/KeyConnectForm';
 import { useKeyStatus } from '../../../lib/ui-client/use-key-status';
 import {
   createFakeBackend,
@@ -29,9 +33,125 @@ function setup(options: FakeBackendOptions = {}, tested = false) {
   return userEvent.setup();
 }
 
-afterEach(() => cleanup());
+afterEach(() => {
+  cleanup();
+  Reflect.deleteProperty(navigator, 'clipboard');
+});
 
 describe('API key section', () => {
+  it.each([
+    ['forbidden', /without an API key was also denied \(HTTP 403\)/],
+    ['auth-required', /HTTP 401 without a key as expected, but HTTP 403/],
+    ['unreachable', /comparison request got no HTTP response/],
+    ['other-response', /comparison response was unexpected/],
+  ] as const)('explains the safe %s comparison result', (accessProbe, conclusion) => {
+    installCatalog();
+    render(
+      <KeyOutcomeNotice
+        outcome={{
+          kind: 'unverified',
+          status: {
+            hasKey: true,
+            storage: 'local',
+            last4: '9876',
+            verification: 'unverified',
+            verificationHttpStatus: 403,
+            forbiddenReason: 'unknown',
+            accessProbe,
+            verifiedAt: null,
+            models: [],
+          },
+        }}
+      />,
+    );
+    expect(screen.getByText(conclusion)).toBeVisible();
+    expect(document.body.textContent).not.toContain(FAKE_KEY);
+  });
+
+  it('copies only fixed diagnostic fields and reports unavailable clipboard access', async () => {
+    installCatalog();
+    const user = userEvent.setup();
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } });
+    const { rerender } = render(
+      <KeyVerificationResponse status={403} reason="unknown" probe="forbidden" showCopy />,
+    );
+    await user.click(screen.getByRole('button', { name: 'Copy diagnostics' }));
+    expect(writeText).toHaveBeenCalledTimes(1);
+    const report = String(writeText.mock.calls[0]?.[0]);
+    expect(report).toContain('HTTP: 403');
+    expect(report).toContain('forbidden');
+    expect(report).toContain('unknown');
+    expect(report).not.toContain(FAKE_KEY);
+    expect(report).not.toContain('9876');
+    expect(screen.getByRole('status')).toHaveTextContent('Diagnostics copied.');
+
+    Reflect.deleteProperty(navigator, 'clipboard');
+    rerender(<KeyVerificationResponse status={403} reason="unknown" probe="forbidden" showCopy />);
+    await user.click(screen.getByRole('button', { name: 'Copy diagnostics' }));
+    expect(screen.getByRole('status')).toHaveTextContent('Clipboard unavailable');
+  });
+
+  it('offers Copy diagnostics only for a probed HTTP 403', () => {
+    installCatalog();
+    const { rerender } = render(<KeyVerificationResponse status={403} reason="unknown" showCopy />);
+    expect(screen.queryByRole('button', { name: 'Copy diagnostics' })).toBeNull();
+    rerender(<KeyVerificationResponse status={500} probe="forbidden" showCopy />);
+    expect(screen.queryByRole('button', { name: 'Copy diagnostics' })).toBeNull();
+  });
+
+  it('shows an HTTP 403 with permission guidance without exposing provider text or a key', () => {
+    installCatalog();
+    render(
+      <KeyOutcomeNotice
+        outcome={{
+          kind: 'unverified',
+          status: {
+            hasKey: true,
+            storage: 'local',
+            last4: '9876',
+            verification: 'unverified',
+            verificationHttpStatus: 403,
+            forbiddenReason: 'unknown',
+            verifiedAt: null,
+            models: [],
+          },
+        }}
+      />,
+    );
+    expect(screen.getByText('Groq returned HTTP 403.')).toBeVisible();
+    expect(screen.getByText(/cannot determine why this request was denied/)).toBeVisible();
+    expect(document.body.textContent).not.toContain(FAKE_KEY);
+  });
+
+  it.each([
+    ['model_permission_org', /organization blocks this model/],
+    ['model_permission_project', /project blocks this model/],
+    ['permission_restriction', /permission restriction but did not identify/],
+    ['region_block', /region block/],
+    ['edge_block', /security or browser\/IP block/],
+  ] as const)('shows fixed guidance for %s', (forbiddenReason, guidance) => {
+    installCatalog();
+    render(
+      <KeyOutcomeNotice
+        outcome={{
+          kind: 'unverified',
+          status: {
+            hasKey: true,
+            storage: 'local',
+            last4: '9876',
+            verification: 'unverified',
+            verificationHttpStatus: 403,
+            forbiddenReason,
+            verifiedAt: null,
+            models: [],
+          },
+        }}
+      />,
+    );
+    expect(screen.getByText(guidance)).toBeVisible();
+  });
+
   it('without a key: says so, shows the connect form, and states that storage is not encrypted', async () => {
     setup();
     expect(await screen.findByText('No Groq key is connected.')).toBeVisible();
@@ -72,7 +192,8 @@ describe('API key section', () => {
 
     backend.state.groq = 'offline';
     await user.click(screen.getByRole('button', { name: 'Test connection' }));
-    expect(await screen.findByText(/couldn't reach Groq to check it/)).toBeVisible();
+    expect(await screen.findByText(/check could not confirm access/)).toBeVisible();
+    expect(screen.getAllByText('No HTTP response (network or timeout).').length).toBeGreaterThan(0);
     expect(
       within(screen.getByTestId('key-facts')).getByText(/Saved, but not verified/),
     ).toBeVisible();

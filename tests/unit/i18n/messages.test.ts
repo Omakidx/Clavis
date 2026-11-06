@@ -55,20 +55,21 @@ describe('messages.json catalog', () => {
       disclosureTitle: 'Your reading stays on your device until you ask',
       disclosureSelect:
         'Selecting text does nothing by itself. Clavis notices the selection on your device and shows its toolbar.',
-      disclosureListen: 'Listen uses the voices on your computer. Nothing is sent to Groq.',
+      disclosureListen:
+        'Listen tries a matching on-device voice first, then an online voice if needed. Online voices send the selected text to their provider. Nothing is sent to Groq.',
       disclosureExplain:
         'Explain sends the text you selected, up to 1,000 characters of the text around it, and your chosen language to Groq, using your own API key. Groq handles it under its own terms and privacy policy.',
       disclosurePdf:
-        'PDFs you open are read inside your browser and never uploaded. Only text you select and explain is sent.',
+        'PDFs you open are read inside your browser and never uploaded. Selected text can be sent when you ask for an explanation or use an online voice.',
       disclosureNoServer: 'Clavis has no server of its own and collects no data about you.',
       disclosureAccept: 'I understand',
       firstSendBody:
         "Send this to Groq? Clavis will send the selected text and a little of the text around it to Groq to explain it. You'll only be asked once.",
-      firstSendConfirm: 'Explain',
+      firstSendConfirm: 'Lookup',
       firstSendCancel: 'Cancel',
       siteAccessTitle: 'Show Clavis when you select text',
       siteAccessBody:
-        'To show the toolbar automatically, Chrome will ask you to let Clavis read and change data on websites. Clavis uses this only to notice when you select text and to show its toolbar. It does not read pages in the background, and nothing leaves your device until you click Explain.',
+        'To show the toolbar automatically, Chrome will ask you to let Clavis read and change data on websites. Clavis uses this only to notice when you select text and to show its toolbar. It does not read pages in the background. Text leaves your device only when you ask for an explanation or use an online voice.',
       siteAccessGrant: 'Enable on websites',
       siteAccessSkip: "Not now — I'll use right-click instead",
       keyStoreLocal:

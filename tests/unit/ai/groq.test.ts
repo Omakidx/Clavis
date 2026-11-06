@@ -109,6 +109,7 @@ describe('GroqProvider.explain', () => {
     expect(url).toBe(GROQ.chatCompletionsUrl);
     expect(init.method).toBe('POST');
     expect((init.headers as Record<string, string>)['Authorization']).toBe(`Bearer ${FAKE_KEY}`);
+    expect((init.headers as Record<string, string>)['Accept']).toBe('application/json');
     expect(init.signal).toBeInstanceOf(AbortSignal);
     const body = JSON.parse(init.body as string);
     expect(body).toMatchObject({
@@ -267,7 +268,7 @@ describe('GroqProvider.explain', () => {
 
   it.each([
     [401, 'INVALID_API_KEY'],
-    [403, 'INVALID_API_KEY'],
+    [403, 'NETWORK_ERROR'],
     [404, 'MODEL_UNAVAILABLE'],
     [408, 'TIMEOUT'],
     // The request (selection plus context) is larger than the model takes: not a connection problem.
@@ -280,7 +281,26 @@ describe('GroqProvider.explain', () => {
     );
     const error = await failure(new GroqProvider().explain(request(), opts()));
     expect(error).toMatchObject({ code, status });
-    expect(error.toEnvelope()).toEqual({ code, message: error.message });
+    expect(error.toEnvelope()).toEqual({
+      code,
+      message: error.message,
+      httpStatus: status,
+      ...(status === 403 ? { forbiddenReason: 'unknown' } : {}),
+    });
+    expectNoLeak(error);
+  });
+
+  it.each([
+    ['code', 'model_permission_blocked'],
+    ['code', 'model_permission_blocked_org'],
+    ['code', 'model_permission_blocked_project'],
+    ['type', 'model_permission_blocked_project'],
+  ] as const)('maps a 403 %s=%s to MODEL_UNAVAILABLE', async (field, providerCode) => {
+    fetchMock.mockResolvedValue(
+      json({ error: { message: 'Access blocked', [field]: providerCode } }, { status: 403 }),
+    );
+    const error = await failure(new GroqProvider().explain(request(), opts()));
+    expect(error).toMatchObject({ code: 'MODEL_UNAVAILABLE', status: 403 });
     expectNoLeak(error);
   });
 
@@ -520,18 +540,74 @@ describe('GroqProvider.listModels', () => {
     expect(url).toBe(GROQ.modelsUrl);
     expect(init.method).toBe('GET');
     expect((init.headers as Record<string, string>)['Authorization']).toBe(`Bearer ${FAKE_KEY}`);
+    expect((init.headers as Record<string, string>)['Accept']).toBe('application/json');
     expect(init.body).toBeUndefined();
   });
 
   it.each([
     [401, 'INVALID_API_KEY'],
-    [403, 'INVALID_API_KEY'],
+    [403, 'NETWORK_ERROR'],
     [429, 'RATE_LIMITED'],
     [502, 'NETWORK_ERROR'],
   ])('maps HTTP %i to %s', async (status, code) => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(json(errorBody('no'), { status })));
     await expect(new GroqProvider().listModels(FAKE_KEY)).rejects.toMatchObject({ code });
   });
+
+  it.each([
+    ['model_permission_blocked_org', 'model_permission_org'],
+    ['model_permission_blocked_project', 'model_permission_project'],
+    ['model_permission_blocked', 'model_permission'],
+  ] as const)(
+    'classifies allowlisted %s without exposing its message',
+    async (providerCode, reason) => {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockResolvedValue(
+          json(
+            {
+              error: {
+                code: providerCode,
+                type: 'permissions_error',
+                message: `secret ${FAKE_KEY}`,
+              },
+            },
+            { status: 403 },
+          ),
+        ),
+      );
+      try {
+        await new GroqProvider().listModels(FAKE_KEY);
+        throw new Error('expected 403');
+      } catch (error) {
+        expect(error).toMatchObject({ status: 403, forbiddenReason: reason });
+        expect((error as GroqError).toEnvelope()).toMatchObject({ forbiddenReason: reason });
+        expect(JSON.stringify((error as GroqError).toEnvelope())).not.toContain(FAKE_KEY);
+        expect(JSON.stringify(error)).not.toContain(FAKE_KEY);
+      }
+    },
+  );
+
+  it.each([
+    ['1009', '<html>Cloudflare Error 1009 secret ' + FAKE_KEY + '</html>', 'region_block'],
+    ['1010', '<html>Cloudflare Error 1010 secret ' + FAKE_KEY + '</html>', 'edge_block'],
+    ['1020', 'Cloudflare Error 1020 secret ' + FAKE_KEY, 'edge_block'],
+    ['unidentified', '<html>Cloudflare block secret ' + FAKE_KEY + '</html>', 'unknown'],
+    ['no Cloudflare marker', '<html>Error 1010 secret ' + FAKE_KEY + '</html>', 'unknown'],
+  ] as const)(
+    'classifies a 403 edge response conservatively (%s)',
+    async (_label, body, reason) => {
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(body, { status: 403 })));
+      try {
+        await new GroqProvider().listModels(FAKE_KEY);
+        throw new Error('expected 403');
+      } catch (error) {
+        expect(error).toMatchObject({ status: 403, forbiddenReason: reason });
+        expect(JSON.stringify((error as GroqError).toEnvelope())).not.toContain(FAKE_KEY);
+        expect(JSON.stringify(error)).not.toContain(FAKE_KEY);
+      }
+    },
+  );
 
   it('INVALID_RESPONSE on a malformed list and NETWORK_ERROR when offline', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(json({ data: 'nope' })));
@@ -558,6 +634,39 @@ describe('GroqProvider.listModels', () => {
     const pending = new GroqProvider().listModels(FAKE_KEY, controller.signal);
     controller.abort();
     await expect(pending).rejects.toMatchObject({ code: 'REQUEST_CANCELLED' });
+  });
+
+  it.each([
+    [401, 'auth-required'],
+    [403, 'forbidden'],
+    [200, 'other-response'],
+  ] as const)(
+    'classifies keyless models HTTP %i without reading its body',
+    async (status, expected) => {
+      const fetchMock = vi.fn().mockResolvedValue(new Response(`private ${FAKE_KEY}`, { status }));
+      const provider = new GroqProvider({ fetch: fetchMock });
+      expect(await provider.probeUnauthenticatedAccess()).toBe(expected);
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+      expect(url).toBe(GROQ.modelsUrl);
+      expect(init.method).toBe('GET');
+      expect(init.headers).toEqual({ Accept: 'application/json' });
+      expect(JSON.stringify(init)).not.toContain(FAKE_KEY);
+      expect(init.body).toBeUndefined();
+      expect(init.credentials).toBe('omit');
+      expect(init.referrerPolicy).toBe('no-referrer');
+      expect(init.cache).toBe('no-store');
+      expect(init.redirect).toBe('error');
+      expect(init.signal).toBeInstanceOf(AbortSignal);
+    },
+  );
+
+  it('classifies keyless transport failure as unreachable', async () => {
+    const fetchMock = vi.fn().mockRejectedValue(new TypeError(`private ${FAKE_KEY}`));
+    expect(await new GroqProvider({ fetch: fetchMock }).probeUnauthenticatedAccess()).toBe(
+      'unreachable',
+    );
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 });
 

@@ -39,6 +39,7 @@
     "^(?:chunks|content-scripts)/[^/]+\\.(?:js|css)$",
     "^assets/[^/]+\\.(?:css|svg|png|mjs)$",
     "^icon/[^/]+\\.png$",
+    "^brand/clavis-(?:icon|logo)\\.svg$",
     "^pdfjs/cmaps/(?:[^/]+\\.bcmap|LICENSE[^/]*)$",
     "^pdfjs/standard_fonts/(?:[^/]+\\.(?:pfb|ttf)|LICENSE[^/]*)$",
     "^pdfjs/iccs/(?:[^/]+\\.icc|LICENSE[^/]*)$",

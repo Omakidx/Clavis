@@ -128,7 +128,7 @@ test('keyboard: focus lands on the one action, Enter trims, focus moves on to Li
     await expect.poll(() => tb(page).focusedAction()).toBe('trim');
     await page.keyboard.press('Enter');
     await tb(page).waitShown(SEL.trimmed);
-    await expect.poll(() => tb(page).focusedAction()).toBe('listen');
+    await expect.poll(() => tb(page).focusedAction()).toBe('explain');
     await page.keyboard.press('Escape');
     await tb(page).waitHidden();
   } finally {

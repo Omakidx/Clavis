@@ -16,6 +16,12 @@
   scroll-behavior: auto;
 }
 
+.reader__header a,
+.reader__overlay a,
+.reader-banner a {
+  color: var(--link);
+}
+
 .reader__header {
   display: flex;
   flex-direction: column;
@@ -60,6 +66,10 @@
   gap: var(--space-1);
 }
 
+.reader-toolbar__group > .clavis-button {
+  white-space: nowrap;
+}
+
 .reader-toolbar__page {
   display: flex;
   align-items: center;
@@ -95,8 +105,8 @@
   max-width: 100%;
 }
 
-.reader-input--zoom {
-  width: auto;
+.reader .reader-input--zoom {
+  width: 9rem;
   min-width: 7rem;
 }
 
@@ -105,6 +115,10 @@
   padding-inline: var(--space-2);
   font-size: 1.25rem;
   line-height: 1;
+}
+
+.reader-icon-button svg {
+  display: block;
 }
 
 .reader-toggle[aria-pressed='true'] {
@@ -135,7 +149,7 @@
 }
 
 .reader__viewer-container:focus-visible {
-  outline-offset: calc(var(--ring-width) * -1);
+  outline: none;
 }
 
 .reader__overlay {
@@ -280,7 +294,6 @@
 
   .reader-toggle[aria-pressed='true'] {
     border-color: Highlight;
-    outline: 2px solid Highlight;
   }
 
   .reader__drop {
@@ -288,8 +301,11 @@
     background: Canvas;
     color: CanvasText;
   }
+}
 
-  .reader__viewer-container:focus-visible {
-    outline-color: Highlight;
-  }
+.reader__title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
 }

@@ -55,12 +55,25 @@ describe('popup status', () => {
     });
   });
 
-  it('says what to do when there is no key, and that Listen and the reader still work', async () => {
+  it('leads with the corrective action when there is no key', async () => {
     setup();
     await waitFor(() => expect(groq()).toHaveTextContent('Setup needed'));
-    expect(screen.getByText('Connect your Groq key to use Explain.')).toBeVisible();
-    expect(screen.getByText(/Listen and the PDF reader work without one/)).toBeVisible();
+    expect(
+      screen.getByText('Explain needs a Groq key. Listen and the PDF reader work without one.'),
+    ).toBeVisible();
     expect(screen.getAllByRole('button', { name: 'Connect Groq' })).toHaveLength(1);
+    const actions = screen.getByRole('region', { name: 'Quick actions' });
+    expect(
+      within(actions)
+        .getAllByRole('button')
+        .map((button) => button.textContent),
+    ).toEqual(['Connect Groq', 'Explain on this page', 'Open PDF reader']);
+    expect(within(actions).getByRole('button', { name: 'Connect Groq' })).toHaveClass(
+      'clavis-button--primary',
+    );
+    expect(
+      within(actions).getByText('Select text on the page, then choose Explain on this page.'),
+    ).toBeVisible();
   });
 
   it('tells a rejected key apart and opens Settings at the key', async () => {
@@ -86,6 +99,11 @@ describe('popup status', () => {
     await waitFor(() => expect(groq()).toHaveTextContent('Connected'));
     expect(screen.queryByRole('button', { name: 'Connect Groq' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Update key' })).toBeNull();
+    const actions = screen.getByRole('region', { name: 'Quick actions' });
+    expect(within(actions).getByRole('button', { name: 'Explain on this page' })).toHaveClass(
+      'clavis-button--primary',
+    );
+    expect(within(actions).getByRole('button', { name: 'Open PDF reader' })).toBeVisible();
   });
 
   it('shows "key not working" with Update key when Groq rejected the key', async () => {
@@ -136,7 +154,7 @@ describe('popup buttons', () => {
 });
 
 describe('"Explain on this page" fallback (FR-018) still works', () => {
-  it('is offered only without website access and injects into the current tab', async () => {
+  it('is offered without website access and injects into the current tab', async () => {
     const user = setup({}, false);
     injectReplies.push({ ok: true, shown: true });
     await user.click(await screen.findByRole('button', { name: 'Explain on this page' }));
@@ -155,10 +173,34 @@ describe('"Explain on this page" fallback (FR-018) still works', () => {
     expect(await screen.findByText(/can't run on this kind of page/)).toBeVisible();
   });
 
-  it('is hidden when website access is on', async () => {
-    setup({}, true);
+  it('also works when website access is on', async () => {
+    const user = setup({}, true);
+    injectReplies.push({ ok: true, shown: true });
     await waitFor(() => expect(screen.getByTestId('popup-site')).toHaveTextContent('On'));
-    expect(screen.queryByRole('button', { name: 'Explain on this page' })).toBeNull();
+    await user.click(screen.getByRole('button', { name: 'Explain on this page' }));
+    await waitFor(() => expect(window.close).toHaveBeenCalled());
+    expect(browser.runtime.sendMessage).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'CLAVIS_INJECT_TAB', tabId: 7 }),
+    );
+  });
+
+  it('blocks a second injection while the first is pending', async () => {
+    const user = setup({}, true);
+    let finish: (value: unknown) => void = () => undefined;
+    injectReplies.push(new Promise<unknown>((resolve) => (finish = resolve)));
+    const button = await screen.findByRole('button', { name: 'Explain on this page' });
+    await user.click(button);
+    expect(screen.getByRole('button', { name: 'Opening Explain…' })).toBeDisabled();
+    expect(screen.getByRole('status')).toHaveTextContent('Opening Explain…');
+    await user.click(screen.getByRole('button', { name: 'Opening Explain…' }));
+    const calls = vi
+      .mocked(browser.runtime.sendMessage)
+      .mock.calls.filter(
+        ([message]) => (message as { type?: string }).type === 'CLAVIS_INJECT_TAB',
+      );
+    expect(calls).toHaveLength(1);
+    finish({ ok: true, shown: false });
+    expect(await screen.findByText(/No text is selected/)).toBeVisible();
   });
 });
 
@@ -170,6 +212,11 @@ describe('PDF tabs (FR-056)', () => {
     expect(help).toHaveTextContent(/can't add its toolbar to Chrome's built-in PDF viewer/);
     // "Explain on this page" cannot work in Chrome's viewer, so it is not offered there.
     expect(screen.queryByRole('button', { name: 'Explain on this page' })).toBeNull();
+    expect(
+      within(screen.getByRole('region', { name: 'Quick actions' })).getByRole('button', {
+        name: 'Open PDF reader',
+      }),
+    ).toHaveClass('clavis-button--primary');
     const create = vi.spyOn(browser.tabs, 'create').mockResolvedValue({} as never);
     await user.click(within(help).getByRole('button', { name: 'How to read PDFs with Clavis' }));
     expect(create).toHaveBeenCalledWith({

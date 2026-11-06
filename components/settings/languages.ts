@@ -1,5 +1,5 @@
 /**
- * Languages offered for explanations and voices. Tags are BCP-47; the explanation language is
+ * Languages offered for explanations, translations and voices. Tags are BCP-47; the explanation language is
  * also the language the model is asked to write in, so only widely supported ones are listed.
  * A saved value outside this list is still shown (see `languageOptions`).
  */

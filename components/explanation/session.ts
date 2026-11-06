@@ -1,5 +1,6 @@
 import { FEATURES } from '../../lib/config/constants';
 import type { ExplainMode, ExplainRequest, ExplainResult } from '../../lib/contracts/explain';
+import type { ForbiddenReason } from '../../lib/contracts/setup';
 import type { SidePanelHandoff } from '../../lib/contracts/sidepanel';
 import type { SelectionKind, SelectionSnapshot } from '../../lib/contracts/selection';
 import { t } from '../../lib/i18n';
@@ -41,6 +42,8 @@ export interface CardError {
   quiet?: boolean;
   /** Epoch ms before which Retry is refused (rate limit). */
   retryAt?: number;
+  /** Safe provider HTTP response, absent for transport failures. */
+  httpStatus?: number;
 }
 
 export interface Entry {
@@ -77,12 +80,24 @@ export interface SessionOptions {
 
 type Listener = (state: SessionState) => void;
 
+const FORBIDDEN_MESSAGE = {
+  model_permission_org: 'keyHttpModelOrg',
+  model_permission_project: 'keyHttpModelProject',
+  model_permission: 'keyHttpModelPermission',
+  permission_restriction: 'keyHttpPermissionRestriction',
+  region_block: 'keyHttpRegionBlock',
+  edge_block: 'keyHttpEdgeBlock',
+  unknown: 'keyHttpUnknown',
+} as const satisfies Record<ForbiddenReason, string>;
+
 /** The error a failed request shows, with the action the user can take (requirements section 7). */
 export function toCardError(
   code: ClientErrorCode,
   retryAfterMs: number | undefined,
   now: number,
   reason?: 'local-limit',
+  httpStatus?: number,
+  forbiddenReason?: ForbiddenReason,
 ): CardError {
   const described = describeError(code, retryAfterMs, reason);
   let action: ErrorAction = described.action;
@@ -114,11 +129,28 @@ export function toCardError(
         quiet: true,
       };
   }
+  if (httpStatus !== undefined) {
+    title = t('cardErrHttpTitle');
+  }
+  const message =
+    httpStatus === undefined
+      ? described.message
+      : [
+          t('keyHttpStatus', String(httpStatus)),
+          httpStatus === 403
+            ? t(FORBIDDEN_MESSAGE[forbiddenReason ?? 'unknown'])
+            : httpStatus >= 500
+              ? t('cardErrHttpServer')
+              : code === 'NETWORK_ERROR'
+                ? t('cardErrHttpOther')
+                : described.message,
+        ].join(' ');
   return {
     code,
     title,
-    message: described.message,
+    message,
     action,
+    ...(httpStatus === undefined ? {} : { httpStatus }),
     ...(code === 'RATE_LIMITED' && retryAfterMs !== undefined && retryAfterMs > 0
       ? { retryAt: now + retryAfterMs }
       : {}),
@@ -161,6 +193,11 @@ export class ExplainSession {
   subscribe(listener: Listener): () => void {
     this.listeners.add(listener);
     return () => this.listeners.delete(listener);
+  }
+
+  /** BCP-47 target used for the Translate result and its pronunciation. */
+  get translationLanguage(): string | undefined {
+    return this.language;
   }
 
   /** Whether a request is on its way (for tests and the card's busy state). */
@@ -424,7 +461,14 @@ export class ExplainSession {
       this.live = t('firstSendBody');
       return;
     }
-    this.fail(entry, reply.code, reply.retryAfterMs, reply.reason);
+    this.fail(
+      entry,
+      reply.code,
+      reply.retryAfterMs,
+      reply.reason,
+      reply.httpStatus,
+      reply.forbiddenReason,
+    );
   }
 
   private fail(
@@ -432,9 +476,11 @@ export class ExplainSession {
     code: ClientErrorCode,
     retryAfterMs?: number,
     reason?: 'local-limit',
+    httpStatus?: number,
+    forbiddenReason?: ForbiddenReason,
   ): void {
     entry.status = 'error';
-    entry.error = toCardError(code, retryAfterMs, this.now(), reason);
+    entry.error = toCardError(code, retryAfterMs, this.now(), reason, httpStatus, forbiddenReason);
     this.live = [entry.error.title, entry.error.message].filter(Boolean).join('. ');
   }
 

@@ -29,6 +29,29 @@ describe('errorCodeSchema / errorEnvelopeSchema', () => {
     );
   });
 
+  it('accepts only bounded HTTP status and a fixed forbidden reason', () => {
+    const base = { code: 'NETWORK_ERROR', message: 'Fixed' };
+    expect(
+      errorEnvelopeSchema.safeParse({ ...base, httpStatus: 403, forbiddenReason: 'edge_block' })
+        .success,
+    ).toBe(true);
+    expect(errorEnvelopeSchema.safeParse({ ...base, httpStatus: 500 }).success).toBe(true);
+    for (const httpStatus of [99, 600, 403.5, '403']) {
+      expect(errorEnvelopeSchema.safeParse({ ...base, httpStatus }).success).toBe(false);
+    }
+    expect(
+      errorEnvelopeSchema.safeParse({
+        ...base,
+        httpStatus: 403,
+        forbiddenReason: 'arbitrary_provider_code',
+      }).success,
+    ).toBe(false);
+    expect(
+      errorEnvelopeSchema.safeParse({ ...base, httpStatus: 403, providerMessage: 'secret' })
+        .success,
+    ).toBe(false);
+  });
+
   it('rejects negative/fractional retry, over-long message and unknown keys', () => {
     expect(
       errorEnvelopeSchema.safeParse({ code: 'TIMEOUT', message: 'x', retryAfterMs: -1 }).success,
@@ -79,6 +102,7 @@ describe('publicSettingsSchema', () => {
       'model',
       'readingLevel',
       'tooltipBehavior',
+      'translationLanguage',
       'ttsLang',
       'ttsRate',
     ]);

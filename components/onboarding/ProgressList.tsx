@@ -1,4 +1,5 @@
 import { t } from '../../lib/i18n';
+import { CheckIcon } from '../common/Icons';
 import { STEPS, STEP_NAME, type StepId } from './steps';
 
 interface ProgressListProps {
@@ -24,7 +25,7 @@ export function ProgressList({ current }: ProgressListProps) {
               {...(state === 'current' ? { 'aria-current': 'step' as const } : {})}
             >
               <span className="clavis-progress__number" aria-hidden="true">
-                {state === 'done' ? '✓' : index + 1}
+                {state === 'done' ? <CheckIcon /> : index + 1}
               </span>
               <span className="clavis-progress__name">{t(STEP_NAME[step])}</span>
               {state === 'current' ? (

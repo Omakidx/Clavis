@@ -1,4 +1,5 @@
 import { useState, type FormEvent, type Ref } from 'react';
+import { ChevronIcon, ZoomIcon } from '../common/Icons';
 import { t } from '../../lib/i18n';
 import type { PdfReaderController, ViewStatus } from '../../lib/pdf/controller';
 import { FIT_WIDTH, ZOOM_PRESETS } from '../../lib/pdf/limits';
@@ -73,7 +74,7 @@ export function ReaderToolbar({
           aria-label={t('readerPrevPage')}
           title={t('readerPrevPage')}
         >
-          <span aria-hidden="true">‹</span>
+          <ChevronIcon direction="left" />
         </button>
         <form className="reader-toolbar__page" onSubmit={commitPage} noValidate>
           <input
@@ -99,7 +100,7 @@ export function ReaderToolbar({
           aria-label={t('readerNextPage')}
           title={t('readerNextPage')}
         >
-          <span aria-hidden="true">›</span>
+          <ChevronIcon direction="right" />
         </button>
       </div>
 
@@ -112,7 +113,7 @@ export function ReaderToolbar({
           aria-label={t('readerZoomOut')}
           title={t('readerZoomOut')}
         >
-          <span aria-hidden="true">−</span>
+          <ZoomIcon direction="out" />
         </button>
         <select
           className="clavis-select reader-input reader-input--zoom"
@@ -144,7 +145,7 @@ export function ReaderToolbar({
           aria-label={t('readerZoomIn')}
           title={t('readerZoomIn')}
         >
-          <span aria-hidden="true">+</span>
+          <ZoomIcon direction="in" />
         </button>
         <button
           type="button"

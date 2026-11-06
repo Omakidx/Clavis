@@ -2,6 +2,7 @@ import { useId } from 'react';
 import { SETTINGS_SECTION_ANCHORS } from '../../lib/config/constants';
 import { t } from '../../lib/i18n';
 import { ExternalLink } from '../common/ui';
+import { SettingsIcon } from '../common/Icons';
 import { PdfHelp } from './PdfHelp';
 
 /**
@@ -13,7 +14,10 @@ export function HelpSection() {
   const headingId = useId();
   return (
     <section className="clavis-section" aria-labelledby={headingId} id="section-help">
-      <h2 id={headingId}>{t('helpTitle')}</h2>
+      <h2 id={headingId}>
+        <SettingsIcon name="privacy" />
+        {t('helpTitle')}
+      </h2>
       <ul>
         <li>
           <a href="/onboarding.html">{t('helpTutorial')}</a>

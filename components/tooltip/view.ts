@@ -2,10 +2,11 @@ import type { SelectionKind } from '../../lib/contracts/selection';
 import { LIMITS } from '../../lib/config/constants';
 import { t } from '../../lib/i18n';
 import type { ToolbarActionName } from '../../lib/selection/ui-api';
+import { toolbarIcon } from './icons';
 
 /** What the toolbar shows. */
 export type ToolbarMode =
-  /** Listen and Explain for a selection within the limit. */
+  /** Lookup and Speak for a selection within the limit. */
   | 'actions'
   /** "Selection too long" with the single trim action. */
   | 'too-long'
@@ -16,7 +17,7 @@ export type ToolbarMode =
 export type ButtonName =
   | Exclude<ToolbarActionName, 'dismiss'>
   | 'close'
-  /** The Slow toggle next to Listen. */
+  /** The compact speed toggle next to Speak. */
   | 'slow'
   /** "Voice settings" in the no-voice message. */
   | 'voice-settings';
@@ -73,17 +74,18 @@ const COUNT = LIMITS.maxSelectionChars.toLocaleString();
 export function toolbarView<N>(props: ToolbarViewProps, h: CreateElement<N>): N {
   const { mode, card, trimmed } = props;
 
-  const button = (name: ButtonName, label: string): N =>
+  const button = (name: ButtonName, label: string, icon?: 'lookup' | 'speak'): N =>
     h(
       'button',
       {
         type: 'button',
-        className: 'button',
+        className: icon ? `button button--${icon}` : 'button',
         'data-action': name,
         'aria-disabled': props.busy === name ? 'true' : null,
         'data-state': props.busy === name ? 'working' : null,
         onClick: (event: Event) => props.onAction(name, event),
       },
+      icon ? toolbarIcon(icon, h) : null,
       label,
     );
 
@@ -93,13 +95,14 @@ export function toolbarView<N>(props: ToolbarViewProps, h: CreateElement<N>): N 
       'button',
       {
         type: 'button',
-        className: 'button',
+        className: 'button button--speak',
         'data-action': 'listen',
         'aria-busy': listen.status === 'starting' ? 'true' : null,
         'data-state':
           listen.status === 'starting' ? 'working' : listen.status === 'playing' ? 'playing' : null,
         onClick: (event: Event) => props.onAction('listen', event),
       },
+      toolbarIcon('speak', h),
       listen.status === 'starting'
         ? h('span', { className: 'spinner', 'aria-hidden': 'true' })
         : null,
@@ -117,9 +120,11 @@ export function toolbarView<N>(props: ToolbarViewProps, h: CreateElement<N>): N 
       'button',
       {
         type: 'button',
-        className: 'button',
+        className: 'button button--speed',
         'data-action': 'slow',
         'aria-pressed': listen.slow ? 'true' : 'false',
+        'aria-label': t('speechSpeedToggle'),
+        title: t('speechSpeedToggle'),
         onClick: (event: Event) => props.onAction('slow', event),
       },
       t('speechSlow'),
@@ -185,7 +190,7 @@ export function toolbarView<N>(props: ToolbarViewProps, h: CreateElement<N>): N 
     },
     head,
     mode === 'actions'
-      ? toolbar(listenButton(), slowButton(), button('explain', t('toolbarExplain')))
+      ? toolbar(button('explain', t('toolbarExplain'), 'lookup'), listenButton(), slowButton())
       : mode === 'too-long'
         ? toolbar(button('trim', t('toolbarUseFirst', COUNT)))
         : null,

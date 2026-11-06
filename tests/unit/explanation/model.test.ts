@@ -150,6 +150,15 @@ describe('result blocks and their plain text', () => {
     expect(text).toContain('Similar words:\n- shore\n- edge');
     expect(text).toContain('Opposite words: Not applicable');
   });
+  it('excludes app-written confidence and empty placeholders from recursive selection', () => {
+    const roots = resultBlocks(resultFor(request('etymology')));
+    expect(roots.find((block) => block.kind === 'note')).toMatchObject({ lookup: false });
+    const related = resultBlocks(resultFor(request('related_words')));
+    expect(related.find((block) => block.kind === 'field')).toMatchObject({ lookup: false });
+    const core = resultBlocks(resultFor(request('core')));
+    expect(core.every((block) => !('lookup' in block) || block.lookup !== false)).toBe(true);
+  });
+
   it('simplify shows the rewrite', () => {
     expect(resultText(resultFor(request('simplify')))).toContain(
       'Simpler version: She finally got people talking.',

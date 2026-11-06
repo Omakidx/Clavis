@@ -206,12 +206,9 @@ test.describe('journey 1 with the real prompt: Allow, automatic toolbar, keyboar
       .toBe(word);
   }
 
-  /** Alt+Shift+E, then Right Right, Enter: from the selection to the open card, no mouse. */
+  /** Alt+Shift+E, then Enter on the first Lookup action: selection to card, no mouse. */
   async function explainByKeyboard(page: Page): Promise<ReturnType<typeof cardOf>> {
     xdotool('key', 'alt+shift+e');
-    await expect.poll(() => tb(page).focusedAction()).toBe('listen');
-    xdotool('key', 'Right');
-    xdotool('key', 'Right');
     await expect.poll(() => tb(page).focusedAction()).toBe('explain');
     xdotool('key', 'Return');
     const card = cardOf(page);
@@ -451,9 +448,7 @@ test.describe('journey 2 with the real browser UI: site access declined, found f
     await tb(page).expectNoHost();
     xdotool('key', paths.shortcut.toLowerCase());
     await tb(page).waitShown();
-    await expect.poll(() => tb(page).focusedAction()).toBe('listen');
-    xdotool('key', 'Right');
-    xdotool('key', 'Right');
+    await expect.poll(() => tb(page).focusedAction()).toBe('explain');
     xdotool('key', 'Return');
     await cardOf(page).waitFor(CARD.ready('core'));
     expect(await registered(world)).toBe(0);

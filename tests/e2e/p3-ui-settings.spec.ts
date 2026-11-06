@@ -17,6 +17,13 @@ async function connectFakeKey(page: Page, storage: 'local' | 'session' = 'local'
   await expect(page.getByTestId('key-facts')).toBeVisible({ timeout: 20_000 });
 }
 
+async function openGroup(page: Page, name: string) {
+  await page
+    .getByRole('navigation', { name: 'Settings sections' })
+    .getByRole('link', { name })
+    .click();
+}
+
 test.describe('settings page', () => {
   test('connect, show only the last four, then remove the key after confirmation', async ({
     context,
@@ -63,6 +70,7 @@ test.describe('settings page', () => {
     extensionId,
   }) => {
     const { page, errors } = await openExtensionPage(context, extensionId, 'options');
+    await openGroup(page, 'Preferences');
     await page.getByRole('radio', { name: /Simple/ }).check();
     await expect(page.getByText('Saved.').first()).toBeVisible();
     await page.getByRole('radio', { name: 'Slow' }).check();
@@ -71,6 +79,7 @@ test.describe('settings page', () => {
     await expect(page.getByLabel('Explanation language')).toHaveValue('es');
 
     await page.reload();
+    await openGroup(page, 'Preferences');
     await expect(page.getByRole('radio', { name: /Simple/ })).toBeChecked();
     await expect(page.getByRole('radio', { name: 'Slow' })).toBeChecked();
     await expect(page.getByRole('radio', { name: /Only when I ask/ })).toBeChecked();
@@ -79,6 +88,7 @@ test.describe('settings page', () => {
     await page.getByRole('button', { name: 'Reset to defaults' }).click();
     await expect(page.getByText('Preferences were reset to their defaults.')).toBeVisible();
     await page.reload();
+    await openGroup(page, 'Preferences');
     await expect(page.getByRole('radio', { name: /Standard/ })).toBeChecked();
     await expect(page.getByRole('radio', { name: 'Normal' })).toBeChecked();
     await expect(page.getByLabel('Explanation language')).toHaveValue('en');
@@ -90,6 +100,7 @@ test.describe('settings page', () => {
     extensionId,
   }) => {
     const { page } = await openExtensionPage(context, extensionId, 'options');
+    await openGroup(page, 'Website access');
     await expect(page.getByTestId('site-access-status')).toContainText('Website access is off');
     await expect(page.getByRole('button', { name: 'Enable on websites' })).toBeVisible();
 
@@ -102,6 +113,7 @@ test.describe('settings page', () => {
     await expect(page.getByTestId('disabled-sites')).toContainText('shop.example.com');
 
     await page.reload();
+    await openGroup(page, 'Website access');
     await expect(page.getByTestId('disabled-sites')).toContainText('shop.example.com');
     await page.getByRole('button', { name: 'Remove shop.example.com' }).click();
     await expect(page.getByText('No websites are listed.')).toBeVisible();
@@ -113,20 +125,26 @@ test.describe('settings page', () => {
   }) => {
     const { page, errors } = await openExtensionPage(context, extensionId, 'options');
     await connectFakeKey(page);
+    await openGroup(page, 'Preferences');
     await page.getByRole('radio', { name: /Advanced/ }).check();
+    await openGroup(page, 'Website access');
     await page.getByLabel('Website address').fill('example.org');
     await page.getByRole('button', { name: 'Add website' }).click();
     await expect(page.getByTestId('disabled-sites')).toContainText('example.org');
 
+    await openGroup(page, 'Privacy & help');
     await page.getByRole('button', { name: 'Clear all data' }).click();
     const dialog = page.getByRole('alertdialog', { name: 'Clear all Clavis data?' });
     await dialog.getByRole('button', { name: 'Clear all data' }).click();
     await expect(page.getByText('All Clavis data was removed from this browser.')).toBeVisible();
+    await openGroup(page, 'Connection');
     await expect(page.getByText('No Groq key is connected.')).toBeVisible();
 
     await page.reload();
     await expect(page.getByText('No Groq key is connected.')).toBeVisible();
+    await openGroup(page, 'Preferences');
     await expect(page.getByRole('radio', { name: /Standard/ })).toBeChecked();
+    await openGroup(page, 'Website access');
     await expect(page.getByText('No websites are listed.')).toBeVisible();
     expect(errors).toEqual([]);
   });

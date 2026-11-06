@@ -2,6 +2,7 @@ import { useId } from 'react';
 import { t } from '../../lib/i18n';
 import type { SettingsHook } from '../../lib/ui-client/use-settings';
 import { Button } from '../common/ui';
+import { SettingsIcon } from '../common/Icons';
 import { PreferencesForm } from './PreferencesForm';
 import { ResourceGate } from './ResourceGate';
 import { useSaveStatus } from './use-save-status';
@@ -17,7 +18,11 @@ export function PreferencesSection({ settings }: PreferencesSectionProps) {
 
   return (
     <section className="clavis-section" aria-labelledby={headingId} id="section-preferences">
-      <h2 id={headingId}>{t('prefsTitle')}</h2>
+      <h2 id={headingId} tabIndex={-1}>
+        <SettingsIcon name="preferences" />
+        {t('prefsTitle')}
+      </h2>
+      <p className="clavis-hint">{t('optionsAutoSaveHint')}</p>
       <ResourceGate resource={settings.resource}>
         {(snapshot) => (
           <>

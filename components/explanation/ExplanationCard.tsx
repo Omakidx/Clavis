@@ -1,12 +1,17 @@
 /** @jsxImportSource preact */
-import { render } from 'preact';
+import { h, render } from 'preact';
 import { useEffect, useId, useLayoutEffect, useRef, useState } from 'preact/hooks';
 import type { ExplainMode } from '../../lib/contracts/explain';
 import type { SidePanelHandoff } from '../../lib/contracts/sidepanel';
 import { t } from '../../lib/i18n';
 import { isTrustedEvent } from '../../lib/selection/trust';
+import { selectionWithin } from '../../lib/selection/contained-range';
+import { lookupIcon } from '../tooltip/icons';
+import { TranslationSpeech } from './TranslationSpeech';
+import type { CardSurface } from '../../lib/selection/ui-api';
 import type { SettingsSection } from './backend';
 import { truncateText as cutAtCodePoint } from '../../lib/selection/text';
+import { resultSelectionFromRange, type ResultLookupInput } from './result-selection';
 import { kindLabel, resultBlocks, tabLabel, truncateText, type Block } from './model';
 import {
   settingsSectionFor,
@@ -42,6 +47,16 @@ export interface CardHost {
   /** Copy plain text with the async Clipboard API; false when the page does not allow it. */
   copy(text: string): Promise<boolean>;
   now(): number;
+  /** Recursive lookup is supplied only by the toolbar card controller. */
+  navigation?: CardNavigation;
+  speak?: CardSurface['speak'];
+  speakerIcon?: CardSurface['speakerIcon'];
+}
+
+export interface CardNavigation {
+  canBack: boolean;
+  lookup(input: ResultLookupInput): void;
+  back(): void;
 }
 
 /**
@@ -65,7 +80,7 @@ interface Props {
 
 /** Mount the card into `slot`; returns the function that removes it. */
 export function mountCard(slot: HTMLElement, props: Props): () => void {
-  render(<ExplanationCard {...props} />, slot);
+  render(<ExplanationCard key={props.session.selectionId} {...props} />, slot);
   return () => render(null, slot);
 }
 
@@ -111,6 +126,13 @@ function ExplanationCard({ session, host }: Props) {
   const [focusTab, setFocusTab] = useState<ExplainMode>(state.active);
   const [armed, setArmed] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [lookupCandidate, setLookupCandidate] = useState<{
+    input: ResultLookupInput;
+    selectionId: string;
+    mode: ExplainMode;
+    result: Entry['result'];
+  } | null>(null);
+  const [lookupFeedback, setLookupFeedback] = useState('');
   const online = useOnline(host, rootRef);
 
   const entries = state.entries;
@@ -161,6 +183,84 @@ function ExplanationCard({ session, host }: Props) {
   const shown = cutAtCodePoint(state.text, HEADER_TEXT_CHARS);
   const tabs = state.tabs;
   const active = entries[state.active];
+
+  // A candidate belongs to one result in one tab of one frame. A late answer, tab switch, or
+  // replacement frame cannot keep an earlier selection actionable.
+  useEffect(() => {
+    if (
+      lookupCandidate !== null &&
+      (lookupCandidate.selectionId !== state.selectionId ||
+        lookupCandidate.mode !== state.active ||
+        lookupCandidate.result !== active?.result)
+    )
+      setLookupCandidate(null);
+  }, [active?.result, lookupCandidate, state.active, state.selectionId]);
+
+  const captureResultSelection = (): void => {
+    const root = rootRef.current;
+    const panel = root?.querySelector<HTMLElement>(
+      `[data-clavis="card-panel"][data-tab="${state.active}"]`,
+    );
+    const range = root === null || panel == null ? null : selectionWithin(root);
+    const candidate =
+      range === null || panel == null ? null : resultSelectionFromRange(range, panel);
+    if (candidate?.kind === 'over-limit') {
+      setLookupCandidate(null);
+      setLookupFeedback(t('cardLookupOverLimit'));
+    } else {
+      setLookupFeedback('');
+      setLookupCandidate(
+        candidate?.kind === 'ready' && active?.status === 'ready'
+          ? {
+              input: candidate.input,
+              selectionId: state.selectionId,
+              mode: state.active,
+              result: active.result,
+            }
+          : null,
+      );
+    }
+  };
+
+  const clearIfOutsideResult = (event: MouseEvent | KeyboardEvent): void => {
+    if (!isTrustedEvent(event)) return;
+    const target = event.target;
+    const root = rootRef.current;
+    if (root === null || target === null || typeof (target as Node).nodeType !== 'number') return;
+    const panel = root.querySelector<HTMLElement>(
+      `[data-clavis="card-panel"][data-tab="${state.active}"]`,
+    );
+    const lookup = root.querySelector<HTMLElement>('[data-clavis="card-lookup"]');
+    if (panel?.contains(target as Node) || lookup?.contains(target as Node)) return;
+    setLookupCandidate(null);
+    setLookupFeedback('');
+  };
+
+  useEffect(() => {
+    const doc = rootRef.current?.ownerDocument;
+    if (doc === undefined) return;
+    const clearOutside = (event: MouseEvent | KeyboardEvent): void => {
+      if (!isTrustedEvent(event)) return;
+      const target = event.target;
+      const root = rootRef.current;
+      const shadowHost = (root?.getRootNode() as ShadowRoot | undefined)?.host;
+      if (
+        root === null ||
+        target === null ||
+        typeof (target as Node).nodeType !== 'number' ||
+        (!root.contains(target as Node) && target !== shadowHost)
+      ) {
+        setLookupCandidate(null);
+        setLookupFeedback('');
+      }
+    };
+    doc.addEventListener('mouseup', clearOutside);
+    doc.addEventListener('keyup', clearOutside);
+    return () => {
+      doc.removeEventListener('mouseup', clearOutside);
+      doc.removeEventListener('keyup', clearOutside);
+    };
+  }, []);
 
   const moveFocus = (mode: ExplainMode): void => {
     setFocusTab(mode);
@@ -225,8 +325,24 @@ function ExplanationCard({ session, host }: Props) {
       data-action="explain"
       tabIndex={-1}
       aria-label={t('cardRegion', selected)}
+      onMouseUp={clearIfOutsideResult}
+      onKeyUp={clearIfOutsideResult}
     >
       <header class="ec__head">
+        {host.navigation?.canBack === true ? (
+          <button
+            type="button"
+            class="ec__btn ec__back"
+            data-clavis="card-back"
+            aria-label={t('cardBack')}
+            onClick={onTrusted(() => host.navigation?.back())}
+          >
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+              <path d="m8 3-3 3 3 3" stroke="currentColor" stroke-width="1.5" />
+            </svg>
+            {t('cardBack')}
+          </button>
+        ) : null}
         <div class="ec__who">
           <p class="ec__kind">{kindLabel(state.kind)}</p>
           <p class="ec__selected" dir="auto" data-clavis="card-text">
@@ -267,6 +383,8 @@ function ExplanationCard({ session, host }: Props) {
                 tabIndex={mode === focusTab ? 0 : -1}
                 onKeyDown={onTabKeyDown}
                 onClick={onTrusted(() => {
+                  setLookupCandidate(null);
+                  setLookupFeedback('');
                   setFocusTab(mode);
                   session.selectTab(mode);
                 })}
@@ -290,6 +408,8 @@ function ExplanationCard({ session, host }: Props) {
           data-status={entries[mode]?.status ?? 'idle'}
           tabIndex={0}
           hidden={mode !== state.active}
+          onMouseUp={onTrusted(captureResultSelection)}
+          onKeyUp={onTrusted(captureResultSelection)}
         >
           <PanelContent
             mode={mode}
@@ -303,6 +423,52 @@ function ExplanationCard({ session, host }: Props) {
           />
         </div>
       ))}
+
+      {lookupCandidate !== null &&
+      lookupCandidate.selectionId === state.selectionId &&
+      lookupCandidate.mode === state.active &&
+      lookupCandidate.result === active?.result &&
+      host.navigation !== undefined ? (
+        <div class="ec__lookup-action">
+          <button
+            type="button"
+            class="ec__btn ec__btn--primary ec__lookup-btn"
+            data-clavis="card-lookup"
+            onMouseDown={onTrusted((event: MouseEvent) => event.preventDefault())}
+            onClick={onTrusted(() => {
+              const root = rootRef.current;
+              const panel = root?.querySelector<HTMLElement>(
+                `[data-clavis="card-panel"][data-tab="${state.active}"]`,
+              );
+              const range = root === null || panel == null ? null : selectionWithin(root);
+              const actual =
+                range === null || panel == null ? null : resultSelectionFromRange(range, panel);
+              const unchanged =
+                actual?.kind === 'ready' &&
+                actual.input.text === lookupCandidate.input.text &&
+                actual.input.contextBefore === lookupCandidate.input.contextBefore &&
+                actual.input.contextAfter === lookupCandidate.input.contextAfter;
+              if (!unchanged) {
+                setLookupCandidate(null);
+                return;
+              }
+              host.navigation?.lookup(lookupCandidate.input);
+              setLookupCandidate(null);
+            })}
+          >
+            {lookupIcon((tag, props, ...children) => h(tag, props, ...children))}
+            <span>{t('cardLookup')}</span>
+            <span class="ec__lookup-word" dir="auto">
+              {cutAtCodePoint(lookupCandidate.input.text, 32)}
+            </span>
+          </button>
+        </div>
+      ) : null}
+      {lookupFeedback !== '' ? (
+        <p class="ec__lookup-feedback" role="status">
+          {lookupFeedback}
+        </p>
+      ) : null}
 
       {longAnswer ? (
         <p class="ec__hint" data-clavis="card-long-hint">
@@ -395,7 +561,14 @@ function PanelContent({
       />
     );
   }
-  return entry.result === null ? null : <ResultView blocks={resultBlocks(entry.result)} />;
+  return entry.result === null ? null : (
+    <ResultView
+      blocks={resultBlocks(entry.result)}
+      speech={
+        mode === 'translate' && isActive ? { host, lang: session.translationLanguage } : undefined
+      }
+    />
+  );
 }
 
 function DisclosurePrompt({
@@ -439,7 +612,13 @@ function DisclosurePrompt({
   );
 }
 
-function ResultView({ blocks }: { blocks: Block[] }) {
+function ResultView({
+  blocks,
+  speech,
+}: {
+  blocks: Block[];
+  speech?: { host: CardHost; lang: string | undefined } | undefined;
+}) {
   return (
     <div class="ec__result" data-clavis="card-result">
       {/* Each piece of model text decides its own direction (dir="auto"), so an Arabic answer next to
@@ -448,27 +627,42 @@ function ResultView({ blocks }: { blocks: Block[] }) {
         switch (block.kind) {
           case 'title':
             return (
-              <p key={index} class="ec__title" dir="auto">
+              <p key={index} class="ec__title" dir="auto" data-clavis="card-result-text">
                 {block.text}
               </p>
             );
           case 'paragraph':
             return (
-              <p key={index} dir="auto">
+              <p key={index} dir="auto" data-clavis="card-result-text">
                 {block.text}
               </p>
             );
           case 'field':
-          case 'note':
+          case 'note': {
+            const content = (
+              <p dir="auto" data-clavis={block.lookup === false ? undefined : 'card-result-text'}>
+                {block.text}
+              </p>
+            );
             return (
               <div
                 key={index}
                 class={block.kind === 'note' ? 'ec__field ec__field--note' : 'ec__field'}
               >
                 <p class="ec__label">{block.label}</p>
-                <p dir="auto">{block.text}</p>
+                {block.kind === 'field' &&
+                block.speak === true &&
+                speech?.host.speak !== undefined ? (
+                  <div class="ec__translation-line">
+                    {content}
+                    <TranslationSpeech text={block.text} lang={speech.lang} host={speech.host} />
+                  </div>
+                ) : (
+                  content
+                )}
               </div>
             );
+          }
           case 'list': {
             const List = block.ordered ? 'ol' : 'ul';
             return (
@@ -476,7 +670,7 @@ function ResultView({ blocks }: { blocks: Block[] }) {
                 <p class="ec__label">{block.label}</p>
                 <List class="ec__list" dir="auto">
                   {block.items.map((item, itemIndex) => (
-                    <li key={itemIndex} dir="auto">
+                    <li key={itemIndex} dir="auto" data-clavis="card-result-text">
                       {item}
                     </li>
                   ))}
@@ -503,7 +697,8 @@ interface ErrorProps {
 const CONNECTION_CODES: readonly string[] = ['NETWORK_ERROR', 'TIMEOUT', 'NO_RESPONSE'];
 
 function ErrorView({ error, mode, session, host, online, onSettings }: ErrorProps) {
-  const offline = !online && CONNECTION_CODES.includes(error.code);
+  const offline =
+    !online && error.httpStatus === undefined && CONNECTION_CODES.includes(error.code);
   return (
     <div
       class={error.quiet === true ? 'ec__error ec__error--quiet' : 'ec__error'}

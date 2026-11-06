@@ -3,6 +3,7 @@ import { deepActiveElement } from '../../lib/selection/eligibility';
 import { markOwnUi, isOwnUiNode } from '../../lib/selection/own-ui';
 import { truncateText } from '../../lib/selection/text';
 import { isTrustedEvent } from '../../lib/selection/trust';
+import { selectionWithin } from '../../lib/selection/contained-range';
 import type {
   ActionContext,
   CardSurface,
@@ -196,9 +197,10 @@ export function createToolbar(
       spoken = t('speechStarting');
     } else if (report.status === 'playing') {
       next.status = 'playing';
-      // Every playback with an online voice says so (privacy: the text leaves the device).
-      if (report.remote) next.note = t('speechRemoteNote');
-      spoken = [t('speechPlaying'), next.note].filter(Boolean).join(' ');
+      // Keep playback announcements accessible without adding a visible label beside the audio.
+      spoken = [t('speechPlaying'), report.remote ? t('speechRemoteNote') : '']
+        .filter(Boolean)
+        .join(' ');
     } else if (report.status === 'ended') {
       next.status = 'ended';
       if (report.message !== undefined) next.message = spoken = t(report.message);
@@ -292,6 +294,65 @@ export function createToolbar(
     const current = (): boolean => id === runs.explain.id && visible;
     return {
       keyboard,
+      speakerIcon() {
+        return (
+          (panelParent
+            ?.querySelector('[data-action="listen"] [data-icon="speak"]')
+            ?.cloneNode(true) as Element | null) ?? null
+        );
+      },
+      speak(text, lang, report) {
+        if (
+          !current() ||
+          selection === null ||
+          actions.listen === undefined ||
+          text.length > LIMITS.maxSelectionChars
+        ) {
+          report({ status: 'failed', message: 'speechInvalidRequest' });
+          return () => undefined;
+        }
+        cancelRun('listen');
+        const control = new AbortController();
+        runs.listen.abort = control;
+        const listenId = runs.listen.id;
+        control.signal.addEventListener('abort', () => report({ status: 'idle' }), { once: true });
+        const stop = (): void => {
+          if (runs.listen.abort !== control) return;
+          cancelRun('listen');
+          applyListen({ status: 'idle' });
+        };
+        try {
+          const outcome = actions.listen({
+            snapshot: {
+              selectionId: selection.snapshot.selectionId,
+              source: selection.snapshot.source,
+              kind: 'word',
+              text,
+            },
+            overLimit: false,
+            signal: control.signal,
+            listen: {
+              slow: undefined,
+              lang,
+              report(value) {
+                if (!current() || control.signal.aborted || listenId !== runs.listen.id) return;
+                applyListen(value);
+                report(value);
+              },
+            },
+          });
+          Promise.resolve(outcome).catch(() => {
+            if (current() && !control.signal.aborted) {
+              const failure: ListenReport = { status: 'failed', message: 'toolbarActionFailed' };
+              applyListen(failure);
+              report(failure);
+            }
+          });
+        } catch {
+          report({ status: 'failed', message: 'toolbarActionFailed' });
+        }
+        return stop;
+      },
       open() {
         if (!current() || panelParent === null) return null;
         if (card?.slot !== true) {
@@ -681,7 +742,14 @@ export function createToolbar(
     show,
     showNotice,
     hide,
-    isInteracting: () => visible && (pointerInside || (shadow?.activeElement ?? null) !== null),
+    isInteracting() {
+      if (!visible) return false;
+      if (pointerInside || (shadow?.activeElement ?? null) !== null) return true;
+      // Result text stays selected after pointer grace ends. Keep that selection inside the
+      // card rather than letting the page observer clear the whole lookup during drill-down.
+      const slot = slotElement();
+      return slot !== null && selectionWithin(slot) !== null;
+    },
     explain() {
       // Not for a selection that is over the limit: that one offers "use the first 2,000" first.
       if (selection !== null && mode === 'actions') perform('explain', selection);

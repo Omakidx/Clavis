@@ -237,11 +237,11 @@ test.describe('site access granted', () => {
   });
 
   test.describe("FR-015 controls reflect the user's site access", () => {
-    test('with access granted the popup does not offer "Explain on this page"', async () => {
+    test('with access granted the popup still offers "Explain on this page"', async () => {
       const popup = await openExtensionPage(harness.ext.context, harness.ext.extensionId, 'popup');
       await popup.waitForLoadState('load');
       await popup.waitForTimeout(500);
-      await expect(popup.getByRole('button', { name: 'Explain on this page' })).toHaveCount(0);
+      await expect(popup.getByRole('button', { name: 'Explain on this page' })).toBeVisible();
       await popup.close();
     });
   });

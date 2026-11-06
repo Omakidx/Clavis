@@ -1,5 +1,11 @@
 import { GroqError } from '../ai/errors';
-import { idSchema, type ErrorCode, type ErrorReason, type MessageReply } from '../contracts';
+import {
+  idSchema,
+  type ErrorCode,
+  type ErrorReason,
+  type ForbiddenReason,
+  type MessageReply,
+} from '../contracts';
 
 /** Fixed message for an envelope that carries a `reason` (the plain code message would mislead). */
 const REASON_MESSAGES: Record<ErrorReason, string> = {
@@ -22,10 +28,14 @@ export function failure(
     requestId?: string | undefined;
     retryAfterMs?: number | undefined;
     reason?: ErrorReason | undefined;
+    httpStatus?: number | undefined;
+    forbiddenReason?: ForbiddenReason | undefined;
   } = {},
 ): MessageReply<never> {
   const base = new GroqError(code, {
     ...(options.retryAfterMs === undefined ? {} : { retryAfterMs: options.retryAfterMs }),
+    ...(options.httpStatus === undefined ? {} : { status: options.httpStatus }),
+    ...(options.forbiddenReason === undefined ? {} : { forbiddenReason: options.forbiddenReason }),
   }).toEnvelope();
   const envelope =
     options.reason === undefined

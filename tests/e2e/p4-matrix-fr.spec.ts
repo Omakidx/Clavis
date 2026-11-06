@@ -950,7 +950,7 @@ test.describe('FR-013 Listen, Slow and Explain, by mouse and by keyboard', () =>
     });
   });
 
-  test('keyboard: the command path puts focus on Listen; arrows reach Slow then Explain; Enter and Space activate', async () => {
+  test('keyboard: the command path puts focus on Lookup; arrows reach Speak then speed; Enter and Space activate', async () => {
     await withFixture('plain-baseline', async ({ page }) => {
       await selectText(
         page,
@@ -961,15 +961,17 @@ test.describe('FR-013 Listen, Slow and Explain, by mouse and by keyboard', () =>
       expect(await expectShown(page)).toBe(true);
       const reply = await openViaCommand(harness.ext.serviceWorker, page);
       expect(reply?.shown).toBe(true);
-      expect(await toolbar(page).focusedAction(), 'focus moved into the toolbar').toBe('listen');
+      expect(await toolbar(page).focusedAction(), 'focus moved into the toolbar').toBe('explain');
       await page.keyboard.press('ArrowRight');
-      expect(await toolbar(page).focusedAction(), 'Listen, then Slow').toBe('slow');
+      expect(await toolbar(page).focusedAction(), 'Lookup, then Speak').toBe('listen');
+      await page.keyboard.press('ArrowRight');
+      expect(await toolbar(page).focusedAction(), 'then speed').toBe('slow');
       await page.keyboard.press('Space');
       expect(await toolbar(page).attr(actionSelector('slow'), 'aria-pressed')).toBe('true');
       await page.keyboard.press('Space');
       expect(await toolbar(page).attr(actionSelector('slow'), 'aria-pressed')).toBe('false');
-      await page.keyboard.press('ArrowRight');
-      expect(await toolbar(page).focusedAction(), 'then Explain').toBe('explain');
+      await page.keyboard.press('Home');
+      expect(await toolbar(page).focusedAction(), 'back to Lookup').toBe('explain');
       await page.keyboard.press('Enter');
       // Phase 5: a keyboard-started Explain moves focus INTO the card.
       await waitFor(
@@ -990,10 +992,8 @@ test.describe('FR-013 Listen, Slow and Explain, by mouse and by keyboard', () =>
       await waitFor(async () => (await toolbar(page).focusedAction()) === 'explain', 2000, 40);
       expect(await toolbar(page).focusedAction(), 'Close returns focus to Explain').toBe('explain');
       expect(await toolbar(page).isShown(SEL.card), 'the card is gone').toBe(false);
-      // The toolbar keyboard model still works: ArrowLeft twice to Listen, Space activates it.
-      await page.keyboard.press('ArrowLeft');
-      expect(await toolbar(page).focusedAction()).toBe('slow');
-      await page.keyboard.press('ArrowLeft');
+      // The toolbar keyboard model still works: ArrowRight to Speak, Space activates it.
+      await page.keyboard.press('ArrowRight');
       expect(await toolbar(page).focusedAction()).toBe('listen');
       await page.keyboard.press('Space');
       expect(await readListenStatus(page), 'Listen reports through the keyboard too').toBeDefined();
@@ -1261,9 +1261,7 @@ test.describe('FR-016 accessibility: roles, labels, focus, motion, automated che
       expect(await expectShown(page), 'toolbar for the keyboard selection').toBe(true);
       const reply = await openViaCommand(harness.ext.serviceWorker, page);
       expect(reply?.shown).toBe(true);
-      expect(await toolbar(page).focusedAction()).toBe('listen');
-      await page.keyboard.press('ArrowRight');
-      await page.keyboard.press('ArrowRight');
+      expect(await toolbar(page).focusedAction()).toBe('explain');
       expect(await toolbar(page).focusedAction()).toBe('explain');
       await page.keyboard.press('Enter');
       await waitFor(
@@ -1291,8 +1289,8 @@ test.describe('FR-016 accessibility: roles, labels, focus, motion, automated che
       );
       expect(await expectShown(page)).toBe(true);
       await openViaCommand(harness.ext.serviceWorker, page);
-      expect(await toolbar(page).focusedAction()).toBe('listen');
-      // Listen, Slow and Explain are each a tab stop; one more Tab leaves the toolbar.
+      expect(await toolbar(page).focusedAction()).toBe('explain');
+      // Lookup, Speak and speed are each a tab stop; one more Tab leaves the toolbar.
       let presses = 0;
       while ((await toolbar(page).focusedAction()) !== null && presses < 6) {
         await page.keyboard.press('Tab');
@@ -1316,23 +1314,27 @@ test.describe('FR-016 accessibility: roles, labels, focus, motion, automated che
       const style = await toolbar(page).evalIn<{
         focusVisible: boolean;
         outlineStyle: string;
-        outlineWidth: number;
-        boxShadow: string;
+        focusedBackground: string;
+        restingBackground: string;
       }>(
         null,
         `function () {
           const el = this.activeElement;
           if (!el) return null;
           const cs = getComputedStyle(el);
-          return { focusVisible: el.matches(':focus-visible'), outlineStyle: cs.outlineStyle, outlineWidth: parseFloat(cs.outlineWidth), boxShadow: cs.boxShadow };
+          const focusVisible = el.matches(':focus-visible');
+          const outlineStyle = cs.outlineStyle;
+          const focusedBackground = cs.backgroundColor;
+          el.blur();
+          return { focusVisible, outlineStyle, focusedBackground, restingBackground: getComputedStyle(el).backgroundColor };
         }`,
       );
       expect(style, 'a button has focus').not.toBeNull();
       expect(style?.focusVisible, 'keyboard focus shows as :focus-visible').toBe(true);
-      const hasOutline =
-        (style?.outlineStyle ?? 'none') !== 'none' && (style?.outlineWidth ?? 0) >= 2;
-      const hasShadow = (style?.boxShadow ?? 'none') !== 'none';
-      expect(hasOutline || hasShadow, `focus indicator: ${JSON.stringify(style)}`).toBe(true);
+      expect(style?.outlineStyle).toBe('none');
+      expect(style?.focusedBackground, `focus indicator: ${JSON.stringify(style)}`).not.toBe(
+        style?.restingBackground,
+      );
     });
   });
 

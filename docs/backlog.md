@@ -102,7 +102,7 @@ FR-026 (IPA and recorded audio) is a Could. FR-036 (Grammar tab, D-25), FR-043 (
 
 | ID | Risk | Likelihood | Impact | Mitigation | Owner phase |
 | --- | --- | --- | --- | --- | --- |
-| R-01 | `chrome.tts` has no voice on the Linux dev machine, so Listen can't be shown working locally | Confirmed | Medium | Install `speech-dispatcher` + `espeak-ng` for the positive path; online voices only when chosen (D-22; the offscreen fallback was not adopted, D-07); keep the no-voice message honest | 2 |
+| R-01 | `chrome.tts` has no voice on the Linux dev machine, so Listen can't be shown working locally | Confirmed | Medium | Install `speech-dispatcher` + `espeak-ng` for the positive path; matching online voices as automatic fallback (D-22, updated 2026-10-29; the offscreen fallback was not adopted, D-07); keep the no-voice message honest | 2 |
 | R-02 | Voices on Windows/macOS never checked by a person | High | Medium | Automated non-voice E2E on CI; one manual tester pass before public listing (D-14); no voice claims until then | 9–10 |
 | R-03 | First toolbar after page load misses 150 ms because UI code must load | Low (mitigated) | Medium | Spike B: bundled Preact toolbar measured 60 ms p95 (D-08); re-measure on a quiet machine | 2 |
 | R-04 | Reasoning models are slow or truncate JSON on the free tier | Medium | High | Spike A model comparison and token budgets (D-09) | 2 |

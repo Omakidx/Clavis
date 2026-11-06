@@ -6,8 +6,8 @@
 body {
   margin: 0;
   padding: 16px 20px 24px;
-  background: #ffffff;
-  color: #1b1f24;
+  background: #f6f7eb;
+  color: #252820;
   font:
     18px/1.7 Georgia,
     'Times New Roman',
@@ -28,9 +28,12 @@ p {
   margin: 0 0 16px;
 }
 
-@media (prefers-color-scheme: dark) {
-  body {
-    background: #14181d;
-    color: #e8ecf1;
-  }
+:root[data-preview-theme='light'] body {
+  background: #f6f7eb;
+  color: #252820;
+}
+
+:root[data-preview-theme='dark'] body {
+  background: #20231e;
+  color: #eff0e6;
 }

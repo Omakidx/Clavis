@@ -1,6 +1,6 @@
 # Clavis privacy policy — DRAFT
 
-> **Status:** draft for v1, last checked against the code on 2026-10-23 (Phase 9 release audit). Not yet published. It will be hosted on GitHub Pages (D-15) and must be re-checked against the shipped code, the permission list in [architecture.md §3](architecture.md#3-extension-entry-points-and-message-routes) and the data flows in [architecture.md §9](architecture.md#9-persistence-privacy-and-telemetry) before store submission. The Chrome Web Store answers that go with this policy are in [store/permission-justifications.md](store/permission-justifications.md).
+> **Status:** draft for v1, last updated on 2026-10-29 for automatic online voice fallback. Not yet published. It will be hosted on GitHub Pages (D-15) and must be re-checked against the shipped code, the permission list in [architecture.md §3](architecture.md#3-extension-entry-points-and-message-routes) and the data flows in [architecture.md §9](architecture.md#9-persistence-privacy-and-telemetry) before store submission. The Chrome Web Store answers that go with this policy are in [store/permission-justifications.md](store/permission-justifications.md).
 >
 > Placeholders: `[PUBLISHER]`, `[SUPPORT_EMAIL]`, `[EFFECTIVE_DATE]`, `[POLICY_URL]`.
 >
@@ -14,8 +14,8 @@ Clavis is a Chrome extension that helps you understand and pronounce text you se
 ## The short version
 
 - Clavis has **no server of its own**. The publisher does not receive, store or sell your data.
-- Nothing you read is sent anywhere until you ask for an explanation. Then the selected text and a small amount of nearby text go to **Groq**, the AI provider, using **your own** Groq API key.
-- **Listen** uses the voices on your computer and sends nothing to Groq. It uses an online voice only if you explicitly choose one in Settings.
+- When you ask for an explanation, the selected text and a small amount of nearby text go to **Groq**, the AI provider, using **your own** Groq API key. Selecting text alone sends nothing.
+- **Listen** sends nothing to Groq. Automatic tries a matching on-device voice first, then a matching online voice if no local voice is available or can start. Online voices send the selected text to their provider.
 - PDFs you open in Clavis are read inside your browser and never uploaded.
 - Your settings and API key are stored only in your Chrome profile, and you can delete them at any time.
 
@@ -25,7 +25,7 @@ Clavis is a Chrome extension that helps you understand and pronounce text you se
 | --- | --- | --- |
 | Text you select on a website or in a PDF | When you select it | Stays on your device. Used to show the Clavis toolbar. |
 | Selected text, up to 1,000 characters of nearby text and a few settings (see [What Groq receives](#what-groq-receives)) | Only when you ask for an explanation (see below) | Sent over HTTPS to Groq with your API key, to generate the explanation. |
-| Selected text for **Listen** | When you click **Listen** | Passed to a speech engine on your computer (Chrome's text-to-speech or your system voices). Not sent to Groq. By default Clavis uses only on-device voices. If you explicitly choose a voice marked *online* in Settings → Voice, the selected text is sent to that voice's provider (for example Google) to be spoken, under that provider's terms. Your operating system's speech engine may have its own data practices. |
+| Selected text, or translated output you ask to hear | When you click **Listen** or the speaker beside a translation | Passed to a speech engine on your computer (Chrome's text-to-speech or your system voices). Not sent to Groq. Automatic tries a matching on-device voice first, then a matching online voice if no local voice is available or can start. You can also choose a specific voice in Settings → Voice. When an online voice is used, the selected text is sent to that voice's provider (for example Google) to be spoken, under that provider's terms; Settings identifies online voices and explains the automatic fallback. Playback adds no visible status label. Your operating system's speech engine may have its own data practices. |
 | Your Groq API key | When you enter it | Stored in Chrome's extension storage on your device, either until you remove it or only while Chrome keeps the session, as you choose. Sent only to Groq, in the request header. |
 | PDF files you open | When you open them | Read in your browser's memory and released when you close the reader. Never uploaded. |
 | Settings and setup state (see [What Clavis stores](#what-clavis-stores)) | When you change them | Stored in Chrome's extension storage on your device. Not synced. |
@@ -47,7 +47,7 @@ Each request goes from Clavis's background worker to `https://api.groq.com` and 
 - up to 1,000 characters of nearby text, taken from the same block of the page or PDF;
 - the language tag the page declares for itself, if it has one;
 - the explanation type (the main explanation, roots, related words, a plainer rewrite or a translation) and whether the selection is a word, phrase, sentence or passage;
-- your explanation language, reading level and detail level, where that explanation type uses them;
+- your explanation language or translation target language, reading level and detail level, where that explanation type uses them;
 - the name of the AI model you chose;
 - fixed instructions written by Clavis, and your Groq API key in the request header.
 
@@ -61,21 +61,21 @@ Before the first Explain, Clavis shows what is sent and asks you to acknowledge 
 
 - Clavis uses website content only to show its toolbar and, when you ask, to get an explanation or read the text aloud. This is the feature you asked for.
 - Clavis does not sell data. It does not use data for advertising, to judge creditworthiness, or for lending.
-- Clavis does not transfer your data to anyone except Groq, to provide the explanation you asked for, and, only if you choose an online voice, that voice's provider, to speak the text.
+- Clavis does not transfer your data to anyone except Groq, to provide the explanation you asked for, and to a voice provider when Automatic falls back to an online voice or you choose one, to speak the text.
 - The publisher has no access to your data. It does not pass through any server of the publisher, and no person at the publisher reads it.
 
 ## What Clavis stores
 
 Clavis keeps this on your device in Chrome's extension storage. It is not synced to other devices.
 
-- **Preferences:** explanation language, reading level, when the toolbar appears (automatically or only when you ask), Listen voice, language and speed, and the AI model you chose.
+- **Preferences:** explanation language, translation target language, reading level, when the toolbar appears (automatically or only when you ask), Listen voice, language and speed, and the AI model you chose.
 - **Sites where Clavis is turned off** (host names only).
 - **Setup state:** whether setup is finished, when you accepted the data disclosure, and whether you granted or declined website access.
 - **Key details:** whether your key is stored on this device or only for the session, its last four characters (for display), whether the last check passed and when, and the list of models Groq said your key can use.
 - **Your Groq API key.**
 - **Model capability notes:** which request options your chosen model accepted. Clavis keeps these in memory-based session storage, so they last only for the browser session.
 
-Clavis does **not** store the text you select, nearby text, or Groq's answers. An answer lives in the page's memory while the card is open. See [Side panel](#side-panel) for the one place a copy is held longer, and only in memory.
+Clavis does **not** store the text you select, nearby text, or Groq's answers. Looking up a word inside an answer sends that selected generated text and a small amount of context from the same answer paragraph. Earlier layers remain only in memory for Back navigation while the original selection is retained; they are never saved as browsing or lookup history. An answer lives in the page's memory while the card is open. See [Side panel](#side-panel) for the one place a copy is held longer, and only in memory.
 
 ## Website access
 
@@ -100,13 +100,13 @@ Clavis asks Chrome for these permissions. Each is used only for the purpose give
 | Permission | Why Clavis needs it |
 | --- | --- |
 | `storage` | Keeps your settings and Groq key in Chrome's extension storage on this device. The "only for this session" option uses in-memory session storage. Nothing is synced. Websites cannot read it. |
-| `tts` | Listen reads the selected text aloud with the voices on your device, and Settings lists the voices that are available. An online voice is used only if you choose one. |
+| `tts` | Listen reads the selected text aloud with the voices on your device, and Settings lists the voices that are available. Automatic prefers a matching on-device voice and falls back to a matching online voice if needed; a specific voice can also be chosen in Settings. |
 | `scripting` | After you grant website access, registers the small selection script on websites (removed when you remove access or turn a site off). Injects it into the current tab when you ask (right-click, icon or shortcut). Loads the explanation card into the page where you clicked Explain. All of this code ships inside the extension. |
 | `activeTab` | Lets Clavis work on the current tab, after your action, if you declined website access. |
 | `contextMenus` | Adds one **Explain with Clavis** item to the right-click menu for selected text. |
 | `sidePanel` | Shows a long explanation in Chrome's side panel, for the tab where you chose **Open in side panel**. |
 | `https://api.groq.com/*` | The only server Clavis contacts. The background worker sends the Explain request and the key check to Groq, with your own key. |
-| Optional: all `http` and `https` websites | Asked for only when you choose **Enable on websites**. It lets the toolbar appear automatically when you select text. The script only notices selections on your device. Nothing is read in the background or sent until you ask for an explanation. You can decline it or remove it at any time. |
+| Optional: all `http` and `https` websites | Asked for only when you choose **Enable on websites**. It lets the toolbar appear automatically when you select text. The script only notices selections on your device. Nothing is read in the background or sent until you ask for an explanation or start Listen with an online voice. You can decline it or remove it at any time. |
 
 ## Security
 

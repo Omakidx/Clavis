@@ -218,13 +218,13 @@ test.describe('keyboard entry and frames Clavis cannot enter', () => {
       });
       expect(reply).toEqual({ ok: true, shown: true });
       await tb(page).waitShown();
-      expect(await tb(page).focusedAction()).toBe('listen');
+      expect(await tb(page).focusedAction()).toBe('explain');
 
-      // Since Phase 6 the order is Listen, Slow, Explain.
+      // The visible order is Lookup, Speak, then speed.
+      await page.keyboard.press('ArrowRight');
+      await expect.poll(() => tb(page).focusedAction()).toBe('listen');
       await page.keyboard.press('ArrowRight');
       await expect.poll(() => tb(page).focusedAction()).toBe('slow');
-      await page.keyboard.press('ArrowRight');
-      await expect.poll(() => tb(page).focusedAction()).toBe('explain');
       await page.keyboard.press('Escape');
       await tb(page).waitHidden();
       // Focus went back to where it was, not into the void.
@@ -655,7 +655,7 @@ test.describe('several frames with a selection', () => {
         tabId,
       );
       await tb(frame).waitShown();
-      await expect.poll(() => tb(frame).focusedAction()).toBe('listen');
+      await expect.poll(() => tb(frame).focusedAction()).toBe('explain');
       await page.waitForTimeout(300);
       // The top document (stale selection, toolbar used and dismissed earlier) stays closed.
       expect(await tb(page).isShown()).toBe(false);

@@ -3,7 +3,7 @@ import type { ExplainOptions } from '../../ai/groq';
 import {
   FEATURES,
   MODE_FEATURE_FLAGS,
-  MODEL_CANDIDATES,
+  RECOMMENDED_MODEL,
   EXTENSION_PAGES,
 } from '../../config/constants';
 import type {
@@ -57,9 +57,9 @@ export function mayAcknowledgeDisclosure(sender: ClassifiedSender): boolean {
   );
 }
 
-/** The model used for a request: the user's choice, else the D-09 candidate (never silently a paid tier). */
+/** Explicit model choices take priority over the recommended default. */
 export function effectiveModel(preferred: string | undefined): string {
-  return preferred ?? MODEL_CANDIDATES.quick;
+  return preferred ?? RECOMMENDED_MODEL;
 }
 
 type Readiness =
@@ -68,6 +68,7 @@ type Readiness =
       apiKey: string;
       model: string;
       explanationLanguage: string;
+      translationLanguage: string;
       readingLevel: ReadingLevel;
     }
   | { state: Exclude<AiStatus['state'], 'ready'>; model?: string };
@@ -126,6 +127,7 @@ async function evaluate(deps: AiHandlerDeps): Promise<Readiness> {
     apiKey: stored.apiKey,
     model,
     explanationLanguage: preferences.explanationLanguage,
+    translationLanguage: preferences.translationLanguage ?? preferences.explanationLanguage,
     readingLevel: preferences.readingLevel,
   };
 }
@@ -159,6 +161,9 @@ export function createAiHandlers(deps: AiHandlerDeps) {
         hasKey,
         disclosureAccepted: onboarding.disclosureAcceptedAt !== null,
         explanationLanguage: preferences.explanationLanguage,
+        ...(preferences.translationLanguage === undefined
+          ? {}
+          : { translationLanguage: preferences.translationLanguage }),
         readingLevel: preferences.readingLevel,
         tooltipBehavior: preferences.tooltipBehavior,
         ttsRate: preferences.ttsRate,
@@ -225,7 +230,14 @@ export function createAiHandlers(deps: AiHandlerDeps) {
         }
         apiKey = readiness.apiKey;
         const result = await deps.provider.explain(
-          { ...payload, targetLanguage: payload.targetLanguage ?? readiness.explanationLanguage },
+          {
+            ...payload,
+            targetLanguage:
+              payload.targetLanguage ??
+              (payload.mode === 'translate'
+                ? readiness.translationLanguage
+                : readiness.explanationLanguage),
+          },
           {
             apiKey,
             model: readiness.model,
@@ -246,7 +258,12 @@ export function createAiHandlers(deps: AiHandlerDeps) {
         if (error.code === 'INVALID_API_KEY' && apiKey !== undefined) {
           await deps.keyService.markInvalid(apiKey);
         }
-        return failure(error.code, { requestId, retryAfterMs: error.retryAfterMs });
+        return failure(error.code, {
+          requestId,
+          retryAfterMs: error.retryAfterMs,
+          httpStatus: error.status,
+          forbiddenReason: error.forbiddenReason,
+        });
       } finally {
         inFlight.end();
       }

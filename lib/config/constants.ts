@@ -33,6 +33,9 @@ export const MODEL_CANDIDATES = {
   deep: 'openai/gpt-oss-120b',
 } as const;
 
+/** Default for an unset model preference; explicit user selections always take priority. */
+export const RECOMMENDED_MODEL = 'openai/gpt-oss-20b';
+
 /** Input ceilings (requirements §4.2, normative). Engineering defaults, not Groq maxima. */
 export const LIMITS = {
   /** Maximum selected/spoken text, in UTF-16 code units, after trimming. */

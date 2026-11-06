@@ -1,4 +1,5 @@
 @import './tokens.css';
+@import './controls.css';
 
 /*
  * Page shell and shared UI primitives for Clavis extension pages (D-19).
@@ -10,17 +11,20 @@
  * `clavis-` names as every other page.
  */
 
+html {
+  font-size: 14px;
+}
+
 html,
 body {
   margin: 0;
   background: var(--bg);
   color: var(--fg);
-  font: 16px/1.5 var(--font);
+  font: 1rem/1.5 var(--font);
 }
 
-:focus-visible {
-  outline: var(--ring-width) solid var(--focus);
-  outline-offset: var(--ring-offset);
+:is(.clavis-page, .reader__header, .reader__overlay, .reader-banner) :focus-visible {
+  outline: none;
 }
 
 /* ---- Page shell ---------------------------------------------------------- */
@@ -48,7 +52,7 @@ body {
 
 .clavis-page__title {
   margin: 0 0 var(--space-4);
-  font-size: 1.5rem;
+  font-size: 1.4rem;
   line-height: 1.25;
 }
 
@@ -58,7 +62,7 @@ body {
 
 .clavis-page h2 {
   margin: 0 0 var(--space-3);
-  font-size: 1.25rem;
+  font-size: 1.125rem;
   line-height: 1.3;
 }
 
@@ -81,8 +85,7 @@ body {
 }
 
 .clavis-page h2:focus-visible {
-  outline: var(--ring-width) solid var(--focus);
-  outline-offset: var(--ring-offset);
+  outline: none;
 }
 
 .clavis-page p,
@@ -109,7 +112,7 @@ body {
 }
 
 .clavis-page a {
-  color: var(--accent);
+  color: var(--link);
 }
 
 .clavis-page code,
@@ -141,10 +144,9 @@ body {
 
 .clavis-section {
   margin: 0 0 var(--space-6);
-  padding: var(--space-4);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  background: var(--bg);
+  padding: 0;
+  border: 0;
+  background: transparent;
 }
 
 .clavis-stack {
@@ -183,17 +185,21 @@ body {
   min-height: var(--target);
   padding: var(--space-2) var(--space-4);
   border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--surface);
-  color: var(--fg);
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--accent-fg);
   font: inherit;
   line-height: 1.3;
   cursor: pointer;
-  transition: background-color 120ms ease;
+  transition:
+    background-color 160ms ease,
+    border-color 160ms ease,
+    box-shadow 160ms ease;
 }
 
 .clavis-button:hover:not(:disabled) {
   border-color: var(--accent);
+  box-shadow: 0 2px 8px rgb(80 65 30 / 8%);
 }
 
 .clavis-button:disabled {
@@ -226,7 +232,7 @@ body {
   padding: var(--space-2);
   border-color: transparent;
   background: transparent;
-  color: var(--accent);
+  color: var(--link);
   text-decoration: underline;
 }
 
@@ -340,8 +346,7 @@ body {
 .clavis-notice {
   margin: 0 0 var(--space-3);
   padding: var(--space-3) var(--space-4);
-  border: 1px solid var(--border);
-  border-left-width: 6px;
+  border: 0;
   border-radius: var(--radius);
   background: var(--info-bg);
   color: var(--fg);
@@ -461,22 +466,26 @@ body {
 
 .clavis-badge {
   display: inline-block;
-  padding: 0 var(--space-2);
-  border: 1px solid currentcolor;
-  border-radius: 999px;
-  font-size: 0.85rem;
+  padding: 2px 7px;
+  border: 0;
+  border-radius: 6px;
+  font-size: 0.78rem;
+  line-height: 1.3;
   font-weight: 600;
 }
 
 .clavis-badge--success {
+  background: var(--success-bg);
   color: var(--success);
 }
 
 .clavis-badge--warning {
+  background: var(--warning-bg);
   color: var(--warning);
 }
 
 .clavis-badge--danger {
+  background: var(--danger-bg);
   color: var(--danger);
 }
 
@@ -616,11 +625,19 @@ body {
     outline: 2px solid Highlight;
   }
 
-  .clavis-notice {
-    border-color: CanvasText;
+  .clavis-notice,
+  .clavis-badge {
+    outline: 1px solid CanvasText;
   }
 
   .clavis-button--primary {
     border-color: ButtonText;
   }
+}
+
+.clavis-page__title {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px 16px;
 }

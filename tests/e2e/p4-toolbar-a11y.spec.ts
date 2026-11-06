@@ -250,9 +250,9 @@ test.describe('structure and targets', () => {
       });
       expect(shape.label).toBe('Clavis actions for the selected text');
       expect(shape.buttons).toEqual([
-        { type: 'button', name: 'Listen', tabIndex: 0 },
-        { type: 'button', name: 'Slow', tabIndex: 0 },
-        { type: 'button', name: 'Explain', tabIndex: 0 },
+        { type: 'button', name: 'Lookup', tabIndex: 0 },
+        { type: 'button', name: 'Speak', tabIndex: 0 },
+        { type: 'button', name: '0.75×', tabIndex: 0 },
       ]);
       expect(shape.live).toBe('live');
     } finally {
@@ -364,7 +364,7 @@ test.describe('user preferences', () => {
     expect(colours[0]).not.toBe(colours[1]);
   });
 
-  test('forced-colors (high contrast): system colours, a real border and a Highlight focus ring', async () => {
+  test('forced-colors (high contrast): system colours, a real border and a focus surface', async () => {
     const page = await openPage({ forcedColors: 'active' });
     try {
       await renderState(page, {
@@ -372,19 +372,23 @@ test.describe('user preferences', () => {
         listen: { ...IDLE, status: 'playing', slow: true },
         card: { action: 'explain', text: 'bank', note: 'x' },
       });
-      const styles = await page.evaluate(() => {
+      const styles = await page.evaluate(async () => {
         const root = document.getElementById('host')?.shadowRoot as ShadowRoot;
         const toolbar = getComputedStyle(root.querySelector('.toolbar') as Element);
         const button = root.querySelector('button') as HTMLButtonElement;
         button.focus();
         const focused = getComputedStyle(button);
+        const focusedBackground = focused.backgroundColor;
+        button.blur();
+        await new Promise((resolve) => window.setTimeout(resolve, 200));
         return {
           toolbarBorder: toolbar.borderTopWidth,
           buttonBorder: getComputedStyle(button).borderTopWidth,
           pressedBorder: getComputedStyle(root.querySelector('[aria-pressed="true"]') as Element)
             .borderTopWidth,
           outline: focused.outlineStyle,
-          outlineWidth: focused.outlineWidth,
+          focusedBackground,
+          restingBackground: getComputedStyle(button).backgroundColor,
           matches: matchMedia('(forced-colors: active)').matches,
         };
       });
@@ -393,32 +397,42 @@ test.describe('user preferences', () => {
       expect(styles.pressedBorder).toBe('1px');
       expect(styles.toolbarBorder).toBe('1px');
       expect(styles.buttonBorder).toBe('1px');
-      expect(styles.outline).toBe('solid');
-      expect(Number.parseFloat(styles.outlineWidth)).toBeGreaterThanOrEqual(2);
+      expect(styles.outline).toBe('none');
+      expect(styles.focusedBackground).not.toBe(styles.restingBackground);
     } finally {
       await page.context().close();
     }
   });
 
-  test('the focus ring is visible on keyboard focus in both colour schemes', async () => {
+  test('keyboard focus changes the button surface without an outline ring', async () => {
     for (const scheme of ['light', 'dark'] as const) {
       const page = await openPage({ colorScheme: scheme });
       try {
         await renderState(page, BASE);
         // The page has nothing else focusable: the first Tab lands on the toolbar's first button.
         await page.keyboard.press('Tab');
-        const ring = await page.evaluate(() => {
+        const focus = await page.evaluate(async () => {
           const root = document.getElementById('host')?.shadowRoot as ShadowRoot;
           const focused = root.activeElement as HTMLElement | null;
           if (focused === null) return null;
           const style = getComputedStyle(focused);
+          const focusedBackground = style.backgroundColor;
+          const visible = focused.matches(':focus-visible');
+          const outline = style.outlineStyle;
+          focused.blur();
+          await new Promise((resolve) => window.setTimeout(resolve, 200));
           return {
             name: focused.textContent,
-            width: style.outlineWidth,
-            style: style.outlineStyle,
+            visible,
+            outline,
+            focusedBackground,
+            restingBackground: getComputedStyle(focused).backgroundColor,
           };
         });
-        expect(ring, scheme).toEqual({ name: 'Listen', width: '2px', style: 'solid' });
+        expect(focus?.name, scheme).toBe('Lookup');
+        expect(focus?.visible, scheme).toBe(true);
+        expect(focus?.outline, scheme).toBe('none');
+        expect(focus?.focusedBackground, scheme).not.toBe(focus?.restingBackground);
       } finally {
         await page.context().close();
       }

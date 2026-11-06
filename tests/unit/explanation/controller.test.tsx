@@ -3,6 +3,7 @@ import { act } from 'preact/test-utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createExplainCard } from '../../../components/explanation/card';
 import * as trust from '../../../lib/selection/trust';
+import * as contained from '../../../lib/selection/contained-range';
 import type { CardSurface, ExplainCardApi, RunContext } from '../../../lib/selection/ui-api';
 import { createFakeBackend, flush, installCatalog, makeSnapshot } from './support';
 
@@ -62,6 +63,32 @@ function setup(overrides: Parameters<typeof createExplainCard>[0] = {}) {
 async function present(card: ExplainCardApi, r: Run): Promise<void> {
   await act(async () => {
     await card.present(r.context);
+  });
+}
+
+async function selectGenerated(slot: HTMLElement, text: string): Promise<void> {
+  const leaf = Array.from(
+    slot.querySelectorAll<HTMLElement>('[data-clavis="card-result-text"]'),
+  ).find((element) => element.textContent?.includes(text));
+  if (leaf?.firstChild === null || leaf === undefined)
+    throw new Error(`No generated leaf containing ${text}`);
+  const offset = leaf.textContent!.indexOf(text);
+  const range = document.createRange();
+  range.setStart(leaf.firstChild, offset);
+  range.setEnd(leaf.firstChild, offset + text.length);
+  const selection = document.getSelection()!;
+  selection.removeAllRanges();
+  selection.addRange(range);
+  // jsdom does not expose a selection inside a shadow root; the browser helper has its own tests.
+  vi.spyOn(contained, 'selectionWithin').mockReturnValue(range);
+  await act(() => {
+    leaf.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
+  });
+}
+
+async function clickLookup(slot: HTMLElement): Promise<void> {
+  await act(() => {
+    (slot.querySelector('[data-clavis="card-lookup"]') as HTMLElement).click();
   });
 }
 
@@ -346,7 +373,7 @@ describe('the host handed to the card', () => {
 describe('Translate language (feature flag)', () => {
   it('looks the language up only when the Translate tab is enabled', async () => {
     const off = setup();
-    const spyOff = vi.spyOn(off.fake.backend, 'explanationLanguage');
+    const spyOff = vi.spyOn(off.fake.backend, 'translationLanguage');
     await present(off.card, run());
     expect(spyOff).not.toHaveBeenCalled();
 
@@ -371,7 +398,7 @@ describe('production flags (Translate on, Grammar off)', () => {
   it('draws the Translate tab, never Grammar, with the language looked up once and one request per open', async () => {
     const fake = createFakeBackend();
     fake.state.language = 'de';
-    const spy = vi.spyOn(fake.backend, 'explanationLanguage');
+    const spy = vi.spyOn(fake.backend, 'translationLanguage');
     // No `features` override: the card uses FEATURES from lib/config/constants.
     const card = createExplainCard({
       backend: fake.backend,
@@ -409,4 +436,277 @@ describe('production flags (Translate on, Grammar off)', () => {
     await click('translate');
     expect(fake.calls).toHaveLength(2);
   });
+});
+
+describe('recursive generated-text lookup', () => {
+  it('opens repeated layers in one card and Back restores each cached answer without a request', async () => {
+    const { card, fake } = setup();
+    const snapshot = makeSnapshot('word', 'bank', { source: 'pdf', page: 4, languageHint: 'en' });
+    const r = run(snapshot);
+    await present(card, r);
+    await act(async () => {
+      fake.calls[0]?.succeed();
+      await flush();
+    });
+    await selectGenerated(r.slot, 'ground');
+    expect(r.slot.querySelector('[data-clavis="card-lookup"]')?.textContent).toContain('ground');
+    await clickLookup(r.slot);
+    expect(fake.calls).toHaveLength(2);
+    expect(fake.calls[1]?.request.snapshot).toMatchObject({
+      source: 'pdf',
+      text: 'ground',
+      kind: 'word',
+    });
+    expect(fake.calls[1]?.request.snapshot).not.toHaveProperty('page');
+    expect(fake.calls[1]?.request.snapshot).not.toHaveProperty('languageHint');
+    expect(fake.calls[1]?.request.snapshot.contextBefore).toContain('Sloping');
+    await act(async () => {
+      fake.calls[1]?.succeed();
+      await flush();
+    });
+    await selectGenerated(r.slot, 'riverside');
+    await clickLookup(r.slot);
+    expect(fake.calls).toHaveLength(3);
+    expect(fake.calls[2]?.request.snapshot.text).toBe('riverside');
+    await act(async () => {
+      fake.calls[2]?.succeed();
+      await flush();
+    });
+    expect(r.slot.querySelector('[data-clavis="card-text"]')?.textContent).toBe('riverside');
+    await act(() => {
+      (r.slot.querySelector('[data-clavis="card-back"]') as HTMLElement).click();
+    });
+    expect(r.slot.querySelector('[data-clavis="card-text"]')?.textContent).toBe('ground');
+    await act(() => {
+      (r.slot.querySelector('[data-clavis="card-back"]') as HTMLElement).click();
+    });
+    expect(r.slot.querySelector('[data-clavis="card-text"]')?.textContent).toBe('bank');
+    expect(r.slot.querySelector('[data-clavis="card-back"]')).toBeNull();
+    expect(fake.calls).toHaveLength(3);
+  });
+
+  it('cancels only the active child on Back; a late child reply cannot replace the parent', async () => {
+    const { card, fake } = setup();
+    const r = run();
+    await present(card, r);
+    await act(async () => {
+      fake.calls[0]?.succeed();
+      await flush();
+    });
+    await selectGenerated(r.slot, 'ground');
+    await clickLookup(r.slot);
+    expect(fake.calls).toHaveLength(2);
+    await act(() => {
+      (r.slot.querySelector('[data-clavis="card-back"]') as HTMLElement).click();
+    });
+    expect(fake.cancelled).toContain(fake.calls[1]?.request.requestId);
+    expect(fake.cancelled).not.toContain(fake.calls[0]?.request.requestId);
+    await act(async () => {
+      fake.calls[1]?.succeed({ title: 'Late child' });
+      await flush();
+    });
+    expect(r.slot.querySelector('[data-clavis="card-text"]')?.textContent).toBe('bank');
+    expect(r.slot.textContent).not.toContain('Late child');
+  });
+
+  it('ignores a late reply from a detached ancestor tab while a child is active', async () => {
+    const { card, fake } = setup();
+    const r = run();
+    await present(card, r);
+    await act(async () => {
+      fake.calls[0]?.succeed();
+      await flush();
+    });
+    await act(() => {
+      (
+        r.slot.querySelector('[data-clavis="card-tab"][data-tab="etymology"]') as HTMLElement
+      ).click();
+    });
+    expect(fake.calls).toHaveLength(2);
+    await act(() => {
+      (r.slot.querySelector('[data-clavis="card-tab"][data-tab="core"]') as HTMLElement).click();
+    });
+    await selectGenerated(r.slot, 'ground');
+    await clickLookup(r.slot);
+    expect(fake.cancelled).toContain(fake.calls[1]?.request.requestId);
+    await act(async () => {
+      fake.calls[1]?.succeed({ title: 'Stale roots' });
+      await flush();
+    });
+    await act(async () => {
+      fake.calls[2]?.succeed();
+      await flush();
+    });
+    await act(() => {
+      (r.slot.querySelector('[data-clavis="card-back"]') as HTMLElement).click();
+    });
+    expect(r.slot.textContent).not.toContain('Stale roots');
+    await act(() => {
+      (
+        r.slot.querySelector('[data-clavis="card-tab"][data-tab="etymology"]') as HTMLElement
+      ).click();
+    });
+    expect(fake.calls).toHaveLength(4);
+  });
+
+  it('requires trusted selection and click, and excludes labels and other card UI', async () => {
+    const { card, fake } = setup();
+    const r = run();
+    await present(card, r);
+    await act(async () => {
+      fake.calls[0]?.succeed();
+      await flush();
+    });
+    vi.mocked(trust.isTrustedEvent).mockReturnValue(false);
+    await selectGenerated(r.slot, 'ground');
+    expect(r.slot.querySelector('[data-clavis="card-lookup"]')).toBeNull();
+    vi.mocked(trust.isTrustedEvent).mockReturnValue(true);
+    await selectGenerated(r.slot, 'ground');
+    expect(r.slot.querySelector('[data-clavis="card-lookup"]')).not.toBeNull();
+    vi.mocked(trust.isTrustedEvent).mockReturnValue(false);
+    await clickLookup(r.slot);
+    expect(fake.calls).toHaveLength(1);
+    vi.mocked(trust.isTrustedEvent).mockReturnValue(true);
+    const label = r.slot.querySelector<HTMLElement>('.ec__label')!;
+    const range = document.createRange();
+    range.selectNodeContents(label);
+    vi.spyOn(contained, 'selectionWithin').mockReturnValue(range);
+    await act(() => {
+      label.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
+    });
+    expect(r.slot.querySelector('[data-clavis="card-lookup"]')).toBeNull();
+    await selectGenerated(r.slot, 'ground');
+    await act(() => {
+      (r.slot.querySelector('[data-clavis="card-close"]') as HTMLElement).dispatchEvent(
+        new MouseEvent('mouseup', { bubbles: true }),
+      );
+    });
+    expect(r.slot.querySelector('[data-clavis="card-lookup"]')).toBeNull();
+  });
+
+  it.each(['outside', 'header', 'mixed'] as const)(
+    'refuses a stale candidate when the range changes to %s before click',
+    async (where) => {
+      const { card, fake } = setup();
+      const r = run();
+      await present(card, r);
+      await act(async () => {
+        fake.calls[0]?.succeed();
+        await flush();
+      });
+      await selectGenerated(r.slot, 'ground');
+      const leaves = r.slot.querySelectorAll<HTMLElement>('[data-clavis="card-result-text"]');
+      const range = document.createRange();
+      if (where === 'outside') {
+        vi.spyOn(contained, 'selectionWithin').mockReturnValue(null);
+      } else if (where === 'header') {
+        range.selectNodeContents(r.slot.querySelector('[data-clavis="card-text"]')!);
+        vi.spyOn(contained, 'selectionWithin').mockReturnValue(range);
+      } else {
+        range.setStart(leaves[0]!.firstChild!, 0);
+        range.setEnd(leaves[1]!.firstChild!, 2);
+        vi.spyOn(contained, 'selectionWithin').mockReturnValue(range);
+      }
+      await clickLookup(r.slot);
+      expect(fake.calls).toHaveLength(1);
+      expect(r.slot.querySelector('[data-clavis="card-lookup"]')).toBeNull();
+    },
+  );
+
+  it('clears the candidate on tab switch and refuses over-limit selections without a request', async () => {
+    const { card, fake } = setup();
+    const r = run();
+    await present(card, r);
+    const longText = 'x'.repeat(2001);
+    await act(async () => {
+      fake.calls[0]?.succeed({ definition: longText });
+      await flush();
+    });
+    await selectGenerated(r.slot, longText);
+    expect(r.slot.querySelector('[data-clavis="card-lookup"]')).toBeNull();
+    expect(r.slot.textContent).toContain('That selection is too long');
+    expect(fake.calls).toHaveLength(1);
+    await selectGenerated(r.slot, 'bank');
+    expect(r.slot.querySelector('[data-clavis="card-lookup"]')).not.toBeNull();
+    await act(() => {
+      (
+        r.slot.querySelector('[data-clavis="card-tab"][data-tab="etymology"]') as HTMLElement
+      ).click();
+    });
+    expect(r.slot.querySelector('[data-clavis="card-lookup"]')).toBeNull();
+  });
+
+  it('keeps nested history across immediate same-root re-presentation and Close', async () => {
+    const { card, fake } = setup();
+    const snapshot = makeSnapshot('word', 'bank');
+    const first = run(snapshot);
+    await present(card, first);
+    await act(async () => {
+      fake.calls[0]?.succeed();
+      await flush();
+    });
+    await selectGenerated(first.slot, 'ground');
+    await clickLookup(first.slot);
+    await act(async () => {
+      fake.calls[1]?.succeed();
+      await flush();
+    });
+    first.abort();
+    const second = run(snapshot);
+    await present(card, second);
+    expect(second.slot.querySelector('[data-clavis="card-text"]')?.textContent).toBe('ground');
+    expect(second.slot.querySelector('[data-clavis="card-back"]')).not.toBeNull();
+    expect(fake.calls).toHaveLength(2);
+    await act(() => {
+      (second.slot.querySelector('[data-clavis="card-close"]') as HTMLElement).click();
+    });
+    const third = run(snapshot);
+    await present(card, third);
+    expect(third.slot.querySelector('[data-clavis="card-text"]')?.textContent).toBe('ground');
+    expect(fake.calls).toHaveLength(2);
+  });
+
+  it('removes its resize listener when destroyed without an abort', async () => {
+    const { card } = setup();
+    const add = vi.spyOn(window, 'addEventListener');
+    const remove = vi.spyOn(window, 'removeEventListener');
+    await present(card, run());
+    const resize = add.mock.calls.find(([name]) => name === 'resize')?.[1];
+    expect(resize).toBeDefined();
+    card.destroy();
+    expect(remove.mock.calls).toContainEqual(['resize', resize]);
+    add.mockRestore();
+    remove.mockRestore();
+  });
+
+  it.each(['destroy', 'dismiss'] as const)(
+    'ignores a deferred language lookup after %s',
+    async (action) => {
+      const fake = createFakeBackend();
+      let resolveLanguage: ((value: string) => void) | undefined;
+      fake.backend.translationLanguage = () =>
+        new Promise<string>((resolve) => {
+          resolveLanguage = resolve;
+        });
+      const card = createExplainCard({
+        backend: fake.backend,
+        newId: () => `id-${(ids += 1)}`,
+        now: Date.now,
+        copy: () => Promise.resolve(true),
+        features: { grammarTab: false, translateTab: true },
+      });
+      const snapshot = makeSnapshot();
+      const r = run(snapshot);
+      const pending = card.present(r.context);
+      if (action === 'destroy') card.destroy();
+      else card.dismiss(snapshot.selectionId);
+      resolveLanguage?.('fr');
+      await act(async () => {
+        await pending;
+        await flush();
+      });
+      expect(r.slot.childElementCount).toBe(0);
+      expect(fake.calls).toHaveLength(0);
+    },
+  );
 });

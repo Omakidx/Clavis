@@ -1,5 +1,7 @@
 # Spike D: voices and the offscreen fallback (D-07)
 
+> **Policy update, 2026-10-29:** At the user's request, D-22 now makes Automatic try a matching on-device voice first, then a matching online voice if no local voice is available or can start. The voice provider receives selected text during online playback, which is disclosed in Settings, onboarding and the playback notice. The original local-only policy described below is historical; the engine-comparison observations remain unchanged.
+
 Status: **provisional**. The no-voice path is proven honest on the Linux dev machine. The positive audio path is implemented and unit-tested but has **not been heard** by anyone yet: it needs the manual checks below on the maintainer's branded Chrome. Decision date: 2026-10-22.
 
 ## Question

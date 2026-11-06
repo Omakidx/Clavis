@@ -1,16 +1,21 @@
 import { useState } from 'react';
+import type { KeyVerification } from '../../../lib/contracts/setup';
 import { t } from '../../../lib/i18n';
 import type { KeyOutcome } from '../../../lib/ui-client/key-flow';
-import { Button, Notice } from '../../common/ui';
+import { GROQ_KEYS_URL } from '../../../lib/ui-client/links';
+import { Button, ExternalLink } from '../../common/ui';
 import { KeyConnectForm, KeyOutcomeNotice } from '../../settings/KeyConnectForm';
 import { ResourceGate } from '../../settings/ResourceGate';
 import type { StepContext } from '../StepTypes';
 
-/**
- * Paste, choose where to keep it, and Connect. The three results stay distinct: working,
- * rejected by Groq, and "saved but could not be checked" (offline). Nothing blocks finishing
- * setup without a key (UJ-05).
- */
+const VERIFICATION_KIND = {
+  valid: 'valid',
+  invalid: 'invalid',
+  unverified: 'unverified',
+  never: 'unchecked',
+} as const satisfies Record<KeyVerification, KeyOutcome['kind']>;
+
+/** Get a Groq key and connect it in one step, while keeping every verification result distinct. */
 export function ConnectStep({ keys, skipKey, focusNext }: StepContext) {
   const [replacing, setReplacing] = useState(false);
   const [outcome, setOutcome] = useState<KeyOutcome | null>(null);
@@ -25,26 +30,24 @@ export function ConnectStep({ keys, skipKey, focusNext }: StepContext) {
       {(status) =>
         status.hasKey && !replacing ? (
           <>
-            {/* The form is gone once a key exists, so its result is shown here instead. */}
             <div className="clavis-live" role="status" aria-live="polite">
-              {outcome !== null && outcome.kind !== 'error' ? (
-                <KeyOutcomeNotice outcome={outcome} />
-              ) : outcome === null ? (
-                <Notice tone="success">
-                  <p>
-                    {status.last4 === null ? t('keyConnectedLive') : t('keyEnding', status.last4)}
-                  </p>
-                </Notice>
-              ) : null}
+              <KeyOutcomeNotice
+                outcome={
+                  outcome !== null && outcome.kind !== 'error'
+                    ? outcome
+                    : { kind: VERIFICATION_KIND[status.verification], status }
+                }
+              />
             </div>
             {outcome?.kind === 'error' ? (
               <KeyOutcomeNotice outcome={outcome} onRetry={() => void retest()} />
             ) : null}
             <div className="clavis-actions">
               <Button disabled={keys.busy !== 'idle'} onClick={() => void retest()}>
-                {t('keyTest')}
+                {keys.busy === 'testing' ? t('keyResultChecking') : t('keyTest')}
               </Button>
               <Button
+                disabled={keys.busy !== 'idle'}
                 onClick={() => {
                   setOutcome(null);
                   setReplacing(true);
@@ -56,6 +59,27 @@ export function ConnectStep({ keys, skipKey, focusNext }: StepContext) {
           </>
         ) : (
           <>
+            {status.hasKey ? (
+              <div className="clavis-actions">
+                <Button disabled={keys.busy !== 'idle'} onClick={() => setReplacing(false)}>
+                  {t('uiCancel')}
+                </Button>
+              </div>
+            ) : (
+              <div className="clavis-onboarding__key-guide">
+                <p>
+                  {t('onbGetKeyIntro')}{' '}
+                  <ExternalLink href={GROQ_KEYS_URL}>{t('onbGetKeyLink')}</ExternalLink>
+                </p>
+                <details>
+                  <summary>{t('onbKeyStepsSummary')}</summary>
+                  <ol>
+                    <li>{t('onbGetKeyStep1')}</li>
+                    <li>{t('onbGetKeyStep2')}</li>
+                  </ol>
+                </details>
+              </div>
+            )}
             <KeyConnectForm
               busy={keys.busy === 'connecting'}
               onConnect={keys.connect}
@@ -70,7 +94,9 @@ export function ConnectStep({ keys, skipKey, focusNext }: StepContext) {
             {status.hasKey ? null : (
               <>
                 <div className="clavis-actions">
-                  <Button onClick={skipKey}>{t('onbSkipKey')}</Button>
+                  <Button disabled={keys.busy !== 'idle'} onClick={skipKey}>
+                    {t('onbSkipKey')}
+                  </Button>
                 </div>
                 <p className="clavis-muted">{t('onbSkipKeyHint')}</p>
               </>

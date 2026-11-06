@@ -6,6 +6,7 @@ import { api } from '../../lib/ui-client/api';
 import type { SettingsHook } from '../../lib/ui-client/use-settings';
 import { useResource } from '../../lib/ui-client/use-resource';
 import { Notice } from '../common/ui';
+import { SettingsIcon } from '../common/Icons';
 import { ResourceGate } from './ResourceGate';
 import { useSaveStatus } from './use-save-status';
 import { SpeedField, VoiceLanguageField } from './VoiceFields';
@@ -95,7 +96,10 @@ export function VoiceSection({ settings }: VoiceSectionProps) {
 
   return (
     <section className="clavis-section" aria-labelledby={headingId} id="section-voice">
-      <h2 id={headingId}>{t('voiceTitle')}</h2>
+      <h2 id={headingId} tabIndex={-1}>
+        <SettingsIcon name="preferences" />
+        {t('voiceTitle')}
+      </h2>
       <p>{t('voiceIntro')}</p>
       <p>{t('voiceLimits')}</p>
       <ResourceGate resource={voices}>

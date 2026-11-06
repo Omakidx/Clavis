@@ -106,7 +106,7 @@ export function rejectedSpeakReply(raw: unknown): MessageReply<never> {
     : invalidReply(raw, parsed.issues, parsed.reason);
 }
 
-/** Reason for "the only voices for this language are online voices" (D-22: on-device by default). */
+/** Legacy reason accepted by the reply contract; Automatic can now use online voices. */
 const ONLINE_ONLY_REASON: ErrorReason = 'online-only';
 
 /** Largest voice lists the report carries (voicesReportSchema). */

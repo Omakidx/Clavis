@@ -106,7 +106,8 @@ function Body({ mode, entry, session, now, online, onSettings }: Omit<SectionPro
   }
   if (entry.status === 'error' && entry.error !== null) {
     const { error } = entry;
-    const offline = !online && CONNECTION_CODES.includes(error.code);
+    const offline =
+      !online && error.httpStatus === undefined && CONNECTION_CODES.includes(error.code);
     return (
       <div
         className={`clavis-notice${error.quiet === true ? '' : ' clavis-notice--danger'}`}

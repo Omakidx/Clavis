@@ -8,6 +8,12 @@ import { ResourceGate } from '../../settings/ResourceGate';
 import { SiteAccessHelp } from '../../settings/SiteAccessHelp';
 import type { StepContext } from '../StepTypes';
 
+const NONWORKING_KEY_SUMMARY = {
+  invalid: 'keyStatusInvalid',
+  unverified: 'keyStatusUnverified',
+  never: 'keyStatusNever',
+} as const;
+
 /** Summary and "Finish setup" (UPDATE_ONBOARDING completed:true). */
 export function DoneStep({ settings, keys }: StepContext) {
   const [busy, setBusy] = useState(false);
@@ -16,6 +22,12 @@ export function DoneStep({ settings, keys }: StepContext) {
   const settingsButton = useRef<HTMLButtonElement>(null);
   const keyState = keys.resource.state;
   const hasKey = keyState.status === 'ready' && keyState.data.hasKey;
+  const keySummary =
+    keyState.status !== 'ready' || !keyState.data.hasKey
+      ? t('onbSummaryNotConnected')
+      : keyState.data.verification === 'valid'
+        ? t('onbSummaryConnected')
+        : t(NONWORKING_KEY_SUMMARY[keyState.data.verification]);
 
   async function finish() {
     setBusy(true);
@@ -39,7 +51,7 @@ export function DoneStep({ settings, keys }: StepContext) {
           <h3>{t('onbSummaryHeading')}</h3>
           <dl className="clavis-facts" data-testid="setup-summary">
             <dt>{t('onbSummaryGroq')}</dt>
-            <dd>{hasKey ? t('onbSummaryConnected') : t('onbSummaryNotConnected')}</dd>
+            <dd>{keySummary}</dd>
             <dt>{t('onbSummaryAccess')}</dt>
             <dd>
               {snapshot.onboarding.siteAccessChoice === 'granted'

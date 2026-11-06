@@ -60,6 +60,8 @@ Install -> welcome -> explanation of data transfer -> **Enable Clavis on website
 
 Highlight `bank` in `They sat on the bank of the river` -> toolbar near selection -> **Listen** speaks `bank` -> **Explain** sends selected word + bounded local sentence context to Groq in one core request -> result identifies riverbank, not a financial institution, with a definition and examples -> user opens **Roots** or **Related words** (one extra request each) -> dismisses with Escape.
 
+Within a lookup result, a user can highlight generated text and press **Lookup** to inspect it in the same popup, repeating for further layers. Highlighting alone sends nothing. **Back** returns to the previous result without requesting it again. Only the selected generated text and bounded context from its own result leaf are sent for the new lookup; the original webpage context is not inherited.
+
 ### UJ-03 — Sentence on a webpage
 
 Highlight `She finally broke the ice.` -> **Listen** speaks the entire sentence -> **Explain** returns the in-context meaning (idiomatic vs literal) -> user opens **Simplify** for a natural rewrite -> copies result. No irrelevant word-only tabs shown.
@@ -91,7 +93,7 @@ On `chrome://`, Chrome Web Store, built-in Chrome PDF viewer, scanned-only PDF, 
 | FR-003 | Must | Link to GroqCloud key creation; show instructions for pasting key | Link opens `https://console.groq.com/keys`; no key requested by developer site |
 | FR-004 | Must | Test user key from privileged extension context | Valid key accepted; invalid 401/403 shows actionable error; no key appears in UI logs |
 | FR-005 | Must | Choose model only from compatible/available options where discoverable | Unavailable ID triggers selection fallback UI; never silently changes to paid-only model |
-| FR-006 | Must | Set explanation language, reading level, tooltip behavior, TTS rate/locale | Values persist, with immediate confirmation and reset-to-default option |
+| FR-006 | Must | Set explanation language, translation target language, reading level, tooltip behavior, TTS rate/locale | Values persist, with immediate confirmation and reset-to-default option |
 | FR-007 | Must | Change/revoke saved key and select persistent/session storage | Remove clears chosen storage area and in-memory references; missing key produces setup prompt |
 | FR-008 | Should | Rerun selection and PDF tutorial from Settings | Demonstration works without requiring a live external page |
 | FR-009 | Must | Request optional all-sites access during onboarding; allow grant/revoke later in Settings | Granting registers the content script without reinstall; declining leaves the extension fully usable via FR-018; revoking stops automatic injection on the next page load |
@@ -105,9 +107,9 @@ This is the approved user-facing wording. Implementation may adjust layout and f
 > **Your reading stays on your device until you ask** `[disclosureTitle]`
 >
 > - Selecting text does nothing by itself. Clavis notices the selection on your device and shows its toolbar. `[disclosureSelect]`
-> - **Listen** uses the voices on your computer. Nothing is sent to Groq. `[disclosureListen]`
+> - **Listen** tries a matching on-device voice first, then an online voice if needed. Online voices send the selected text to their provider. Nothing is sent to Groq. `[disclosureListen]`
 > - **Explain** sends the text you selected, up to 1,000 characters of the text around it, and your chosen language to **Groq**, using your own API key. Groq handles it under its own terms and privacy policy. `[disclosureExplain]` *(link: Groq privacy policy)*
-> - PDFs you open are read inside your browser and never uploaded. Only text you select and explain is sent. `[disclosurePdf]`
+> - PDFs you open are read inside your browser and never uploaded. Selected text can be sent when you ask for an explanation or use an online voice. `[disclosurePdf]`
 > - Clavis has no server of its own and collects no data about you. `[disclosureNoServer]`
 >
 > Button: **I understand** `[disclosureAccept]`
@@ -122,7 +124,7 @@ This is the approved user-facing wording. Implementation may adjust layout and f
 
 > **Show Clavis when you select text** `[siteAccessTitle]`
 >
-> To show the toolbar automatically, Chrome will ask you to let Clavis read and change data on websites. Clavis uses this only to notice when you select text and to show its toolbar. It does not read pages in the background, and nothing leaves your device until you click Explain. `[siteAccessBody]`
+> To show the toolbar automatically, Chrome will ask you to let Clavis read and change data on websites. Clavis uses this only to notice when you select text and to show its toolbar. It does not read pages in the background. Text leaves your device only when you ask for an explanation or use an online voice. `[siteAccessBody]`
 >
 > Buttons: **Enable on websites** `[siteAccessGrant]` · **Not now — I'll use right-click instead** `[siteAccessSkip]`
 
@@ -159,11 +161,11 @@ This is the approved user-facing wording. Implementation may adjust layout and f
 | FR-021 | Must | Read aloud a selected **sentence** (including punctuation) | Sentence starts/stops/replays correctly; no sentence truncation for supported lengths |
 | FR-022 | Must | Normal and slow rate; Stop and Replay | Controls work from tooltip; reselecting and playing stops previous utterance |
 | FR-023 | Must | Detect no-voice/error and show feedback | Unsupported Linux/browser configuration shows an actionable message, not a fake playing state |
-| FR-024 | Must | Speak only user-selected text and respect chosen locale if supported | Inspection demonstrates no surrounding unselected text gets spoken |
+| FR-024 | Must | Speak only selected text or translated output the user asks to hear, and respect chosen locale if supported | Inspection demonstrates no surrounding unselected text gets spoken |
 | FR-025 | Should | Voice chooser lists actually available voices | Empty/missing voice gracefully disables unavailable choices |
 | FR-026 | Could | Show IPA / authentic dictionary audio for supported words | Source/locale clearly labeled; never invent audio or phonetics |
 
-**TTS routing (D-07, settled):** `chrome.tts` only. The Web Speech fallback in an offscreen document was evaluated and **not adopted**: on the user's Chrome it reported exactly the same voices as `chrome.tts`. Voices vary by operating system; Linux without a speech engine has only online voices (used only when chosen, D-22) or none. Playback never depends on Groq.
+**TTS routing (D-07, settled):** `chrome.tts` only. The Web Speech fallback in an offscreen document was evaluated and **not adopted**: on the user's Chrome it reported exactly the same voices as `chrome.tts`. Voices vary by operating system; Linux without a speech engine has only online voices (used as automatic fallback, D-22) or none. Playback never depends on Groq.
 
 ### 4.4 AI explanation and provider behavior
 
@@ -176,7 +178,7 @@ This is the approved user-facing wording. Implementation may adjust layout and f
 | FR-034 | Must | **Related words tab:** synonyms and antonyms where semantically meaningful, requested when opened | Terms match intended sense; display `Not applicable` when relevant |
 | FR-035 | Must | **Simplify tab:** plain-language rewrite for phrases, sentences and passages, requested when opened | Rewrite preserves meaning; no hallucinated facts |
 | FR-036 | Later (D-25) | **Grammar tab:** grammatical function and expression/idiom breakdown | Models return usable breakdown for fixture idioms and simple sentences |
-| FR-037 | Should | **Translate tab:** translation into the user's selected language | Translation separates literal form from contextual sense where appropriate |
+| FR-037 | Should | **Translate tab:** translation into the user's selected language | Settings → Preferences saves Translation language independently from Explanation language; existing settings without a target follow Explanation language. Translation separates literal form from contextual sense where appropriate. A speaker beside the translation reads that output using the saved speech preferences and target language, with Stop and cleanup on leaving the result |
 | FR-038 | Must | On-demand Groq calls with bounded context and requested mode | Request created only after an explicit action; opening an already-loaded tab for the same selection makes no new request; inputs validated; model output runtime validated |
 | FR-039 | Must | Loading, success, empty, timeout, permission, key, model and rate-limit states | Explicit labeled states and retry options; no infinite spinner |
 | FR-040 | Must | Model ID/API capabilities checked or fail safely | Unsupported models/schema settings fall back to supported request mode or show error |
@@ -257,7 +259,7 @@ This is the approved user-facing wording. Implementation may adjust layout and f
 | Small adjacent context | Disambiguation | Content script/reader -> privileged AI request | **Only for Explain** to Groq |
 | User Groq API key | Authorize user's Groq calls | Trusted extension contexts only | To Groq over HTTPS only |
 | Voice locale/rate/voice choice | Playback preference | Local extension settings | No |
-| Selected text for **Listen** | Pronunciation | Background → speech engine | **No** with on-device voices (the default, D-22); to the voice provider only if the user explicitly chose an *online* voice in Settings |
+| Selected text for **Listen** | Pronunciation | Background → speech engine | **No** with on-device voices; to the voice provider when Automatic falls back to an online voice (D-22) or the user chooses an online voice in Settings |
 | Local PDF bytes | PDF rendering | Reader tab + PDF.js worker | No |
 | Webpage access (optional, user-granted) | Show toolbar at selection | Runtime-registered content script on granted http/https sites | Page data goes to Groq only on action |
 | Current-tab access (`activeTab`) | Explain via context menu / toolbar icon when site access is declined | One-time injection into the current tab after a user gesture | Page data goes to Groq only on action |
@@ -316,7 +318,7 @@ The team can test **Linux only** by hand. Other platforms get automated coverage
 | Platform | Coverage | What it proves |
 | --- | --- | --- |
 | Linux, latest Chrome Stable, with `speech-dispatcher` + a voice engine (e.g. `espeak-ng`) installed | Manual + automated E2E (primary dev machine) | Full feature set; `chrome.tts` playback path |
-| Linux, latest Chrome Stable, **without** `speech-dispatcher` | Manual | No on-device voice: online-only or no-voice message (D-22) |
+| Linux, latest Chrome Stable, **without** `speech-dispatcher` | Manual | No on-device voice: matching online voice fallback, or a no-voice message if none is available (D-22) |
 | Windows, latest Chrome Stable | Automated E2E on CI runners (non-voice flows) | Install, site access, selection, Explain with mocked Groq, PDF reader |
 | macOS, latest Chrome Stable | Automated E2E on CI runners (non-voice flows) | Same as Windows |
 | Minimum supported Chrome (147, D-18) | Automated smoke test with a pinned [Chrome for Testing](https://googlechromelabs.github.io/chrome-for-testing/) build | APIs used exist at the declared `minimum_chrome_version` |
@@ -370,7 +372,7 @@ The team can test **Linux only** by hand. Other platforms get automated coverage
 | D-19 | **No Tailwind for v1; plain CSS with shared design tokens** | Global resets (as in Tailwind's preflight) shift the PDF.js text layer (Spike C finding 3); extension pages are simple forms that don't need a utility framework | Tech stack §1, §6; shared classes are namespaced `clavis-*` |
 | D-20 | **Observer budget raised from 15 KB to 18 KB gzip** | The 15 KB figure protected the 150 ms first-toolbar target; measured p95 is 58.5 ms (1× CPU) / 133.9 ms (4×) on a loaded machine. Fitting into 15 KB meant dropping pinch-zoom placement | `scripts/size-budgets.json`; tech stack §6 |
 | D-21 | **Per-tab AI rate limit raised from 10 to 20 requests per minute** | One selection can use up to four requests (core + three lazy tabs), so 10/min throttled ordinary reading; webpages can't trigger requests (trusted clicks only, Phase 2 HIGH-1), so the limit now mainly guards cost | `AI_RATE_LIMIT` in lib/config; architecture §9 rule 9 |
-| D-22 | **Listen uses on-device voices only by default**; an online voice (e.g. Chrome's Google network voices in the Web Speech fallback) is used only when the user explicitly chooses it in Settings → Voice, where it is labelled *online* with a note, and the toolbar marks each online playback | Keeps the approved disclosure ("Listen uses the voices on your computer") true by default; the Phase 6 code review found the fallback can expose network voices, especially on Linux | lib/speech voice resolution; Settings → Voice; privacy policy; §6 inventory |
+| D-22 | **Automatic tries matching on-device voices first, then matching online voices if no local voice is available or can start**. Explicit voice choices are respected; Settings labels online voices and explains the fallback, and the toolbar announces online playback to assistive technology without a visible playback label. No voice for another language is substituted | Updated at the user's request on 2026-10-29; replaces the original local-only default. Online playback sends selected text to the voice provider, never to Groq | lib/speech voice resolution; Settings → Voice; privacy policy; §6 inventory |
 | D-23 | **Keep PDF.js CMaps in the package** | About 1 MB of the 2.6 MB ZIP, but without them CJK PDFs that don't embed their fonts render incorrectly; the store ZIP stays under its 3.2 MB budget | wxt.config.ts asset hook; size budgets |
 | D-24 | **Side panel ships in v1 (FR-042); the cross-selection answer cache is deferred (FR-043 → Later)** (2026-10-23) | User's Phase 8 choice. The side panel gives long answers room and needs only `sidePanel`, which shows no install warning. A cache across selections would store selected text on disk (TTL, clearing UI, privacy-policy change) for a small saving; answers stay cached per selection in memory | FR-042, FR-043; architecture §3 |
 | D-25 | **Translate tab ships in v1 (FR-037); the Grammar tab stays off (FR-036 → Later)** (2026-10-23) | User's live Groq eval, 4 runs pooled ([p5-prompt-eval.md](decisions/p5-prompt-eval.md)): Translate 96/96 valid on gpt-oss-20b and -120b, correct contextual and literal renderings for French, Japanese and Arabic. Grammar 36/40 (90%) on the default gpt-oss-20b — three failures on injection fixtures (failing safe) but one on an ordinary sentence — below the ≥ 95% gate; -120b was 40/40. Revisit Grammar with a prompt/schema change or one retry on `json_validate_failed` | FR-036, FR-037; `FEATURES` in lib/config/constants.ts |

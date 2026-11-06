@@ -17,13 +17,15 @@ test.describe('onboarding wizard', () => {
     await expect(heading).toHaveText(/Understand and pronounce/);
     await expect(
       page.getByRole('navigation', { name: 'Setup progress' }).getByRole('listitem'),
-    ).toHaveCount(8);
+    ).toHaveCount(7);
 
     await next.click();
     await expect(heading).toHaveText('Your reading stays on your device until you ask');
     await expect(heading).toBeFocused();
     await expect(
-      page.getByText('Listen uses the voices on your computer. Nothing is sent to Groq.'),
+      page.getByText(
+        /^Listen tries a matching on-device voice first, then an online voice if needed/,
+      ),
     ).toBeVisible();
     await expect(
       page.getByText(/^Explain sends the text you selected, up to 1,000 characters/),
@@ -46,13 +48,10 @@ test.describe('onboarding wizard', () => {
     await expect(page.getByRole('status')).toContainText('Right-click selected text');
     await next.click();
 
-    await expect(heading).toHaveText('Get your Groq key');
+    await expect(heading).toHaveText('Connect your Groq key');
     const link = page.getByRole('link', { name: /Open the Groq keys page/ });
     await expect(link).toHaveAttribute('href', 'https://console.groq.com/keys');
     await expect(link).toHaveAttribute('target', '_blank');
-    await page.getByRole('button', { name: 'I have my key' }).click();
-
-    await expect(heading).toHaveText('Connect your Groq key');
     await expect(page.getByLabel('Your Groq key', { exact: true })).toHaveAttribute(
       'type',
       'password',
@@ -112,8 +111,6 @@ test.describe('onboarding wizard', () => {
     await next.click();
     await page.getByRole('button', { name: /Not now/ }).click();
     await next.click();
-    await page.getByRole('button', { name: 'I have my key' }).click();
-
     await page.getByLabel('Your Groq key', { exact: true }).fill(FAKE_KEY);
     // The typed key must not be mirrored into the DOM (an uncontrolled input has no value attribute).
     expect(
@@ -131,7 +128,7 @@ test.describe('onboarding wizard', () => {
     const outcome = await result.getAttribute('data-outcome');
     expect(['invalid', 'unverified']).toContain(outcome);
     if (outcome === 'invalid') await expect(result).toContainText("Groq didn't accept this key");
-    else await expect(result).toContainText("couldn't reach Groq");
+    else await expect(result).toContainText('check could not confirm access');
 
     expect(await visibleTextAndValues(page)).not.toContain(FAKE_KEY);
     expect(await visibleTextAndValues(page)).not.toContain('gsk_TESTe2eNotARealKey');

@@ -355,7 +355,7 @@ describe('speech handlers', () => {
       expect(chrome.speakCalls).toHaveLength(1);
     });
 
-    it('uses a network voice only when the user chose it, and reports it as remote', async () => {
+    it('preserves an explicitly chosen network voice and reports it as remote', async () => {
       const net = voice('chrome-tts', 'en-US', { name: 'Net', remote: true });
       const explicit = setup({ chromeVoices: [net] });
       expect(await explicit.handlers.speak(speakMsg({ voiceName: 'Net' }), SELF)).toMatchObject({
@@ -367,7 +367,7 @@ describe('speech handlers', () => {
       });
     });
 
-    it('never picks a network voice on its own (D-22): on-device voice, or NO_VOICE', async () => {
+    it('Automatic tries local first, then online when no local voice matches', async () => {
       const local = voice('chrome-tts', 'en-US', { name: 'Local' });
       const net = voice('chrome-tts', 'en-US', { name: 'Net', remote: true });
       for (const lang of ['en', undefined]) {
@@ -377,8 +377,8 @@ describe('speech handlers', () => {
         });
         const onlyNet = setup({ chromeVoices: [net] });
         const reply = await onlyNet.handlers.speak(speakMsg({ lang }), SELF);
-        expect(reply).toMatchObject({ ok: false, error: { code: 'NO_VOICE' } });
-        expect(onlyNet.chrome.speakCalls).toHaveLength(0);
+        expect(reply).toMatchObject({ data: { voiceName: 'Net', remote: true } });
+        expect(onlyNet.chrome.speakCalls.map((call) => call.voice?.name)).toEqual(['Net']);
       }
     });
 
@@ -474,12 +474,12 @@ describe('speech handlers', () => {
       });
     });
 
-    it('reports network-only voices as online-only (D-22: on-device voices by default)', async () => {
+    it('reports an online-only matching voice as started and remote', async () => {
       const { handlers } = setup({
         chromeVoices: [voice('chrome-tts', 'en-US', { name: 'Net', remote: true })],
       });
       expect(await handlers.speak(speakMsg({ lang: 'en' }), SELF)).toMatchObject({
-        error: { code: 'NO_VOICE', reason: 'online-only' },
+        data: { state: 'started', voiceName: 'Net', remote: true },
       });
     });
 

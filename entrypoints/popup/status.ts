@@ -17,7 +17,7 @@ export const GROQ_STATUS: Record<AiStatus['state'], GroqStatusView> = {
     text: 'popupGroqSetup',
     tone: 'warning',
     action: 'connect',
-    notice: ['errSetupRequired', 'keyNoneHint'],
+    notice: ['popupNoKeyNotice'],
   },
   invalid_key: {
     text: 'popupGroqInvalid',

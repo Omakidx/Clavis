@@ -16,7 +16,7 @@
 | A-004 | Never place API key in content script | Webpage context is untrusted | Only privileged background/settings/reader contexts handle credentials |
 | A-005 | Shared domain action and result contracts | Web and PDF use same explain/listen workflows | Multiple UI entry points; one adapter for speech and AI |
 | A-006 | PDF.js custom extension page built on PDF.js viewer components | Native Chrome PDF viewer cannot reliably host normal content scripts; viewer components give virtualization, text layer and find for free | User explicitly opens PDF in reader; no browser-wide PDF hijack; local files only in v1 |
-| A-007 | `chrome.tts`, capability-detected; the offscreen Web Speech fallback was evaluated and not adopted (D-07) | No AI cost, good Chrome integration; the fallback found no extra voices | Not guaranteed Linux voices; honest no-voice / online-only messages |
+| A-007 | `chrome.tts`, capability-detected; the offscreen Web Speech fallback was evaluated and not adopted (D-07) | No AI cost, good Chrome integration; the fallback found no extra voices | Not guaranteed Linux voices; honest voice-availability messages and online-voice disclosures in Settings |
 | A-008 | Structured responses with runtime validation | Predictable cards, failure isolation | Model feature checks and safe fallback when schema mode unavailable |
 | A-009 | Explicit user-triggered AI requests | Privacy and cost control | Selection itself has zero network transmission to Groq |
 | A-010 | Future provider interface from day one | Later OpenRouter/Gemini support | v1 contains only `GroqProvider`; no premature complex router |
@@ -64,6 +64,8 @@ flowchart TD
 | **Side panel** | Long explanations after the user pressed **Open in side panel**: the selection, every tab the card had loaded, further tabs on demand, Copy, Listen for the selected text | Raw key, any Groq request on open, the first-send disclosure (only the card collects it), other tabs' explanations, page history |
 | **PDF reader** | Local/user-requested PDF loading, page lifecycle, search/zoom, text-layer selection, local reader UI | Uploading PDFs or invoking Groq without user action |
 | **Shared libraries** | Schemas, AI mode definitions, feature flags, selection normalization, error mapping | Page-specific secrets or direct DOM globals in pure data layers |
+
+The extension package includes the static Clavis brand assets `brand/clavis-icon.svg` and `brand/clavis-logo.svg`, alongside generated PNG manifest icons. These bundled SVGs contain no scripts or external resources.
 
 ## 3. Extension entry points and message routes
 
@@ -145,6 +147,12 @@ export interface ExplainRequest {
 
 The payload is **not** automatically trusted because TypeScript says it is typed. Apply Zod runtime validation in background, especially the selection and context limits defined in [requirements.md §4.2](requirements.md#42-selection-toolbar-and-accessibility), allowable modes, locale limits and plain-text-only strings. Avoid retaining precise page URL or origin unless genuinely necessary for troubleshooting and clearly disclosed.
 
+**Translation target:** Settings → Preferences stores an optional `translationLanguage` independently from `explanationLanguage`. Older records without it keep following the explanation language. `GET_PUBLIC_SETTINGS` exposes the non-secret target; new card sessions read it only when Translate is enabled, and side-panel hand-offs preserve the session target. Changing the preference affects new selection sessions; cached results remain keyed by selection, mode and target language.
+
+A speaker beside the translated output reuses the toolbar's Listen controller. It sends only that translated text with the target BCP-47 language; the background chooses the saved voice (or a matching fallback), and the saved speech rate applies. Stop, tab changes, recursive navigation and card closure cancel playback. The speaker artwork is cloned from the extension-owned toolbar so the popup does not bundle a second copy.
+
+**Lookup within results:** The popup card can capture a user-selected word or phrase inside one generated plain-text result leaf. Selection alone sends nothing; a trusted Lookup click creates a fresh selection session. Its bounded context comes only from that generated leaf, with no inherited page context, page number or source-language hint. A card-owned stack keeps earlier results in memory for Back navigation; only the visible session can run requests. Returning to a completed parent reuses its cached answer. The stack is cleared when the original selection is dismissed or replaced, and never written to storage. The known closed shadow root stays private while selection containment also keeps the popup open during highlighting.
+
 **Per-selection result cache:** the UI keeps loaded tab results in memory keyed by `selectionId` + `mode` (+ `targetLanguage`), so reopening a tab never repeats a request. The cache is dropped when the selection is dismissed or the page navigates.
 
 ### Explanation response contract
@@ -211,7 +219,7 @@ How the hand-off works (spike: [p8-sidepanel-spike.md](decisions/p8-sidepanel-sp
 
 `GET_SIDE_PANEL_STATE` also answers `/sidepanel.html` opened as an ordinary tab (the sender is then tab-bearing). That is reachable only by the user typing the extension URL (there are no `web_accessible_resources`), and it is accepted as a design choice (Phase 8 security review L-3); the handler still serves only the tab named in that page's own url. The panel has its own AI limiter key (`panel:<tabId>`), so a card and its panel together get twice the per-tab budget and may each have one request in flight; every such request still comes from a user click. The hand-off is also dropped when `tabs.onUpdated` reports a `url` change (single-page navigations), besides `status: 'loading'`.
 
-**Phase 9 sender rules (release audit).** `AI_EXPLAIN` and `AI_CANCEL` are accepted only from content scripts, `/reader.html`, `/practice.html` and `/sidepanel.html` (`AI_SENDERS` in `lib/router/routes.ts`): Settings, onboarding and the popup never send them. `TTS_SPEAK.voiceName` (an explicit voice, which bypasses the on-device-only rule of D-22) is accepted only from `/options.html` and `/onboarding.html` (Settings "Test voice"); from every other sender a message that carries it is refused with `INVALID_REQUEST`, and Listen takes the chosen voice from the saved settings in the background. The reader, the side panel and the practice page accept background events (`TTS_EVENT`, `CLAVIS_OPEN_SELECTION`) only from the service worker itself (`isFromBackground`: our id, no tab, `/background.js`). The observer and the card script are unlisted scripts (`observer.js`, `explain-card.js`), not WXT content scripts, so no `<extension id>:…:wxt:content-script-started` event is dispatched to the page.
+**Phase 9 sender rules (release audit).** `AI_EXPLAIN` and `AI_CANCEL` are accepted only from content scripts, `/reader.html`, `/practice.html` and `/sidepanel.html` (`AI_SENDERS` in `lib/router/routes.ts`): Settings, onboarding and the popup never send them. `TTS_SPEAK.voiceName` (an explicit voice for testing instead of Automatic selection) is accepted only from `/options.html` and `/onboarding.html` (Settings "Test voice"); from every other sender a message that carries it is refused with `INVALID_REQUEST`, and Listen takes the chosen voice from the saved settings in the background. The reader, the side panel and the practice page accept background events (`TTS_EVENT`, `CLAVIS_OPEN_SELECTION`) only from the service worker itself (`isFromBackground`: our id, no tab, `/background.js`). The observer and the card script are unlisted scripts (`observer.js`, `explain-card.js`), not WXT content scripts, so no `<extension id>:…:wxt:content-script-started` event is dispatched to the page.
 
 ### Message contract
 
@@ -393,7 +401,7 @@ flowchart LR
     F -->|No| ERR[Explain unavailable voice]
 ```
 
-**Phase 6 implementation notes.** `TTS_SPEAK` resolves the voice as: an explicit `voiceName` exactly (else `NO_VOICE`), then the saved `ttsVoice` only if it speaks the requested language, then the best match by language among on-device voices (D-22) — never a voice for another language. The reply comes only after the engine starts (`speakResultSchema`, with `remote`); `TTS_EVENT` (ended/cancelled/error) goes to exactly the requesting document. On Linux with no voices, `NO_VOICE` carries `reason: 'no-voice-linux'`. `GET_VOICES` reports per-engine voices for Settings → Voice. On the toolbar, Listen has its own run slot, so it never closes an open explanation.
+**Phase 6 implementation notes.** `TTS_SPEAK` resolves the voice as: an explicit `voiceName` exactly (else `NO_VOICE`), then the saved `ttsVoice` only if it speaks the requested language, then the best match by language among on-device voices, followed by a matching online voice if no local voice is available or can start (D-22, updated 2026-10-29) — never a voice for another language. Startup remains bounded to two attempts and the overall deadline; when a matching online voice exists, the first local attempt receives at most half the remaining startup window, reserving time and the final attempt for online fallback. Explicit voice tests retain their full startup window. The reply comes only after the engine starts (`speakResultSchema`, with `remote`); `TTS_EVENT` (ended/cancelled/error) goes to exactly the requesting document. On Linux with no voices, `NO_VOICE` carries `reason: 'no-voice-linux'`. `GET_VOICES` reports per-engine voices for Settings → Voice. On the toolbar, Listen has its own run slot, so it never closes an open explanation.
 
 **Responsibilities:**
 

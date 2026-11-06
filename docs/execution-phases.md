@@ -262,7 +262,7 @@ Effort counts are overlapping planning estimates, not additive deadlines; use th
 - [x] Rapid repeats and superseding (cancelled events), dismiss/selection change stop playback.
 - [x] Works without a Groq key.
 - [x] Settings → Voice: per-engine voice counts, chooser, Test voice, empty state — replaces the spike's `SPEECH_DIAGNOSE` (removed).
-- [x] On-device voices only by default; online voices only when explicitly chosen and labelled (D-22).
+- [x] Matching on-device voices first, then online fallback if needed; online playback labelled (D-22, updated at the user's request on 2026-10-29).
 - [x] Code review findings fixed: Stop during start no longer lost, orphaned speech stoppable after a worker restart, distinct copy for no voice / no voice for this language / voice didn't start, one overall start deadline below the UI backstop.
 
 **Phase 6 follow-ups:**

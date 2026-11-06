@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { browser } from 'wxt/browser';
+import { interpretReply } from '../../../components/explanation/backend';
+import { toCardError } from '../../../components/explanation/session';
 import { registerBackground } from '../../../lib/router/register';
 import {
   lockDownStorage,
@@ -16,6 +18,7 @@ import {
   pageSender,
   panelSender,
 } from '../router/harness';
+import { installCatalog } from '../ui-client/support';
 
 // Phase 9, "Add chrome.runtime/storage message integration tests and secret-boundary checks"
 // (FR-070, FR-072, FR-073, abuse cases 1, 5 and 7, architecture section 9 "Secret boundary").
@@ -353,10 +356,53 @@ describe('the key lifecycle through the real listener', () => {
 });
 
 describe('Explain through the real listener, against a hostile Groq', () => {
+  it.each([
+    ['HTTP 403', () => new Response(hostile(), { status: 403 }), 403, 'unknown'],
+    ['HTTP 500', () => new Response(hostile(), { status: 500 }), 500, undefined],
+    [
+      'transport',
+      () => {
+        throw new TypeError('secret transport failure');
+      },
+      undefined,
+      undefined,
+    ],
+  ] as const)(
+    '%s reaches the card model with safe diagnostics',
+    async (_label, respond, status, reason) => {
+      installCatalog();
+      const w = await startWorld();
+      await ready(w);
+      w.respond.current = respond;
+      const raw = await w.call(explain(REQ_A), content());
+      const client = interpretReply(raw);
+      expect(client).toMatchObject({
+        kind: 'error',
+        code: 'NETWORK_ERROR',
+        ...(status === undefined ? {} : { httpStatus: status }),
+        ...(reason === undefined ? {} : { forbiddenReason: reason }),
+      });
+      if (client.kind !== 'error') throw new Error('expected error');
+      const card = toCardError(
+        client.code,
+        client.retryAfterMs,
+        0,
+        client.reason,
+        client.httpStatus,
+        client.forbiddenReason,
+      );
+      expect(card.httpStatus).toBe(status);
+      if (status === 403) expect(card.message).toContain('cannot determine why');
+      else if (status === 500) expect(card.message).toContain('HTTP 500');
+      else expect(card.message).toContain("can't reach Groq");
+      await expectNoLeaks(w, [raw, client, card], _label);
+    },
+  );
+
   const STATUS_TO_CODE: [number, string][] = [
     [400, 'MODEL_UNAVAILABLE'],
     [401, 'INVALID_API_KEY'],
-    [403, 'INVALID_API_KEY'],
+    [403, 'NETWORK_ERROR'],
     [404, 'MODEL_UNAVAILABLE'],
     [408, 'TIMEOUT'],
     [413, 'SELECTION_TOO_LONG'],
@@ -384,10 +430,19 @@ describe('Explain through the real listener, against a hostile Groq', () => {
         });
       const reply = (await w.call(explain(REQ_A), content())) as {
         ok: boolean;
-        error?: { code: string; message: string; retryAfterMs?: number };
+        error?: {
+          code: string;
+          message: string;
+          retryAfterMs?: number;
+          httpStatus?: number;
+          forbiddenReason?: string;
+        };
       };
       expect(reply.ok).toBe(false);
       expect(reply.error?.code).toBe(code);
+      expect(reply.error?.httpStatus).toBe(status);
+      if (status === 403) expect(reply.error?.forbiddenReason).toBe('unknown');
+      else expect(reply.error?.forbiddenReason).toBeUndefined();
       if (status === 429) expect(reply.error?.retryAfterMs).toBe(7000);
       else expect(reply.error?.retryAfterMs).toBeUndefined();
       // Exactly one paid request, however long we wait: no automatic retry, no loop.
@@ -397,7 +452,9 @@ describe('Explain through the real listener, against a hostile Groq', () => {
       // The reply is the documented envelope and nothing else.
       expect(
         Object.keys(reply.error ?? {}).every((k) =>
-          ['code', 'message', 'retryAfterMs', 'reason'].includes(k),
+          ['code', 'message', 'retryAfterMs', 'reason', 'httpStatus', 'forbiddenReason'].includes(
+            k,
+          ),
         ),
       ).toBe(true);
       // FR-072: a rejected key is flagged, but the user's settings survive.

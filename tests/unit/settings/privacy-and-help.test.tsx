@@ -131,12 +131,12 @@ describe('help section (FR-008)', () => {
     expect(help).toHaveTextContent(/no text recognition \(OCR\)/);
     expect(help).toHaveTextContent(/ask for their password/);
     expect(help).toHaveTextContent(/XFA/);
+    expect(screen.getByText(/available languages and accents depend on your system/)).toBeVisible();
     expect(
       screen.getByText(
-        /Some systems, including many Linux setups, have no voice until you install one/,
+        /Automatic tries a matching on-device voice first, then a matching online voice/,
       ),
     ).toBeVisible();
-    expect(screen.getByText(/used only if you choose one in Voice settings/)).toBeVisible();
   });
 
   it('points to the website access help instead of repeating it', () => {

@@ -1,0 +1,59 @@
+.clavis-page--narrow:has(.clavis-popup) {
+  padding: var(--space-3);
+}
+
+.clavis-page:has(.clavis-popup) .clavis-page__title {
+  margin-bottom: var(--space-3);
+}
+
+.clavis-popup__actions {
+  display: grid;
+  gap: var(--space-2);
+  margin-bottom: var(--space-4);
+}
+
+.clavis-popup__actions > .clavis-button {
+  width: 100%;
+  text-align: center;
+}
+
+.clavis-popup__hint {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.clavis-popup .clavis-facts {
+  grid-template-columns: 4.5rem minmax(0, 1fr);
+  gap: var(--space-1) var(--space-2);
+  margin-bottom: var(--space-3);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--border);
+  font-size: 0.9rem;
+}
+
+.clavis-popup .clavis-facts dd {
+  margin-bottom: 0;
+  font-weight: 500;
+}
+
+.clavis-popup .clavis-notice {
+  padding: var(--space-2) var(--space-3);
+  font-size: 0.9rem;
+}
+
+.clavis-popup .clavis-notice__title {
+  font-size: 0.95rem;
+}
+
+.clavis-popup .clavis-disclosure {
+  font-size: 0.9rem;
+}
+
+.clavis-popup__footer {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: var(--space-3);
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--border);
+}

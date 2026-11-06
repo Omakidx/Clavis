@@ -111,12 +111,15 @@ describe('voices present', () => {
     expect(screen.queryByText('No voices found on this device')).toBeNull();
   });
 
-  it('states the limits truthfully: system-dependent voices, online voices only by choice', async () => {
+  it('states that Automatic tries local first and discloses the online fallback', async () => {
     setup({ voices: WITH_VOICES });
     await screen.findByTestId('voice-counts');
     expect(screen.getByText(/depends on your operating system/)).toBeVisible();
     expect(screen.getByText(/uses a voice only for a language it speaks/)).toBeVisible();
-    expect(screen.getByText(/only if you choose it here/)).toBeVisible();
+    expect(
+      screen.getByText(/Automatic tries on-device voices first, then online if needed/),
+    ).toBeVisible();
+    expect(screen.getByText(/sends the selected text to that voice's provider/)).toBeVisible();
   });
 
   it('ignores voices of the fallback engine when that engine is not available', async () => {
@@ -197,11 +200,17 @@ describe('language and speed (FR-006)', () => {
   });
 });
 
-describe('online voices (D-22: only on explicit choice)', () => {
+describe('online voices and automatic fallback disclosure', () => {
   it('labels them, and shows a persistent privacy note only while an online voice is chosen', async () => {
     const user = setup({ voices: WITH_VOICES });
     const chooser = await screen.findByRole('combobox', { name: 'Voice' });
     expect(screen.queryByTestId('voice-online-note')).toBeNull();
+    expect(
+      screen.getByText(
+        /Automatic tries a matching on-device voice first, then an online voice if needed/,
+      ),
+    ).toBeVisible();
+    expect(screen.getByText(/Online voices send the text to their provider/)).toBeVisible();
     await user.selectOptions(chooser, 'Google Deutsch');
     await waitFor(() => expect(backend.state.preferences.ttsVoice).toBe('Google Deutsch'));
     expect(await screen.findByTestId('voice-online-note')).toHaveTextContent(
@@ -211,9 +220,14 @@ describe('online voices (D-22: only on explicit choice)', () => {
     await waitFor(() => expect(screen.queryByTestId('voice-online-note')).toBeNull());
   });
 
-  it('the Automatic hint promises an on-device voice', async () => {
+  it('the Automatic hint explains that a matching online voice may be used and sends text online', async () => {
     setup({ voices: WITH_VOICES });
-    expect(await screen.findByText(/best voice on this device/)).toBeVisible();
+    expect(
+      await screen.findByText(
+        /Automatic tries a matching on-device voice first, then an online voice if needed/,
+      ),
+    ).toBeVisible();
+    expect(screen.getByText(/Online voices send the text to their provider/)).toBeVisible();
   });
 });
 

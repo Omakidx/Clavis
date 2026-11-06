@@ -188,6 +188,49 @@ describe('api key store', () => {
       });
     });
 
+    it('persists a failed HTTP check and clears its status after a successful check', async () => {
+      const { store } = setup();
+      await store.set(KEY, 'local');
+      await store.recordVerification(KEY, {
+        verification: 'unverified',
+        verificationHttpStatus: 403,
+        forbiddenReason: 'edge_block',
+        accessProbe: 'forbidden',
+      });
+      expect(await store.getStatus()).toMatchObject({
+        verification: 'unverified',
+        verificationHttpStatus: 403,
+        forbiddenReason: 'edge_block',
+        accessProbe: 'forbidden',
+      });
+      await store.recordVerification(KEY, { verification: 'valid', models, at: 10 });
+      expect(await store.getStatus()).not.toHaveProperty('verificationHttpStatus');
+      expect(await store.getStatus()).not.toHaveProperty('forbiddenReason');
+      expect(await store.getStatus()).not.toHaveProperty('accessProbe');
+    });
+
+    it('clears a prior access probe on the next check and when replacing the key', async () => {
+      const { store } = setup();
+      await store.set(KEY, 'local');
+      await store.recordVerification(KEY, {
+        verification: 'unverified',
+        verificationHttpStatus: 403,
+        accessProbe: 'auth-required',
+      });
+      await store.recordVerification(KEY, {
+        verification: 'unverified',
+        verificationHttpStatus: 429,
+      });
+      expect(await store.getStatus()).not.toHaveProperty('accessProbe');
+      await store.recordVerification(KEY, {
+        verification: 'unverified',
+        verificationHttpStatus: 403,
+        accessProbe: 'forbidden',
+      });
+      await store.set(OTHER_KEY, 'local');
+      expect(await store.getStatus()).not.toHaveProperty('accessProbe');
+    });
+
     it('ignores a result for a key that was replaced or removed meanwhile', async () => {
       const { store } = setup();
       await store.set(KEY, 'local');

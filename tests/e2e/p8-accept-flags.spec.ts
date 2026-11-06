@@ -158,8 +158,80 @@ test('Translate asks once when its tab is opened, in the explanation language, a
   }
 });
 
+test('Settings saves an independent translation language used only when Translate is opened', async () => {
+  const options = (await openExtensionPage(world.ext.context, world.ext.extensionId, 'options'))
+    .page;
+  const prompts: string[] = [];
+  const record = (request: import('@playwright/test').Request): void => {
+    if (request.url().endsWith('/chat/completions')) prompts.push(request.postData() ?? '');
+  };
+  world.ext.context.on('request', record);
+  try {
+    await options.getByRole('link', { name: 'Preferences', exact: true }).click();
+    await expect(options.getByLabel('Explanation language', { exact: true })).toBeVisible();
+    await options.getByLabel('Explanation language', { exact: true }).selectOption('de');
+    await options.getByLabel('Translation language', { exact: true }).selectOption('fr');
+    await expect
+      .poll(async () => {
+        const reply = await send(options, { v: 1, type: 'GET_PUBLIC_SETTINGS' });
+        return reply?.data;
+      })
+      .toMatchObject({ explanationLanguage: 'de', translationLanguage: 'fr' });
+
+    await options.reload();
+    await expect(options.getByLabel('Explanation language', { exact: true })).toHaveValue('de');
+    await expect(options.getByLabel('Translation language', { exact: true })).toHaveValue('fr');
+
+    const { page, dispose } = await openWebpage(world, 'article.html?translation-preference=1');
+    try {
+      await page.bringToFront();
+      await dragSelect(page, page, 'The old bank stood', 'two hundred years.');
+      await tb(page).waitShown();
+      calls.length = 0;
+      prompts.length = 0;
+      await tb(page).click('explain');
+      const card = cardOf(page);
+      await card.waitFor(CARD.ready('core'));
+      expect(calls.map((call) => call.mode)).toEqual(['core']);
+      expect(prompts.filter((body) => body.includes('(mode: translate)'))).toEqual([]);
+      const coreBody = JSON.parse(prompts[0] ?? '{}') as {
+        messages?: { content: string }[];
+      };
+      expect(coreBody.messages?.map((message) => message.content).join('\n')).toContain(
+        'BCP-47 "de"',
+      );
+
+      await card.click(CARD.tab('translate'));
+      await card.waitFor(CARD.ready('translate'));
+      expect(calls.map((call) => call.mode)).toEqual(['core', 'translate']);
+      const translate = prompts.find((body) => body.includes('(mode: translate)'));
+      const translateBody = JSON.parse(translate ?? '{}') as {
+        messages?: { content: string }[];
+      };
+      expect(translateBody.messages?.map((message) => message.content).join('\n')).toContain(
+        'BCP-47 tag "fr"',
+      );
+      expect(translateBody.messages?.map((message) => message.content).join('\n')).toContain(
+        'BCP-47 "fr"',
+      );
+      expect(await card.text(CARD.panel('translate'))).toContain('Translation into French');
+    } finally {
+      await dispose();
+    }
+  } finally {
+    world.ext.context.off('request', record);
+    await send(options, {
+      v: 1,
+      type: 'UPDATE_PREFERENCES',
+      patch: { explanationLanguage: 'en', translationLanguage: null },
+    });
+    await options.close();
+  }
+});
+
 test('Settings does not mention Grammar or a cache', async () => {
   const { page } = await openExtensionPage(world.ext.context, world.ext.extensionId, 'options');
+  await page.getByRole('link', { name: 'Preferences', exact: true }).click();
   await expect(page.getByTestId('voice-counts')).toBeVisible({ timeout: 15_000 });
   await page.evaluate(() =>
     document.querySelectorAll('details').forEach((d) => d.setAttribute('open', '')),

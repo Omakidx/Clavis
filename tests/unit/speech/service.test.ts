@@ -611,30 +611,166 @@ describe('one overall start deadline (M3)', () => {
   });
 });
 
-describe('on-device voices only unless the user chose one (D-22)', () => {
+describe('Automatic local-first voice choice with matching online fallback', () => {
   const local = voice('chrome-tts', 'en-US', { name: 'Local' });
   const net = voice('chrome-tts', 'en-US', { name: 'Net', remote: true });
 
-  it('best match skips a network voice even when it is the exact tag', async () => {
+  it('uses a local same-language voice before an online exact-locale voice', async () => {
+    const localOtherRegion = voice('chrome-tts', 'en-GB', { name: 'Local GB' });
+    const { chrome, service } = setup([net, localOtherRegion]);
+    const result = await service.speak(input({ lang: 'en-US' }));
+    expect(result).toMatchObject({ voiceName: 'Local GB', remote: false });
+    expect(chrome.speakCalls.map((call) => call.voice?.name)).toEqual(['Local GB']);
+  });
+
+  it('best match starts local even when an online voice is listed first', async () => {
     const { chrome, service } = setup([net, local]);
     const result = await service.speak(input({ lang: 'en-US' }));
     expect(result).toMatchObject({ voiceName: 'Local', remote: false });
     expect(chrome.speakCalls[0]?.voice?.name).toBe('Local');
   });
 
-  it('with only network voices for the language: NO_VOICE online-only, nothing spoken', async () => {
+  it('uses a matching online voice when no local one is available', async () => {
     const { chrome, service } = setup([net]);
-    const error = await rejection(service.speak(input({ lang: 'en' })));
+    expect(await service.speak(input({ lang: 'en' }))).toMatchObject({
+      voiceName: 'Net',
+      remote: true,
+    });
+    expect(chrome.speakCalls.map((call) => call.voice?.name)).toEqual(['Net']);
+  });
+
+  it('skips a local voice that cannot report start and uses a matching online voice', async () => {
+    const unusableLocal = voice('chrome-tts', 'en-US', {
+      name: 'Silent local',
+      eventTypes: ['end', 'error'],
+    });
+    const { chrome, service } = setup([unusableLocal, net]);
+    expect(await service.speak(input({ lang: 'en' }))).toMatchObject({
+      voiceName: 'Net',
+      remote: true,
+    });
+    expect(chrome.speakCalls.map((call) => call.voice?.name)).toEqual(['Net']);
+  });
+
+  it('uses the second attempt for online after the local voice fails to start', async () => {
+    const secondLocal = voice('chrome-tts', 'en-US', { name: 'Local 2' });
+    const { chrome, service } = setup([local, secondLocal, net]);
+    const speak = chrome.speak.bind(chrome);
+    chrome.autoStart = false;
+    chrome.speak = (request, sink) => {
+      if (chrome.speakCalls.length >= 1) chrome.autoStart = true;
+      return speak(request, sink);
+    };
+    const pending = service.speak(input({ lang: 'en' }));
+    await vi.advanceTimersByTimeAsync(1_000);
+    expect(await pending).toMatchObject({ voiceName: 'Net', remote: true });
+    expect(chrome.speakCalls.map((call) => call.voice?.name)).toEqual(['Local', 'Net']);
+  });
+
+  it('at default timings, a silent local voice leaves time for online fallback', async () => {
+    const chrome = new FakeEngine('chrome-tts', [local, net]);
+    const service = new SpeechService({ engine: chrome });
+    const speak = chrome.speak.bind(chrome);
+    chrome.autoStart = false;
+    chrome.speak = (request, sink) => {
+      if (chrome.speakCalls.length >= 1) chrome.autoStart = true;
+      return speak(request, sink);
+    };
+    const started = Date.now();
+    const pending = service.speak(input({ lang: 'en' }));
+    await vi.advanceTimersByTimeAsync(2_499);
+    expect(chrome.speakCalls.map((call) => call.voice?.name)).toEqual(['Local']);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(await pending).toMatchObject({ voiceName: 'Net', remote: true });
+    expect(chrome.speakCalls.map((call) => call.voice?.name)).toEqual(['Local', 'Net']);
+    expect(Date.now() - started).toBeLessThan(5_000);
+  });
+
+  it('gives a saved local voice the same online fallback budget', async () => {
+    const chrome = new FakeEngine('chrome-tts', [local, net]);
+    const service = new SpeechService({ engine: chrome });
+    const speak = chrome.speak.bind(chrome);
+    chrome.autoStart = false;
+    chrome.speak = (request, sink) => {
+      if (chrome.speakCalls.length >= 1) chrome.autoStart = true;
+      return speak(request, sink);
+    };
+    const pending = service.speak(input({ preferredVoice: 'Local', lang: 'en' }));
+    await vi.advanceTimersByTimeAsync(2_500);
+    expect(await pending).toMatchObject({ voiceName: 'Net', remote: true });
+    expect(chrome.speakCalls.map((call) => call.voice?.name)).toEqual(['Local', 'Net']);
+  });
+
+  it('never starts a saved local voice when lookup consumes the entire deadline', async () => {
+    const chrome = new FakeEngine('chrome-tts', [local, net]);
+    const started = Date.now();
+    chrome.getVoices = () =>
+      Promise.resolve().then(() => {
+        // The voice list arrives exactly as the overall deadline expires.
+        vi.setSystemTime(started + 5_000);
+        return [local, net];
+      });
+    const service = new SpeechService({ engine: chrome });
+    const error = await rejection(service.speak(input({ preferredVoice: 'Local', lang: 'en' })));
     expect(error.code).toBe('NO_VOICE');
-    expect(error.noVoice).toBe('online-only');
     expect(chrome.speakCalls).toHaveLength(0);
   });
 
+  it('keeps the full startup budget for an explicit local voice', async () => {
+    const chrome = new FakeEngine('chrome-tts', [local, net]);
+    const service = new SpeechService({ engine: chrome });
+    chrome.autoStart = false;
+    const pending = rejection(service.speak(input({ voiceName: 'Local', lang: 'en' })));
+    await vi.advanceTimersByTimeAsync(2_500);
+    expect(chrome.speakCalls.map((call) => call.voice?.name)).toEqual(['Local']);
+    await vi.advanceTimersByTimeAsync(2_500);
+    expect((await pending).noVoice).toBe('start-failed');
+    expect(chrome.speakCalls).toHaveLength(1);
+  });
+
+  it('caps two silent local and online attempts at the original overall deadline', async () => {
+    const chrome = new FakeEngine('chrome-tts', [local, net]);
+    const service = new SpeechService({ engine: chrome });
+    chrome.autoStart = false;
+    const started = Date.now();
+    const pending = rejection(service.speak(input({ lang: 'en' })));
+    await vi.advanceTimersByTimeAsync(5_000);
+    expect((await pending).noVoice).toBe('start-failed');
+    expect(chrome.speakCalls.map((call) => call.voice?.name)).toEqual(['Local', 'Net']);
+    expect(Date.now() - started).toBe(5_000);
+  });
+
+  it('stop during the online fallback cancels it without a third attempt', async () => {
+    const { chrome, service } = setup([local, net]);
+    chrome.autoStart = false;
+    const pending = rejection(service.speak(input({ lang: 'en' })));
+    await vi.advanceTimersByTimeAsync(1_100);
+    expect(chrome.speakCalls.map((call) => call.voice?.name)).toEqual(['Local', 'Net']);
+    expect(await service.stop(ID_A)).toBe(true);
+    expect((await pending).code).toBe('REQUEST_CANCELLED');
+    await vi.advanceTimersByTimeAsync(5_000);
+    expect(chrome.speakCalls).toHaveLength(2);
+  });
+
+  it('a cancelled local start never falls back online', async () => {
+    const { chrome, service } = setup([local, net]);
+    chrome.autoStart = false;
+    const pending = rejection(service.speak(input({ lang: 'en' })));
+    await vi.advanceTimersByTimeAsync(0);
+    await service.stop(ID_A);
+    expect((await pending).code).toBe('REQUEST_CANCELLED');
+    await vi.advanceTimersByTimeAsync(2_000);
+    expect(chrome.speakCalls.map((call) => call.voice?.name)).toEqual(['Local']);
+  });
+
   it('network voices for another language only are a plain language gap', async () => {
-    const { service } = setup([voice('chrome-tts', 'fr-FR', { name: 'Net', remote: true })]);
+    const { chrome, service } = setup([
+      voice('chrome-tts', 'fr-FR', { name: 'Net', remote: true }),
+    ]);
     expect((await rejection(service.speak(input({ lang: 'en' })))).noVoice).toBe(
       'no-language-match',
     );
+    expect(chrome.speakCalls).toHaveLength(0);
   });
 
   it("a saved or explicit network voice is the user's choice and is used", async () => {
@@ -659,11 +795,10 @@ describe('on-device voices only unless the user chose one (D-22)', () => {
     expect((await without.speak(input({ requestId: ID_B }))).voiceName).toBe('Hans');
   });
 
-  it('without a language and with only network voices: NO_VOICE (never the engine default)', async () => {
+  it('without a language and with only online voices: chooses one explicitly', async () => {
     const { chrome, service } = setup([net]);
-    const error = await rejection(service.speak(input()));
-    expect(error.noVoice).toBe('online-only');
-    expect(chrome.speakCalls).toHaveLength(0);
+    expect(await service.speak(input())).toMatchObject({ voiceName: 'Net', remote: true });
+    expect(chrome.speakCalls[0]?.voice?.name).toBe('Net');
   });
 });
 

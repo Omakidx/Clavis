@@ -129,6 +129,23 @@ describe('settings store', () => {
     expect((await store.getPreferences()).disabledSites).toEqual(['a.test']);
   });
 
+  it('persists translation language independently and can clear it for legacy fallback', async () => {
+    const { store } = setup();
+    await store.updatePreferences({ explanationLanguage: 'en', translationLanguage: 'ja' });
+    expect(await store.getPreferences()).toMatchObject({
+      explanationLanguage: 'en',
+      translationLanguage: 'ja',
+    });
+    await store.updatePreferences({ explanationLanguage: 'de' });
+    expect(await store.getPreferences()).toMatchObject({
+      explanationLanguage: 'de',
+      translationLanguage: 'ja',
+    });
+    await store.updatePreferences({ translationLanguage: null });
+    expect(await store.getPreferences()).not.toHaveProperty('translationLanguage');
+    expect((await store.getPreferences()).explanationLanguage).toBe('de');
+  });
+
   it('applies concurrent patches without losing either (serialized read-modify-write)', async () => {
     const { store } = setup();
     await Promise.all([
@@ -147,6 +164,7 @@ describe('settings store', () => {
     const { store } = setup();
     await store.updatePreferences({
       explanationLanguage: 'fr',
+      translationLanguage: 'ja',
       readingLevel: 'advanced',
       tooltipBehavior: 'on-demand',
       ttsRate: 1.5,

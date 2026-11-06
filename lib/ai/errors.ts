@@ -1,4 +1,5 @@
 import type { ErrorCode, ErrorEnvelope } from '../contracts';
+import type { ForbiddenReason } from '../contracts/setup';
 import { LIMITS } from '../config/constants';
 
 /** Longest Retry-After the client will ever surface: one hour (matches `errorEnvelopeSchema`). */
@@ -42,6 +43,8 @@ export interface GroqErrorInit {
   /** Provider `error.type` / `error.code` identifiers, sanitized to a short token charset. */
   providerErrorType?: string;
   providerErrorCode?: string;
+  /** Fixed reason for HTTP 403, derived from allowlisted response markers only. */
+  forbiddenReason?: ForbiddenReason;
   usage?: GroqUsage;
 }
 
@@ -56,6 +59,7 @@ export class GroqError extends Error {
   readonly stage: InvalidResponseStage | undefined;
   readonly providerErrorType: string | undefined;
   readonly providerErrorCode: string | undefined;
+  readonly forbiddenReason: ForbiddenReason | undefined;
   readonly usage: GroqUsage | undefined;
 
   constructor(code: ErrorCode, init: GroqErrorInit = {}) {
@@ -67,6 +71,7 @@ export class GroqError extends Error {
     this.stage = init.stage;
     this.providerErrorType = init.providerErrorType;
     this.providerErrorCode = init.providerErrorCode;
+    this.forbiddenReason = init.forbiddenReason;
     this.usage = init.usage;
   }
 
@@ -75,6 +80,15 @@ export class GroqError extends Error {
       code: this.code,
       message: this.message.slice(0, LIMITS.maxErrorMessageChars),
       ...(this.retryAfterMs !== undefined ? { retryAfterMs: this.retryAfterMs } : {}),
+      ...(this.status !== undefined &&
+      Number.isInteger(this.status) &&
+      this.status >= 100 &&
+      this.status <= 599
+        ? { httpStatus: this.status }
+        : {}),
+      ...(this.status === 403 && this.forbiddenReason !== undefined
+        ? { forbiddenReason: this.forbiddenReason }
+        : {}),
     };
   }
 }
@@ -104,9 +118,18 @@ export function parseRetryAfter(
   return Math.min(Math.max(ms, 0), MAX_RETRY_AFTER_MS);
 }
 
-/** Map an HTTP status to an error code (architecture §6 table). */
-export function codeForStatus(status: number): ErrorCode {
-  if (status === 401 || status === 403) return 'INVALID_API_KEY';
+/** Map an HTTP status and sanitized provider code to an error code. */
+export function codeForStatus(status: number, providerCode?: string): ErrorCode {
+  // A 403 confirms that Groq received the request, but does not prove the key is invalid.
+  // Documented model-permission codes have a specific model remedy.
+  if (status === 401) return 'INVALID_API_KEY';
+  if (status === 403) {
+    return providerCode === 'model_permission_blocked' ||
+      providerCode === 'model_permission_blocked_org' ||
+      providerCode === 'model_permission_blocked_project'
+      ? 'MODEL_UNAVAILABLE'
+      : 'NETWORK_ERROR';
+  }
   if (status === 404) return 'MODEL_UNAVAILABLE';
   if (status === 408) return 'TIMEOUT';
   // 413: the request (selection plus context) is larger than the model accepts, not a connection problem.

@@ -18,6 +18,7 @@ import {
   type GroqErrorInit,
   type GroqUsage,
 } from './errors';
+import type { AccessProbe, ForbiddenReason } from '../contracts/setup';
 import { buildResult, schemaNameFor, strictSchemaFor } from './modes';
 import { buildPrompt, type ResponseMode } from './prompts';
 
@@ -213,6 +214,28 @@ function readProviderError(text: string): { type?: string; code?: string; messag
   }
 }
 
+/** Classify only recognized 403 markers. Never persist or forward the response body. */
+function forbiddenReason(text: string, type?: string, code?: string): ForbiddenReason {
+  if (code === 'model_permission_blocked_org' || type === 'model_permission_blocked_org') {
+    return 'model_permission_org';
+  }
+  if (code === 'model_permission_blocked_project' || type === 'model_permission_blocked_project') {
+    return 'model_permission_project';
+  }
+  if (code === 'model_permission_blocked' || type === 'model_permission_blocked') {
+    return 'model_permission';
+  }
+  // The documented Groq error.type identifies a permission response without naming its scope.
+  if (type === 'permissions_error') return 'permission_restriction';
+  // Cloudflare challenge/block pages contain its name and a numeric 1xxx error code.
+  // Numbers alone are insufficient; a provider message might contain them as ordinary text.
+  if (/cloudflare/i.test(text)) {
+    if (/\b1009\b/.test(text)) return 'region_block';
+    if (/\b(?:1010|1020)\b/.test(text)) return 'edge_block';
+  }
+  return 'unknown';
+}
+
 export class GroqProvider {
   readonly id = 'groq' as const;
   private readonly deps: GroqDeps;
@@ -256,6 +279,7 @@ export class GroqProvider {
         method: init.method,
         headers: {
           Authorization: `Bearer ${init.apiKey}`,
+          Accept: 'application/json',
           ...(init.body !== undefined ? { 'Content-Type': 'application/json' } : {}),
         },
         ...(init.body !== undefined ? { body: init.body } : {}),
@@ -288,16 +312,26 @@ export class GroqProvider {
     const init: GroqErrorInit = { status: outcome.status };
     const retryAfterMs = parseRetryAfter(outcome.retryAfter, this.wallNow());
     if (retryAfterMs !== undefined && outcome.status === 429) init.retryAfterMs = retryAfterMs;
-    if (provider.type) init.providerErrorType = provider.type;
-    if (provider.code) init.providerErrorCode = provider.code;
+    // Existing format-fallback diagnostics use short provider identifiers on 400s.
+    // A 403 keeps only the fixed classification below, never arbitrary provider identifiers.
+    if (outcome.status !== 403 && provider.type) init.providerErrorType = provider.type;
+    if (outcome.status !== 403 && provider.code) init.providerErrorCode = provider.code;
+    if (outcome.status === 403) {
+      init.forbiddenReason = forbiddenReason(outcome.text, provider.type, provider.code);
+    }
     // Groq returns 400 `json_validate_failed` when its own schema check on the output failed.
     if (outcome.status === 400 && provider.code === 'json_validate_failed') {
       return new GroqError('INVALID_RESPONSE', { ...init, stage: 'schema' });
     }
-    return new GroqError(codeForStatus(outcome.status), init);
+    const codeFromProviderCode = codeForStatus(outcome.status, provider.code);
+    const code =
+      codeFromProviderCode === 'NETWORK_ERROR'
+        ? codeForStatus(outcome.status, provider.type)
+        : codeFromProviderCode;
+    return new GroqError(code, init);
   }
 
-  /** List models visible to the key. Also serves as the key check (401/403 → INVALID_API_KEY). */
+  /** List models visible to the key. Also serves as the key check (only 401 proves invalid). */
   async listModels(apiKey: string, signal?: AbortSignal): Promise<GroqModel[]> {
     assertApiKey(apiKey);
     const deadline = AbortSignal.timeout(REQUEST_TIMEOUT_MS.keyValidation);
@@ -320,6 +354,27 @@ export class GroqProvider {
       ...(entry.context_window !== undefined ? { contextWindow: entry.context_window } : {}),
       supportsJsonSchema: getModelCapabilities(entry.id).jsonSchema !== 'unknown',
     }));
+  }
+
+  /** Keyless, bounded comparison after a keyed models request returns 403. Reads no body. */
+  async probeUnauthenticatedAccess(): Promise<AccessProbe> {
+    try {
+      const response = await this.doFetch(GROQ.modelsUrl, {
+        method: 'GET',
+        headers: { Accept: 'application/json' },
+        signal: AbortSignal.timeout(3_000),
+        redirect: 'error',
+        credentials: 'omit',
+        referrerPolicy: 'no-referrer',
+        cache: 'no-store',
+      });
+      void response.body?.cancel().catch(() => undefined);
+      if (response.status === 401) return 'auth-required';
+      if (response.status === 403) return 'forbidden';
+      return 'other-response';
+    } catch {
+      return 'unreachable';
+    }
   }
 
   /** Explain a selection in the requested mode. Returns the unified result. */

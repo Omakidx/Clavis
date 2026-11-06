@@ -38,8 +38,13 @@ export interface StoredApiKey {
 /** Outcome of a key check (FR-004), written by `recordVerification`. */
 export type VerificationUpdate =
   | { verification: 'valid'; models: ModelInfo[]; at: number }
-  | { verification: 'invalid' }
-  | { verification: 'unverified' };
+  | { verification: 'invalid'; verificationHttpStatus?: number }
+  | {
+      verification: 'unverified';
+      verificationHttpStatus?: number;
+      forbiddenReason?: KeyStatus['forbiddenReason'];
+      accessProbe?: KeyStatus['accessProbe'];
+    };
 
 export interface ApiKeyStore {
   /**
@@ -171,6 +176,15 @@ export function createApiKeyStore(deps: ApiKeyStoreDeps): ApiKeyStore {
           storage: stored.storage,
           last4: current.last4,
           verification,
+          ...('verificationHttpStatus' in update && update.verificationHttpStatus !== undefined
+            ? { verificationHttpStatus: update.verificationHttpStatus }
+            : {}),
+          ...('forbiddenReason' in update && update.forbiddenReason !== undefined
+            ? { forbiddenReason: update.forbiddenReason }
+            : {}),
+          ...('accessProbe' in update && update.accessProbe !== undefined
+            ? { accessProbe: update.accessProbe }
+            : {}),
           // FR-072: an invalid result clears the "verified" state but nothing else the user set.
           verifiedAt:
             update.verification === 'valid'

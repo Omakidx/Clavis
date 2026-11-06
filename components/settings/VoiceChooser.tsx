@@ -1,8 +1,10 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { VoiceInfo, VoicesReport } from '../../lib/contracts/speech';
 import type { Preferences } from '../../lib/contracts/setup';
 import { t } from '../../lib/i18n';
 import { Button, ErrorNotice, LiveStatus } from '../common/ui';
+import { useToast } from '../common/Toast';
+import { MicrophoneIcon } from '../common/Icons';
 import { SelectField } from './fields';
 import { useVoiceTest } from './use-voice-test';
 import {
@@ -26,7 +28,7 @@ interface VoiceChooserProps {
 
 const AUTOMATIC = '';
 
-/** Online voices are labelled as such: choosing one sends the text to that service (D-22). */
+/** Online voices are labelled as such: playback sends the text to that service (D-22). */
 function optionLabel(voice: VoiceInfo): string {
   if (voice.lang === undefined || voice.lang === '') {
     return voice.remote ? `${voice.name} ${t('voiceOnlineTag')}` : voice.name;
@@ -57,6 +59,31 @@ export function VoiceChooser({
     setFilter(initialFilter(voices, preferences.ttsLang));
   }
   const test = useVoiceTest();
+  const toast = useToast();
+  const testToastId = useRef<number | null>(null);
+  const testState = test.state;
+  useEffect(() => {
+    if (!toast || testState.kind === 'idle') {
+      if (toast && testToastId.current !== null) toast.dismiss(testToastId.current);
+      testToastId.current = null;
+      return;
+    }
+    const content =
+      testState.kind === 'error' ? (
+        <ErrorNotice error={testState.error} />
+      ) : testState.kind === 'starting' ? (
+        t('voiceTestStarting')
+      ) : testState.kind === 'playing' ? (
+        t('voiceTestPlaying')
+      ) : (
+        t('voiceTestDone')
+      );
+    testToastId.current = toast.show({
+      content,
+      tone: testState.kind === 'error' ? 'danger' : testState.kind === 'done' ? 'success' : 'info',
+      ...(testState.kind === 'starting' || testState.kind === 'playing' ? { durationMs: 0 } : {}),
+    });
+  }, [testState, toast]);
   const saved = preferences.ttsVoice;
   const empty = voices.length === 0;
   const chosen = saved === undefined ? undefined : voices.find((voice) => voice.name === saved);
@@ -111,6 +138,7 @@ export function VoiceChooser({
 
       <div className="clavis-actions">
         <Button
+          className="clavis-button--voice-test"
           disabled={empty}
           onClick={() =>
             test.toggle({
@@ -126,13 +154,14 @@ export function VoiceChooser({
             })
           }
         >
+          <MicrophoneIcon />
           {test.state.kind === 'playing' || test.state.kind === 'starting'
             ? t('speechStop')
             : t('voiceTest')}
         </Button>
       </div>
-      <LiveStatus message={test.live} />
-      {test.state.kind === 'error' ? <ErrorNotice error={test.state.error} /> : null}
+      {!toast ? <LiveStatus message={test.live} /> : null}
+      {!toast && test.state.kind === 'error' ? <ErrorNotice error={test.state.error} /> : null}
     </div>
   );
 }

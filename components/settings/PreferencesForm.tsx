@@ -29,7 +29,7 @@ interface PreferencesFormProps {
 }
 
 /**
- * FR-006 preference fields, shared by the onboarding wizard and Settings: explanation language,
+ * FR-006 preference fields, shared by the onboarding wizard and Settings: explanation and translation languages,
  * voice language, reading level, playback speed and toolbar behaviour. Every change is saved
  * immediately and confirmed in a live region; a failed save is explained and the control
  * returns to the stored value (the page only ever shows what the background stored).
@@ -53,6 +53,11 @@ export function PreferencesForm({
 
   const view = {
     explanationLanguage: pending?.explanationLanguage ?? preferences.explanationLanguage,
+    translationLanguage:
+      pending?.translationLanguage ??
+      preferences.translationLanguage ??
+      pending?.explanationLanguage ??
+      preferences.explanationLanguage,
     readingLevel: pending?.readingLevel ?? preferences.readingLevel,
     tooltipBehavior: pending?.tooltipBehavior ?? preferences.tooltipBehavior,
     ttsRate: pending?.ttsRate ?? preferences.ttsRate,
@@ -70,6 +75,19 @@ export function PreferencesForm({
         onChange={(value) => void change({ explanationLanguage: value })}
       >
         {languageOptions(view.explanationLanguage).map((option) => (
+          <option key={option.tag} value={option.tag}>
+            {option.label}
+          </option>
+        ))}
+      </SelectField>
+
+      <SelectField
+        label={t('prefTranslationLanguage')}
+        hint={t('prefTranslationLanguageHint')}
+        value={view.translationLanguage}
+        onChange={(value) => void change({ translationLanguage: value })}
+      >
+        {languageOptions(view.translationLanguage).map((option) => (
           <option key={option.tag} value={option.tag}>
             {option.label}
           </option>

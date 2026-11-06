@@ -68,8 +68,7 @@ export const PANEL_SENDERS: SenderRule = {
 /**
  * Who may send TTS_SPEAK with an explicit `voiceName` (Settings "Test voice"): Settings and
  * onboarding only. The voice Listen uses everywhere else comes from the saved settings in the
- * background, so a page-side content script cannot pick a voice (D-22: on-device voices only, and
- * an explicit voice is the one thing allowed to bypass that rule).
+ * background, so a page-side content script cannot override the saved voice or Automatic policy.
  */
 export const VOICE_NAME_SENDERS: readonly string[] = [options, onboarding];
 

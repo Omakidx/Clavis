@@ -25,6 +25,10 @@ test.describe('Voice section, no voices on this device', () => {
     extensionId,
   }) => {
     const { page, errors } = await openExtensionPage(context, extensionId, 'options');
+    await page
+      .getByRole('navigation', { name: 'Settings sections' })
+      .getByRole('link', { name: 'Preferences' })
+      .click();
     const report = await sendFromPage(page, { v: 1, type: 'GET_VOICES' });
     test.skip(
       !report.ok ||
@@ -74,7 +78,7 @@ test.describe('Voice section, no voices on this device', () => {
     await expect(settings.locator('#section-voice')).toBeVisible();
     await expect(
       settings.getByRole('navigation', { name: 'Settings sections' }).getByRole('link', {
-        name: 'Voice',
+        name: 'Preferences',
       }),
     ).toBeVisible();
   });
@@ -88,6 +92,10 @@ test.describe('Voice section, with voices (scripted chrome.tts)', () => {
   }) => {
     await installScriptedTts(serviceWorker);
     const { page, errors } = await openExtensionPage(context, extensionId, 'options');
+    await page
+      .getByRole('navigation', { name: 'Settings sections' })
+      .getByRole('link', { name: 'Preferences' })
+      .click();
     const section = page.getByRole('region', { name: 'Voice' });
     await expect(section.getByTestId('voice-counts')).toContainText(
       'On-device voices: 2. Online voices: 1.',

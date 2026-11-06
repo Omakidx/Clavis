@@ -1,10 +1,13 @@
-import { FEATURES } from '../../lib/config/constants';
+import { FEATURES, LIMITS } from '../../lib/config/constants';
+import type { SelectionSnapshot } from '../../lib/contracts/selection';
+import { classifySelection } from '../../lib/selection/classify';
 import type { ExplainCardApi, RunContext } from '../../lib/selection/ui-api';
 import { newSelectionId } from '../../lib/selection/ids';
+import { normalizeText } from '../../lib/selection/text';
 import { createBackend, type ExplainBackend } from './backend';
 import css from './card.css?inline';
 import { copyPlainText } from './copy';
-import { mountCard, type CardHost } from './ExplanationCard';
+import { mountCard, type CardHost, type CardNavigation } from './ExplanationCard';
 import { ExplainSession, type SessionOptions } from './session';
 
 export interface CardDeps {
@@ -67,10 +70,9 @@ function fitSlot(slot: HTMLElement): void {
  * The explanation card (D-08): loaded separately from the always-on observer, it draws inside the
  * toolbar's closed shadow root through the `CardSurface` the toolbar lends (lib/selection/ui-api.ts).
  *
- * One selection has one `ExplainSession` (cache, queue, request state). Pressing Explain again on the
- * same selection re-shows the cached card without a new request; another selection, a dismissal or a
- * trim discards it. The run's `AbortSignal` ties the card to the toolbar: aborting it (superseded,
- * replaced, dismissed, closed) removes the card and cancels what is pending.
+ * Each root selection owns a stack of `ExplainSession` frames. Only its active frame is attached;
+ * ancestors keep their cached results while a user looks up words within generated text. Pressing
+ * Explain again on the same root selection re-shows the active frame without a duplicate request.
  */
 export function createExplainCard(overrides: Partial<CardDeps> = {}): ExplainCardApi {
   const deps: CardDeps = {
@@ -81,9 +83,14 @@ export function createExplainCard(overrides: Partial<CardDeps> = {}): ExplainCar
     features: FEATURES,
     ...overrides,
   };
-  let session: ExplainSession | null = null;
+  let rootSelectionId: string | null = null;
+  let pendingRootSelectionId: string | null = null;
+  let frames: ExplainSession[] = [];
+  let targetLanguage: string | undefined;
   /** Removes the card from the surface it is showing in. */
   let unmount: (() => void) | null = null;
+  /** Resize belongs to a surface run, while view removal also happens between child frames. */
+  let cleanupRun: (() => void) | null = null;
 
   function removeView(): void {
     unmount?.();
@@ -94,8 +101,13 @@ export function createExplainCard(overrides: Partial<CardDeps> = {}): ExplainCar
     clearTimeout(pendingDetach);
     pendingDetach = undefined;
     removeView();
-    session?.destroy();
-    session = null;
+    cleanupRun?.();
+    cleanupRun = null;
+    for (const frame of frames) frame.destroy();
+    frames = [];
+    rootSelectionId = null;
+    pendingRootSelectionId = null;
+    targetLanguage = undefined;
   }
 
   /**
@@ -115,29 +127,40 @@ export function createExplainCard(overrides: Partial<CardDeps> = {}): ExplainCar
       if (surface === undefined) throw new Error('The card needs a toolbar surface');
       if (signal.aborted) return;
       const mine = (run += 1);
+      cleanupRun?.();
+      cleanupRun = null;
       clearTimeout(pendingDetach);
       pendingDetach = undefined;
 
-      if (session?.selectionId !== snapshot.selectionId) {
+      if (rootSelectionId !== snapshot.selectionId) {
         drop();
+        pendingRootSelectionId = snapshot.selectionId;
         // Only the Translate tab needs it, and that tab is behind a feature flag.
-        const targetLanguage = deps.features?.translateTab
-          ? await deps.backend.explanationLanguage()
+        const language = deps.features?.translateTab
+          ? await deps.backend.translationLanguage()
           : undefined;
         // The user may have moved on while the language was looked up.
-        if (signal.aborted || mine !== run) return;
-        session = new ExplainSession({
-          snapshot,
-          backend: deps.backend,
-          newId: deps.newId,
-          now: deps.now,
-          requestTimeoutMs: deps.requestTimeoutMs,
-          features: deps.features,
-          targetLanguage,
-        });
+        if (signal.aborted || mine !== run) {
+          if (mine === run) pendingRootSelectionId = null;
+          return;
+        }
+        targetLanguage = language;
+        rootSelectionId = snapshot.selectionId;
+        pendingRootSelectionId = null;
+        frames = [
+          new ExplainSession({
+            snapshot,
+            backend: deps.backend,
+            newId: deps.newId,
+            now: deps.now,
+            requestTimeoutMs: deps.requestTimeoutMs,
+            features: deps.features,
+            targetLanguage,
+          }),
+        ];
       }
-      const current = session;
-      if (current === null) return;
+      const current = frames.at(-1);
+      if (current === undefined) return;
       const slot = surface.open();
       if (slot === null) return;
       // A superseding run drew a new slot: the previous tree goes first.
@@ -146,34 +169,89 @@ export function createExplainCard(overrides: Partial<CardDeps> = {}): ExplainCar
       const win = slot.ownerDocument.defaultView;
       const refit = (): void => fitSlot(slot);
       win?.addEventListener('resize', refit);
-      const host: CardHost = {
-        keyboard: surface.keyboard,
-        reposition: () => {
-          refit();
-          surface.reposition();
-        },
-        close: () => surface.close(),
-        openSettings: (section) => deps.backend.openSettings(section),
-        openSidePanel: (handoff) => deps.backend.openSidePanel(handoff),
-        online: () => slot.ownerDocument.defaultView?.navigator.onLine !== false,
-        copy: (text) => deps.copy(slot.ownerDocument, text),
-        now: deps.now,
+      const showActive = (): void => {
+        const active = frames.at(-1);
+        if (active === undefined || signal.aborted || mine !== run) return;
+        removeView();
+        const navigation: CardNavigation = {
+          canBack: frames.length > 1,
+          lookup(input) {
+            if (signal.aborted || mine !== run || frames.at(-1) !== active) return;
+            const text = normalizeText(input.text);
+            const before =
+              input.contextBefore === undefined ? '' : normalizeText(input.contextBefore);
+            const after = input.contextAfter === undefined ? '' : normalizeText(input.contextAfter);
+            if (
+              text.length === 0 ||
+              text.length > LIMITS.maxSelectionChars ||
+              before.length + after.length > LIMITS.maxContextChars
+            )
+              return;
+            const childSnapshot: SelectionSnapshot = {
+              selectionId: deps.newId(),
+              source: snapshot.source,
+              kind: classifySelection(text),
+              text,
+              ...(before === '' ? {} : { contextBefore: before }),
+              ...(after === '' ? {} : { contextAfter: after }),
+            };
+            active.detach();
+            frames.push(
+              new ExplainSession({
+                snapshot: childSnapshot,
+                backend: deps.backend,
+                newId: deps.newId,
+                now: deps.now,
+                requestTimeoutMs: deps.requestTimeoutMs,
+                features: deps.features,
+                targetLanguage,
+              }),
+            );
+            showActive();
+          },
+          back() {
+            if (signal.aborted || mine !== run || frames.at(-1) !== active || frames.length < 2)
+              return;
+            active.destroy();
+            frames.pop();
+            showActive();
+          },
+        };
+        const host: CardHost = {
+          keyboard: surface.keyboard,
+          reposition: () => {
+            refit();
+            surface.reposition();
+          },
+          close: () => surface.close(),
+          openSettings: (section) => deps.backend.openSettings(section),
+          openSidePanel: (handoff) => deps.backend.openSidePanel(handoff),
+          online: () => slot.ownerDocument.defaultView?.navigator.onLine !== false,
+          copy: (text) => deps.copy(slot.ownerDocument, text),
+          now: deps.now,
+          ...(surface.speak === undefined ? {} : { speak: surface.speak }),
+          ...(surface.speakerIcon === undefined ? {} : { speakerIcon: surface.speakerIcon }),
+          navigation,
+        };
+        const removeCard = mountCard(slot, { session: active, host });
+        unmount = removeCard;
+        active.attach();
+        refit();
       };
-      const removeCard = mountCard(slot, { session: current, host });
-      unmount = () => {
-        win?.removeEventListener('resize', refit);
-        removeCard();
-      };
-      current.attach();
+      win?.addEventListener('resize', refit);
+      cleanupRun = () => win?.removeEventListener('resize', refit);
+      showActive();
       signal.addEventListener(
         'abort',
         () => {
           // Only the run that currently shows the card may take it down.
           if (mine !== run) return;
           removeView();
+          cleanupRun?.();
+          cleanupRun = null;
           pendingDetach = setTimeout(() => {
             pendingDetach = undefined;
-            if (mine === run) current.detach();
+            if (mine === run) frames.at(-1)?.detach();
           }, 0);
         },
         { once: true },
@@ -181,9 +259,19 @@ export function createExplainCard(overrides: Partial<CardDeps> = {}): ExplainCar
     },
 
     dismiss(selectionId) {
-      if (selectionId === undefined || session?.selectionId === selectionId) drop();
+      if (
+        selectionId === undefined ||
+        rootSelectionId === selectionId ||
+        pendingRootSelectionId === selectionId
+      ) {
+        run += 1;
+        drop();
+      }
     },
 
-    destroy: drop,
+    destroy() {
+      run += 1;
+      drop();
+    },
   };
 }

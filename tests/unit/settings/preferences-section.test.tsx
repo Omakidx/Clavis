@@ -36,6 +36,7 @@ describe('preferences section (FR-006)', () => {
     expect(await screen.findByRole('radio', { name: /Advanced/ })).toBeChecked();
     expect(screen.getByRole('radio', { name: /Only when I ask/ })).toBeChecked();
     expect(screen.getByLabelText('Explanation language')).toHaveValue('en');
+    expect(screen.getByLabelText('Translation language')).toHaveValue('en');
   });
 
   it('tells the user that toolbar changes apply to pages loaded afterwards', async () => {
@@ -62,9 +63,25 @@ describe('preferences section (FR-006)', () => {
   });
 
   it('keeps a saved language that is not in the list selectable', async () => {
-    setup({ preferences: { explanationLanguage: 'sw' } });
+    setup({ preferences: { explanationLanguage: 'sw', translationLanguage: 'eo' } });
     const select = (await screen.findByLabelText('Explanation language')) as HTMLSelectElement;
     expect(select.value).toBe('sw');
+    expect(screen.getByLabelText('Translation language')).toHaveValue('eo');
+  });
+
+  it('saves Translation language independently of Explanation language', async () => {
+    const user = setup({ preferences: { explanationLanguage: 'de' } });
+    const translation = await screen.findByLabelText('Translation language');
+    expect(translation).toHaveValue('de');
+    await user.selectOptions(translation, 'fr');
+    await waitFor(() => expect(backend.state.preferences.translationLanguage).toBe('fr'));
+    expect(screen.getByLabelText('Explanation language')).toHaveValue('de');
+    expect(screen.getByLabelText('Translation language')).toHaveValue('fr');
+    expect(backend.calls.find((call) => call.type === 'UPDATE_PREFERENCES')).toMatchObject({
+      patch: { translationLanguage: 'fr' },
+    });
+    await user.selectOptions(screen.getByLabelText('Explanation language'), 'it');
+    expect(screen.getByLabelText('Translation language')).toHaveValue('fr');
   });
 
   it('Reset to defaults restores them and says so', async () => {
@@ -72,6 +89,7 @@ describe('preferences section (FR-006)', () => {
       preferences: {
         readingLevel: 'simple',
         explanationLanguage: 'de',
+        translationLanguage: 'fr',
         tooltipBehavior: 'on-demand',
       },
     });
@@ -80,6 +98,7 @@ describe('preferences section (FR-006)', () => {
     expect(await screen.findByText('Preferences were reset to their defaults.')).toBeVisible();
     expect(screen.getByRole('radio', { name: /Standard/ })).toBeChecked();
     expect(screen.getByLabelText('Explanation language')).toHaveValue('en');
+    expect(screen.getByLabelText('Translation language')).toHaveValue('en');
   });
 
   it('explains a failed save and returns to the stored value', async () => {
@@ -90,5 +109,16 @@ describe('preferences section (FR-006)', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent(/protected extension storage/);
     expect(screen.getByRole('radio', { name: /Standard/ })).toBeChecked();
     expect(document.body.textContent).not.toContain('RAW_PROVIDER_TEXT');
+  });
+
+  it('restores the saved Translation language after a failed save', async () => {
+    const user = setup({ preferences: { explanationLanguage: 'de', translationLanguage: 'fr' } });
+    const select = await screen.findByLabelText('Translation language');
+    expect(select).toHaveValue('fr');
+    backend.state.failNext = 'STORAGE_UNAVAILABLE';
+    await user.selectOptions(select, 'it');
+    expect(await screen.findByRole('alert')).toHaveTextContent(/protected extension storage/);
+    expect(screen.getByLabelText('Translation language')).toHaveValue('fr');
+    expect(backend.state.preferences.translationLanguage).toBe('fr');
   });
 });

@@ -80,6 +80,16 @@ beforeEach(() => vi.useFakeTimers());
 afterEach(() => vi.useRealTimers());
 
 describe('listen controller', () => {
+  it('uses a known translation language before the general speech locale and keeps saved speed', async () => {
+    const h = setup({ prefs: { ttsLang: 'en-US', ttsRate: 1.25 } });
+    const context = h.context();
+    context.listen!.lang = 'fr';
+    h.controller.listen(context);
+    await flush();
+    expect(h.of('TTS_SPEAK')[0]).toMatchObject({ lang: 'fr', rate: 1.25, text: snapshot.text });
+    expect(h.of('TTS_SPEAK')[0]).not.toHaveProperty('voiceName');
+  });
+
   it('reports starting at once, and playing only after the started reply', async () => {
     let answer: (value: unknown) => void = () => undefined;
     const h = setup({ speak: () => new Promise((resolve) => (answer = resolve)) });

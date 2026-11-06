@@ -15,6 +15,11 @@ test.describe('popup', () => {
     await expect(page.getByRole('button', { name: 'Explain on this page' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Open PDF reader' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Settings' })).toBeVisible();
+    const actions = page.getByRole('region', { name: 'Quick actions' });
+    await expect(actions.getByRole('button')).toHaveCount(3);
+    await expect(actions.getByRole('button', { name: 'Connect Groq' })).toHaveClass(
+      /clavis-button--primary/,
+    );
     expect(errors).toEqual([]);
   });
 

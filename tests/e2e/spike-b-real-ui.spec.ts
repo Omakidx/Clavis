@@ -214,11 +214,13 @@ test('keyboard shortcut (proposed command): works without site access, and focus
   xdotool('key', 'alt+shift+e');
   await tb(page).waitShown();
   // Keyboard users land on the first action, then can activate it without a mouse.
+  await expect.poll(() => tb(page).focusedAction()).toBe('explain');
+  // Visible order: Lookup → Speak → speed.
+  xdotool('key', 'Right');
   await expect.poll(() => tb(page).focusedAction()).toBe('listen');
-  // Phase 6 order: Listen → Slow → Explain.
   xdotool('key', 'Right');
   await expect.poll(() => tb(page).focusedAction()).toBe('slow');
-  xdotool('key', 'Right');
+  xdotool('key', 'Home');
   await expect.poll(() => tb(page).focusedAction()).toBe('explain');
   xdotool('key', 'Return');
   await tb(page).waitShown(SEL.card);

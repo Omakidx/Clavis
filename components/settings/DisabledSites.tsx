@@ -6,6 +6,7 @@ import { checkNewSite } from '../../lib/ui-client/hostnames';
 import { openSettingsPage } from '../../lib/ui-client/navigation';
 import type { ClientResult } from '../../lib/ui-client/request';
 import { Button, ErrorNotice, LiveStatus } from '../common/ui';
+import { useToast } from '../common/Toast';
 
 interface DisabledSitesProps {
   sites: readonly string[];
@@ -21,6 +22,7 @@ const PROBLEM_TEXT = {
 
 /** Per-site disable list: add a hostname (validated and normalized) or remove one. */
 export function DisabledSites({ sites, save }: DisabledSitesProps) {
+  const toast = useToast();
   const inputId = useId();
   const hintId = useId();
   const errorId = useId();
@@ -39,9 +41,14 @@ export function DisabledSites({ sites, save }: DisabledSitesProps) {
     setBusy(false);
     if (result.ok) {
       setMessage(done);
+      toast?.show({ content: done, tone: 'success' });
       return true;
     }
     setError(result.error);
+    toast?.show({
+      content: <ErrorNotice error={result.error} onOpenSettings={openSettingsPage} />,
+      tone: 'danger',
+    });
     return false;
   }
 
@@ -78,7 +85,7 @@ export function DisabledSites({ sites, save }: DisabledSitesProps) {
       <p>{t('siteDisabledIntro')}</p>
       <p className="clavis-hint">{t('settingsReloadNote')}</p>
 
-      <form onSubmit={(event) => void add(event)} noValidate>
+      <form onSubmit={(event) => void add(event)} noValidate aria-busy={busy}>
         <div className="clavis-field">
           <label className="clavis-label" htmlFor={inputId}>
             {t('siteDisabledLabel')}
@@ -134,8 +141,8 @@ export function DisabledSites({ sites, save }: DisabledSitesProps) {
         </ul>
       )}
 
-      <LiveStatus message={message} tone="success" />
-      {error ? <ErrorNotice error={error} onOpenSettings={openSettingsPage} /> : null}
+      {!toast ? <LiveStatus message={message} tone="success" /> : null}
+      {!toast && error ? <ErrorNotice error={error} onOpenSettings={openSettingsPage} /> : null}
     </div>
   );
 }

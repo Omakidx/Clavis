@@ -172,7 +172,7 @@ test('Explain on a web page, success and every failure: the key appears in no me
   const { page, world: content } = await webPage();
   const options = await openExtensionPage(world.ext.context, world.ext.extensionId, 'options');
   const refresh = async (): Promise<void> => {
-    // A 401/403 flags the stored key as rejected (FR-072); put it back before the next failure.
+    // A 401 flags the stored key as rejected (FR-072); put it back before the next failure.
     await send(options, { v: 1, type: 'SET_API_KEY', apiKey: CANARY, storage: 'local' });
   };
 

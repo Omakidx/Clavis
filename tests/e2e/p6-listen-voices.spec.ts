@@ -79,7 +79,7 @@ test('Stop stops the audio and goes back to Listen', async () => {
     await listen.click('listen');
     await listen.waitLabel('Stop');
     await listen.click('listen');
-    await listen.waitLabel('Listen');
+    await listen.waitLabel('Speak');
     await expect.poll(() => scriptedStops(h.ext.serviceWorker)).toBeGreaterThan(stopsBefore);
     await listen.until(
       () => listen.toolbar.live(),
@@ -164,7 +164,7 @@ test('a new selection stops the previous utterance', async () => {
     await expect.poll(() => scriptedStops(h.ext.serviceWorker)).toBeGreaterThan(stops);
     await listen.until(
       () => listen.listenButton(),
-      (b) => b?.label === 'Listen',
+      (b) => b?.label === 'Speak',
       'reset label',
     );
   } finally {
@@ -172,7 +172,7 @@ test('a new selection stops the previous utterance', async () => {
   }
 });
 
-test('a remote voice is noted once', async () => {
+test('a remote voice plays without a visible playback label', async () => {
   const { page, dispose } = await h.open();
   try {
     await send(h.options, {
@@ -184,11 +184,7 @@ test('a remote voice is noted once', async () => {
     const listen = listenOf(page);
     await listen.click('listen');
     await listen.waitLabel('Stop');
-    await listen.until(
-      () => listen.toolbar.text(LISTEN.note),
-      (text) => text === 'This voice sends the text to an online service.',
-      'remote note',
-    );
+    expect(await listen.toolbar.isShown(LISTEN.note)).toBe(false);
     await finishAudio(h.ext.serviceWorker);
     await listen.waitLabel('Replay');
     await send(h.options, {

@@ -5,11 +5,11 @@
  * No transition or animation except the loading spinner, which is off under reduced motion.
  */
 .ec {
-  --ec-accent: #0b57d0;
-  --ec-on-accent: #fff;
-  --ec-ring: #0b57d0;
+  --ec-accent: #fca311;
+  --ec-on-accent: #292314;
+  --ec-ring: #805000;
   --ec-danger: #b3261e;
-  --ec-wash: #eef3fd;
+  --ec-wash: #fff0ce;
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
@@ -20,10 +20,10 @@
   background: var(--surface);
   color: var(--ink);
   border: 1px solid var(--line);
-  border-radius: 8px;
-  box-shadow: 0 2px 8px rgb(0 0 0 / 25%);
+  border-radius: 20px;
+  box-shadow: 0 2px 8px rgb(50 45 25 / 8%);
   font:
-    14px/1.45 system-ui,
+    13px/1.5 system-ui,
     sans-serif;
   text-align: start;
 }
@@ -33,8 +33,11 @@
 }
 
 .ec :focus-visible {
-  outline: 2px solid var(--ec-ring);
-  outline-offset: 1px;
+  outline: none;
+}
+
+.ec :is(button, [tabindex='0']):focus-visible {
+  background: var(--ec-wash);
 }
 
 .ec__head {
@@ -48,7 +51,20 @@
 }
 
 .ec__who {
+  flex: 1 1 auto;
   min-width: 0;
+}
+
+.ec__head > .ec__btn {
+  flex: none;
+  min-width: max-content;
+  white-space: nowrap;
+}
+
+.ec__back {
+  display: flex;
+  align-items: center;
+  gap: 4px;
 }
 
 .ec__kind {
@@ -73,8 +89,8 @@
   min-height: 28px;
   padding: 3px 10px;
   border: 1px solid var(--line);
-  border-radius: 6px;
-  background: transparent;
+  border-radius: 999px;
+  background: var(--ec-accent);
   color: inherit;
   font: inherit;
   text-align: center;
@@ -153,6 +169,39 @@
   display: none;
 }
 
+.ec__lookup-action {
+  flex: none;
+  padding: 5px 12px;
+  border-top: 1px solid var(--line);
+}
+
+.ec__lookup-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  max-width: 100%;
+}
+
+.ec__lookup-btn svg {
+  flex: none;
+  width: 16px;
+  height: 16px;
+}
+
+.ec__lookup-word {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+}
+
+.ec__lookup-feedback {
+  padding: 4px 12px;
+  color: var(--ec-danger);
+  font-size: 12px;
+}
+
 .ec__title {
   font-weight: 600;
 }
@@ -175,7 +224,8 @@
 
 .ec__field--note {
   padding: 6px 8px;
-  border-inline-start: 3px solid var(--ec-accent);
+  border: 1px solid var(--line);
+  border-radius: 8px;
   background: var(--ec-wash);
 }
 
@@ -283,16 +333,6 @@
   border: 0;
 }
 
-@media (prefers-color-scheme: dark) {
-  .ec {
-    --ec-accent: #8db3ff;
-    --ec-on-accent: #0b1b3a;
-    --ec-ring: #8db3ff;
-    --ec-danger: #ffb4ab;
-    --ec-wash: #26303d;
-  }
-}
-
 /* High contrast: system colours, real borders, selected tab marked by Highlight. */
 @media (forced-colors: active) {
   .ec {
@@ -318,7 +358,45 @@
     border-color: CanvasText;
   }
   .ec__field--note {
-    border-inline-start-color: Highlight;
+    border-color: CanvasText;
     background: transparent;
   }
+}
+
+/* Translation pronunciation shares the toolbar speaker and its saved speech preferences. */
+.ec__translation-line {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+}
+.ec__translation-line > p {
+  min-width: 0;
+}
+.ec__translation-speech {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  flex: none;
+}
+.ec__speaker {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 4px;
+  margin-top: -3px;
+}
+.ec__speaker svg {
+  display: block;
+  width: 16px;
+  height: 16px;
+}
+.ec__speech-note {
+  color: var(--muted);
+  font-size: 11px;
+  max-width: 12rem;
+}
+.ec__speech-note:empty {
+  display: none;
 }

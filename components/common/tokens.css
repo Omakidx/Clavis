@@ -7,25 +7,26 @@
  * (the PDF.js text layer is sensitive to that, see docs/decisions/spike-c-pdf.md finding 3).
  */
 :root {
-  color-scheme: light dark;
+  color-scheme: light;
 
-  /* Colour */
-  --bg: #ffffff;
-  --fg: #1b1f24;
-  --muted: #4a5360;
-  --border: #c3cbd4;
-  --accent: #1a56db;
-  --accent-fg: #ffffff;
-  --surface: #f6f8fa;
-  --focus: #1a56db;
+  /* Warm ivory and orange stay consistent with the system appearance. */
+  --bg: #f6f7eb;
+  --fg: #252820;
+  --muted: #5d6255;
+  --border: #dce0cf;
+  --accent: #fca311;
+  --accent-fg: #292314;
+  --surface: #eeefdf;
+  --focus: #805000;
+  --link: #805000;
   --success: #116329;
-  --success-bg: #e6f4ea;
+  --success-bg: #dcf0d5;
   --warning: #7a4b00;
-  --warning-bg: #fff4d6;
+  --warning-bg: #ffe5ad;
   --danger: #b42318;
   --danger-bg: #fdecea;
   --danger-fg: #ffffff;
-  --info-bg: #e8f0fe;
+  --info-bg: #fff0ce;
 
   /* Spacing, radius, type, focus ring */
   --space-1: 4px;
@@ -34,9 +35,9 @@
   --space-4: 16px;
   --space-5: 24px;
   --space-6: 32px;
-  --radius: 6px;
-  --radius-lg: 10px;
-  --target: 2.5rem; /* minimum interactive height: 40px, above the 24px WCAG 2.2 floor */
+  --radius: 12px;
+  --radius-lg: 20px;
+  --target: 40px; /* minimum interactive height: 40px, above the 24px WCAG 2.2 floor */
   --ring-width: 3px;
   --ring-offset: 2px;
   --font:
@@ -44,23 +45,19 @@
   --font-mono: ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #14181d;
-    --fg: #e8ecf1;
-    --muted: #a8b3c0;
-    --border: #4a5563;
-    --accent: #6ea0ff;
-    --accent-fg: #0b1220;
-    --surface: #1d232b;
-    --focus: #8db3ff;
-    --success: #7ee2a0;
-    --success-bg: #12301d;
-    --warning: #f5c76b;
-    --warning-bg: #3a2c0b;
-    --danger: #ff9b92;
-    --danger-bg: #3d1713;
-    --danger-fg: #1b0a08;
-    --info-bg: #17284a;
-  }
+/* Explicit preview controls can inspect dark appearance without changing the default palette. */
+:root[data-preview-theme='dark'] {
+  --bg: #20221b;
+  --fg: #f6f7eb;
+  --muted: #b9beac;
+  --border: #414536;
+  --surface: #303329;
+  --info-bg: #493a20;
+  --success: #a4d5ac;
+  --success-bg: #293d2a;
+  --warning: #ffd68b;
+  --warning-bg: #493a20;
+  --danger: #ffc0b4;
+  --danger-bg: #4a2b28;
+  --link: #ffc66b;
 }

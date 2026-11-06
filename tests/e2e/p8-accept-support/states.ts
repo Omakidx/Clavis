@@ -40,7 +40,7 @@ async function page(world: World, path: string): Promise<Page> {
 
 const next = (p: Page) => p.getByRole('button', { name: 'Next', exact: true });
 
-/** Move the welcome wizard to `step` (1 to 8) by pressing what each screen offers, key not connected. */
+/** Move the welcome wizard to `step` (1 to 7) by pressing what each screen offers, key not connected. */
 async function onboardingAt(world: World, step: number): Promise<Page> {
   await ensureKey(world, false);
   const p = await page(world, 'onboarding.html');
@@ -55,16 +55,15 @@ async function onboardingAt(world: World, step: number): Promise<Page> {
     await p.getByRole('button', { name: "Not now — I'll use right-click instead" }).click();
     await next(p).click();
   }
-  if (step >= 5) await p.getByRole('button', { name: 'I have my key' }).click();
-  if (step >= 6) {
+  if (step >= 5) {
     await p.getByRole('button', { name: 'Set up later' }).click();
   }
+  if (step >= 6) await next(p).click();
   if (step >= 7) await next(p).click();
-  if (step >= 8) await next(p).click();
   return p;
 }
 
-export const ONBOARDING_STATES: PageState[] = [1, 2, 3, 4, 5, 6, 7, 8].map((step) => ({
+export const ONBOARDING_STATES: PageState[] = [1, 2, 3, 4, 5, 6, 7].map((step) => ({
   name: `onboarding step ${step}`,
   open: (world) => onboardingAt(world, step),
 }));

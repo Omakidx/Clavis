@@ -146,6 +146,28 @@ describe('AI_EXPLAIN modes', () => {
     }
   });
 
+  it('publishes the saved translation target while keeping explanation requests independent', async () => {
+    await h.call(
+      {
+        v: 1,
+        type: 'UPDATE_PREFERENCES',
+        patch: { explanationLanguage: 'en', translationLanguage: 'ja' },
+      },
+      options,
+    );
+    expect(await h.call({ v: 1, type: 'GET_PUBLIC_SETTINGS' }, contentSender())).toMatchObject({
+      ok: true,
+      data: { explanationLanguage: 'en', translationLanguage: 'ja' },
+    });
+    await h.call(explainMessage(REQ_A, { mode: 'core' }), contentSender());
+    expect(h.provider.explain.mock.calls[0]?.[0].targetLanguage).toBe('en');
+    await h.call(
+      explainMessage(REQ_B, { mode: 'translate', targetLanguage: 'ja' }),
+      contentSender(),
+    );
+    expect(h.provider.explain.mock.calls[1]?.[0].targetLanguage).toBe('ja');
+  });
+
   it('never retries on its own: one provider call per message, even after a transient failure', async () => {
     h.provider.explain.mockRejectedValue(failWith('NETWORK_ERROR'));
     expect(await h.call(explainMessage(), contentSender())).toMatchObject({

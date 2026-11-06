@@ -134,7 +134,7 @@ export function createFakeBackend() {
       handoffs.push(handoff);
       return Promise.resolve(state.panelOpens);
     },
-    explanationLanguage: () => Promise.resolve(state.language),
+    translationLanguage: () => Promise.resolve(state.language),
   };
   return { backend, calls, cancelled, settings, handoffs, state };
 }

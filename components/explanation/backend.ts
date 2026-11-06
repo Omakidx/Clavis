@@ -1,6 +1,7 @@
 import { browser } from 'wxt/browser';
 import { MESSAGE_VERSION } from '../../lib/config/constants';
 import type { ErrorCode } from '../../lib/contracts/errors';
+import type { ForbiddenReason } from '../../lib/contracts/setup';
 import type { ExplainRequest, ExplainResult } from '../../lib/contracts/explain';
 import type { SidePanelHandoff } from '../../lib/contracts/sidepanel';
 import type { ClientErrorCode } from '../../lib/ui-client/errors';
@@ -21,7 +22,14 @@ export type BackendReply =
   | { kind: 'result'; result: ExplainResult }
   /** The one-time "Send this to Groq?" confirmation is still owed (FR-002, D-16). */
   | { kind: 'disclosure' }
-  | { kind: 'error'; code: ClientErrorCode; retryAfterMs?: number; reason?: 'local-limit' };
+  | {
+      kind: 'error';
+      code: ClientErrorCode;
+      retryAfterMs?: number;
+      reason?: 'local-limit';
+      httpStatus?: number;
+      forbiddenReason?: ForbiddenReason;
+    };
 
 export interface ExplainBackend {
   /**
@@ -34,8 +42,8 @@ export interface ExplainBackend {
   cancel(requestId: string): void;
   /** Open the Settings page, at a section if given. Resolves to whether the background did it. */
   openSettings(section?: SettingsSection): Promise<boolean>;
-  /** The user's explanation language (needed by the Translate tab only). */
-  explanationLanguage(): Promise<string | undefined>;
+  /** The saved Translate target, falling back to the explanation language for older settings. */
+  translationLanguage(): Promise<string | undefined>;
   /**
    * Hand the explanation to the side panel and open it (FR-042). Must be called synchronously from
    * the trusted click that asked for it: Chrome lets the background open the panel only while that
@@ -68,6 +76,16 @@ const KNOWN_CODES: readonly string[] = [
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
 
+const FORBIDDEN_REASONS: readonly string[] = [
+  'model_permission_org',
+  'model_permission_project',
+  'model_permission',
+  'permission_restriction',
+  'region_block',
+  'edge_block',
+  'unknown',
+] satisfies ForbiddenReason[];
+
 /**
  * Whether an error envelope means "ask the user to confirm the first send" rather than "no key":
  * exactly SETUP_REQUIRED with `reason: 'disclosure'` (lib/contracts/errors.ts). Nothing else.
@@ -92,6 +110,15 @@ export function interpretReply(raw: unknown): BackendReply {
   const code = error['code'];
   if (isDisclosure(code, error)) return { kind: 'disclosure' };
   const retryAfter = error['retryAfterMs'];
+  const httpStatus = error['httpStatus'];
+  const safeStatus =
+    typeof httpStatus === 'number' &&
+    Number.isInteger(httpStatus) &&
+    httpStatus >= 100 &&
+    httpStatus <= 599
+      ? httpStatus
+      : undefined;
+  const forbiddenReason = error['forbiddenReason'];
   return {
     kind: 'error',
     code: (KNOWN_CODES.includes(code) ? code : 'INTERNAL_ERROR') as ClientErrorCode,
@@ -101,6 +128,12 @@ export function interpretReply(raw: unknown): BackendReply {
     // Clavis's own throttle (not Groq's rate limit) is worded as such.
     ...(code === 'RATE_LIMITED' && error['reason'] === 'local-limit'
       ? { reason: 'local-limit' as const }
+      : {}),
+    ...(safeStatus === undefined ? {} : { httpStatus: safeStatus }),
+    ...(safeStatus === 403 &&
+    typeof forbiddenReason === 'string' &&
+    FORBIDDEN_REASONS.includes(forbiddenReason)
+      ? { forbiddenReason: forbiddenReason as ForbiddenReason }
       : {}),
   };
 }
@@ -136,10 +169,10 @@ export function createBackend(send: Send = (message) => browser.runtime.sendMess
       const reply = await call({ type: 'OPEN_SIDE_PANEL', handoff });
       return isRecord(reply) && reply['ok'] === true;
     },
-    async explanationLanguage() {
+    async translationLanguage() {
       const reply = await call({ type: 'GET_PUBLIC_SETTINGS' });
       const data = isRecord(reply) && isRecord(reply['data']) ? reply['data'] : undefined;
-      const language = data?.['explanationLanguage'];
+      const language = data?.['translationLanguage'] ?? data?.['explanationLanguage'];
       return typeof language === 'string' ? language : undefined;
     },
   };

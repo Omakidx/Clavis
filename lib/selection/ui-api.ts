@@ -71,6 +71,8 @@ export type ListenReport =
 export interface ListenSurface {
   /** The speed the user chose with the toolbar's Slow toggle for this selection; undefined = preference. */
   slow: boolean | undefined;
+  /** Known output language, which takes priority over the general voice-language preference. */
+  lang?: string | undefined;
   report(report: ListenReport): void;
 }
 
@@ -80,6 +82,14 @@ export interface ListenSurface {
  * only draws inside `open()` and reports size changes. It never receives the root itself.
  */
 export interface CardSurface {
+  /** Read generated output with the existing Listen action and saved voice; return Stop. */
+  speak?(
+    text: string,
+    lang: string | undefined,
+    report: (report: ListenReport) => void,
+  ): () => void;
+  /** Clone the existing toolbar speaker artwork without bundling a second copy in the card. */
+  speakerIcon?(): Element | null;
   /** The action was started from the keyboard (a toolbar button had focus), so focus may move. */
   keyboard: boolean;
   /**
@@ -185,7 +195,7 @@ export interface ToolbarHandle {
    */
   showNotice(message: string): void;
   hide(reason?: DismissReason): void;
-  /** True while a pointer press or keyboard focus is inside the toolbar (selection may collapse). */
+  /** True while pointer/focus interaction or a selected popup result keeps the toolbar active. */
   isInteracting(): boolean;
   /** Move keyboard focus into the toolbar (the Alt+Shift+E path); Escape or Tab gives it back. */
   focus(): void;
