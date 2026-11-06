@@ -537,6 +537,7 @@ test.describe('deadline, offline, service worker and cancellation', () => {
 
   test('the card Close button and removing the key each cancel the in-flight request at the worker (no late result, no orphan call)', async () => {
     const aborted: string[] = [];
+    const mark = ledger.mark();
     h.ext.context.on('requestfailed', (request) => {
       if (request.url().includes('api.groq.com')) aborted.push(request.failure()?.errorText ?? '');
     });
@@ -549,6 +550,7 @@ test.describe('deadline, offline, service worker and cancellation', () => {
     let page = (await h.open()).page;
     let card = await explainWord(page, WORD);
     await card.waitFor(`${CARD.panel('core')}[data-status="loading"]`);
+    await expect.poll(() => ledger.chats(mark).length).toBe(1);
     await card.click(CARD.close);
     await expect.poll(() => aborted.length, { timeout: 8000 }).toBe(1);
     await page.close();
@@ -559,6 +561,7 @@ test.describe('deadline, offline, service worker and cancellation', () => {
     page = second.page;
     card = await explainWord(page, 'river');
     await card.waitFor(`${CARD.panel('core')}[data-status="loading"]`);
+    await expect.poll(() => ledger.chats(mark).length).toBe(2);
     await send(h.options, { v: 1, type: 'REMOVE_API_KEY' });
     await expect.poll(() => aborted.length, { timeout: 8000 }).toBe(2);
     await card.waitFor(CARD.error);
