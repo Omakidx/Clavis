@@ -539,18 +539,24 @@ export async function perform(page: Page, surface: Surface, plan: InputPlan): Pr
       return;
     }
     case 'keyboard': {
+      // Playwright's macOS key table maps Down to line motion even in vertical text. Right
+      // supplies its character-motion command, which these LTR Japanese targets require.
+      const forwardKey =
+        located.vertical && process.platform === 'darwin' ? 'ArrowRight' : plan.forwardKey;
       await page.mouse.dblclick(start.x, start.y);
+      // Japanese word-selection direction differs between platforms. Collapse to its reading
+      // start before extending, so Shift+Down always grows from the same boundary.
+      if (located.vertical) await page.keyboard.press(backKeyFor(forwardKey));
       let current = normalize((await readSelection(surface)).text);
       await page.keyboard.down('Shift');
       try {
         const first = expected.startsWith(current) ? expected.length - current.length : 0;
-        for (let i = 0; i < first; i++) await page.keyboard.press(plan.forwardKey);
+        for (let i = 0; i < first; i++) await page.keyboard.press(forwardKey);
         for (let i = 0; i < 6; i++) {
           current = normalize((await readSelection(surface)).text);
           if (current === expected) break;
-          if (expected.startsWith(current)) await page.keyboard.press(plan.forwardKey);
-          else if (current.startsWith(expected))
-            await page.keyboard.press(backKeyFor(plan.forwardKey));
+          if (expected.startsWith(current)) await page.keyboard.press(forwardKey);
+          else if (current.startsWith(expected)) await page.keyboard.press(backKeyFor(forwardKey));
           else break;
         }
       } finally {

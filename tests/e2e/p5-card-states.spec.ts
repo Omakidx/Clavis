@@ -30,7 +30,7 @@ test.describe('first send (FR-002, D-16)', () => {
       const card = await explainWord(page, 'cartographer');
       await card.waitFor(CARD.disclosure);
       expect(await card.text(CARD.disclosure)).toContain(APPROVED_COPY);
-      expect(await card.text(CARD.confirm)).toBe('Explain');
+      expect(await card.text(CARD.confirm)).toBe('Lookup');
       expect(await card.text(CARD.cancel)).toBe('Cancel');
       expect(chatCount(h)).toBe(0);
       await page.waitForTimeout(300);
@@ -191,7 +191,7 @@ test.describe('errors from Groq', () => {
   test('429 with Retry-After: "Rate limit reached", a countdown, Try again stays inactive until it is over', async () => {
     const { card, dispose } = await failWith(429, { 'retry-after': '3' });
     await card.waitFor(CARD.error);
-    expect(await card.text(CARD.error)).toContain('Rate limit reached');
+    expect(await card.text(CARD.error)).toContain('HTTP 429');
     const label = (await card.text(CARD.retry)) ?? '';
     expect(label).toMatch(/^Try again in [123] s$/);
     expect(await card.toolbar.attr(CARD.retry, 'aria-disabled')).toBe('true');
@@ -215,7 +215,7 @@ test.describe('errors from Groq', () => {
   test('500: "Can\'t connect" with Try again, which asks once more only when pressed', async () => {
     const { card, dispose } = await failWith(500);
     await card.waitFor(CARD.error, 20_000);
-    expect(await card.text(CARD.error)).toContain("Can't connect");
+    expect(await card.text(CARD.error)).toContain('HTTP 500');
     const before = chatCount(h);
     await new Promise((resolve) => setTimeout(resolve, 500));
     expect(chatCount(h)).toBe(before);

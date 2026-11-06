@@ -178,6 +178,11 @@ export function startSelectionObserver(options: SelectionObserverOptions): Selec
   return {
     captureNow: () => evaluate(true),
     allowReshow() {
+      // Escape may beat the keyboard debounce for a newly extended selection. Remember the
+      // selection being dismissed, so that queued capture or Escape's keyup cannot reopen it.
+      if (timer !== undefined) win.clearTimeout(timer);
+      timer = undefined;
+      evaluate(true);
       reshow = true;
     },
     stop() {

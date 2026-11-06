@@ -58,7 +58,7 @@ test('one session: highlight sends nothing to any host; one request per Explain,
   await tb(page).waitHidden();
   await keyboardExtend(page, page, 'cartographer', 8); // keyboard
   await tb(page).waitShown();
-  await page.keyboard.press('Control+a'); // select all
+  await page.keyboard.press('ControlOrMeta+a'); // select all
   await pause(300);
   await page.mouse.wheel(0, 200); // scroll with a selection
   await page.mouse.wheel(0, -200);

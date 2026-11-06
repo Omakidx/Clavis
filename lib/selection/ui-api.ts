@@ -207,6 +207,9 @@ export interface ToolbarHandle {
 /** Produces the toolbar, loading UI code first if it is not on the page yet. */
 export type ToolbarLoader = (options: ToolbarOptions) => Promise<ToolbarHandle>;
 
+/** Toolbar factory registered by the lazy UI script in the frame's isolated world. */
+export const TOOLBAR_GLOBAL = Symbol.for('clavis.toolbar');
+
 /** What the frame's single observer exposes to a newer injection that replaces it. */
 export interface SelectionControllerLike {
   stop(): void;

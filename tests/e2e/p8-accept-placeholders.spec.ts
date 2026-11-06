@@ -67,7 +67,9 @@ function findZip(): string | undefined {
 function walk(dir: string, base = dir): string[] {
   return readdirSync(dir).flatMap((name) => {
     const full = path.join(dir, name);
-    return statSync(full).isDirectory() ? walk(full, base) : [path.relative(base, full)];
+    return statSync(full).isDirectory()
+      ? walk(full, base)
+      : [path.relative(base, full).split(path.sep).join('/')];
   });
 }
 
@@ -258,6 +260,7 @@ test.fail('the privacy-policy link does not point at a placeholder address', asy
     await world.onboarding.close();
     const page = await world.ext.context.newPage();
     await page.goto(`chrome-extension://${world.ext.extensionId}/options.html`);
+    await page.getByRole('link', { name: 'Privacy & help' }).click();
     const link = page.getByRole('link', { name: /Clavis privacy policy/ });
     await expect(link).toBeVisible();
     const href = (await link.getAttribute('href')) ?? '';

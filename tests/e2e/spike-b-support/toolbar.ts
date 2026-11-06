@@ -115,6 +115,19 @@ export class ToolbarProbe {
 
   /** Run `fn` (source of a function using `this`) on a node inside the closed root. */
   async evalIn<T>(selector: string | null, fn: string): Promise<T | undefined> {
+    for (let attempt = 0; ; attempt++) {
+      try {
+        return await this.evalCurrentNode<T>(selector, fn);
+      } catch (error) {
+        // Preact may replace a node between CDP discovery and resolution. Re-discover it, as a
+        // locator would; never retry errors from the action itself or mask a missing toolbar.
+        if (attempt >= 2 || !/Could not find node|No node with given id/.test(String(error)))
+          throw error;
+      }
+    }
+  }
+
+  private async evalCurrentNode<T>(selector: string | null, fn: string): Promise<T | undefined> {
     const { session, hosts } = await this.hosts();
     const root = hosts[0]?.shadowRoots?.[0];
     if (root === undefined) return undefined;
@@ -208,6 +221,26 @@ export class ToolbarProbe {
     return this.evalIn<string>(selector, `function () { return this.textContent; }`);
   }
 
+  /** Match locator actionability: do not click coordinates from a card's first, moving render. */
+  async stableBox(selector: string) {
+    let previous = await this.box(selector);
+    const deadline = Date.now() + 1000;
+    for (;;) {
+      await this.page.waitForTimeout(32);
+      const current = await this.box(selector);
+      if (
+        current.width > 0 &&
+        current.height > 0 &&
+        (['x', 'y', 'width', 'height'] as const).every(
+          (key) => Math.abs(current[key] - previous[key]) < 0.25,
+        )
+      )
+        return current;
+      if (Date.now() > deadline) throw new Error(`layout did not settle for ${selector}`);
+      previous = current;
+    }
+  }
+
   attr(selector: string, name: string): Promise<string | null | undefined> {
     return this.evalIn<string | null>(
       selector,
@@ -217,7 +250,7 @@ export class ToolbarProbe {
 
   /** Real (trusted) mouse click on an action button. */
   async click(action: ActionName): Promise<void> {
-    const box = await this.box(SEL.action(action));
+    const box = await this.stableBox(SEL.action(action));
     let offsetX = 0;
     let offsetY = 0;
     if (!('mouse' in this.target)) {

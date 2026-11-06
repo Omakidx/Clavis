@@ -42,8 +42,6 @@ npm run zip        # Production ZIP in .output/
 
 The [technical documentation](docs/README.md) covers architecture, requirements, and release checks. The [design preview](dev/preview/README.md) is for UI development; it uses simulated data and cannot validate a real Groq key.
 
-Known validation issue: the selection observer currently exceeds its configured bundle-size budget. `npm run size` and the CI size gate flag this; the production build and local installation still work.
-
 ## License
 
 [MIT](LICENSE).

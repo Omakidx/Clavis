@@ -27,6 +27,8 @@ import { manifest, methodsFor } from './p4-matrix-support/manifest';
 
 let harness: Harness;
 const attempts: Attempt[] = [];
+// The summary consumes all preceding attempts; a retry must rerun that complete measurement.
+test.describe.configure({ mode: 'serial' });
 
 test.beforeAll(async () => {
   harness = await startHarness();

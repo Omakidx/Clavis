@@ -483,6 +483,7 @@ describe('what the side panel may call', () => {
       ...Object.values(SETTINGS_MESSAGES),
       { v: 1, type: 'GET_AI_STATUS' },
       CARD_MESSAGES['LOAD_EXPLAIN_CARD'],
+      CARD_MESSAGES['LOAD_TOOLBAR'],
       openSidePanelMessage(),
     ];
     for (const message of messages) {

@@ -355,10 +355,14 @@ test.describe('site access granted', () => {
         ),
       );
       expect(carrying, 'a message carrying selected text').toEqual([]);
-      expect(
-        messages.filter((m) => m.fromTab),
-        'any message from a page at all',
-      ).toEqual([]);
+      const loading = messages.filter((m) => m.fromTab);
+      expect(loading, 'one packaged-UI load per document').toHaveLength(3);
+      for (const message of loading) {
+        expect(JSON.parse(message.json), 'UI loading carries no selected text or target').toEqual({
+          v: 1,
+          type: 'LOAD_TOOLBAR',
+        });
+      }
     });
 
     test('Listen never calls Groq', async () => {

@@ -161,8 +161,8 @@ test('dark colour scheme: the card follows it', async () => {
       '[data-clavis="card"]',
       `function () { const s = getComputedStyle(this); return { bg: s.backgroundColor, fg: s.color }; }`,
     );
-    // #1d232b on #e8ecf1 (components/tooltip/toolbar.css, dark).
-    expect(colours).toEqual({ bg: 'rgb(29, 35, 43)', fg: 'rgb(232, 236, 241)' });
+    // Dark surface and light text from the shared toolbar/card palette.
+    expect(colours).toEqual({ bg: 'rgb(39, 42, 33)', fg: 'rgb(246, 247, 235)' });
   } finally {
     await dispose();
   }
@@ -224,9 +224,9 @@ test('keyboard only: Tab to Open in side panel and press Enter; Escape dismisses
     await page.keyboard.press('Enter');
     await expect.poll(() => card.text(CARD.live)).toBe('Opened in the side panel.');
     expect((await realPanelUrls(h.ext.serviceWorker)).length).toBeGreaterThanOrEqual(before);
-    expect(await realPanelUrls(h.ext.serviceWorker)).toContainEqual(
-      expect.stringMatching(/sidepanel\.html\?tab=\d+$/),
-    );
+    await expect
+      .poll(() => realPanelUrls(h.ext.serviceWorker))
+      .toContainEqual(expect.stringMatching(/sidepanel\.html\?tab=\d+$/));
 
     // Escape dismisses the card and the toolbar together (UJ-02); Close alone keeps focus on Explain.
     await page.keyboard.press('Escape');

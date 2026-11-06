@@ -28,6 +28,7 @@ test('without voices: the toolbar and the panel both say so, with the Linux hint
   context,
   extensionId,
 }) => {
+  test.skip(process.platform !== 'linux', 'This case checks Linux no-voice installation guidance.');
   // GET_VOICES is an options/onboarding/popup route: ask from the options page.
   const options = await openExtensionPage(context, extensionId, 'options');
   const report = await sendFromPage(options.page, { v: 1, type: 'GET_VOICES' });
@@ -47,7 +48,7 @@ test('without voices: the toolbar and the panel both say so, with the Linux hint
   expect(await listen.toolbar.text(LISTEN.message)).toBe("Voice isn't available on this device.");
   expect(await listen.toolbar.text(LISTEN.hint)).toContain('speech-dispatcher');
   expect(await listen.listenButton()).toMatchObject({
-    label: 'Listen',
+    label: 'Speak',
     state: null,
     spinner: false,
   });
@@ -83,7 +84,7 @@ test('with a voice: playing, Stop, Slow, Replay and the panel follow the real ev
   expect((await scriptedCalls(serviceWorker)).at(-1)).toMatchObject({ chars: 4, rate: 1 });
 
   await listen.click('listen');
-  await listen.waitLabel('Listen');
+  await listen.waitLabel('Speak');
   await expect(page.getByTestId('practice-result')).toContainText('Stopped.');
 
   await listen.click('slow');

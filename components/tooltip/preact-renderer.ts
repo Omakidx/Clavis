@@ -2,7 +2,7 @@ import { h, render, type VNode } from 'preact';
 import type { ViewRenderer } from './toolbar';
 import { toolbarView, type CreateElement } from './view';
 
-/** Preact renderer, bundled directly into the observer in option (c). */
+/** Preact renderer shared by the on-demand website toolbar and extension-owned readers. */
 export function createPreactRenderer(): ViewRenderer {
   const create = h as unknown as CreateElement<VNode>;
   return {

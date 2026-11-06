@@ -151,6 +151,7 @@ test.describe('keyboard only', () => {
     await expect.poll(() => reader.currentPage()).toBeGreaterThan(95);
     await reader.page.keyboard.press('Home');
     await expect.poll(() => reader.viewer.evaluate((el) => el.scrollTop)).toBe(0);
+    await expect.poll(() => reader.currentPage()).toBe(1);
 
     // Zoom.
     await reader.page.keyboard.press('0');
@@ -195,11 +196,13 @@ test.describe('keyboard only', () => {
     await reader.page.close();
   });
 
-  test('every control in the toolbar can be reached with Tab, has an accessible name and a visible focus ring', async () => {
+  test('every control in the toolbar can be reached with Tab, has an accessible name and a visible focus surface', async () => {
     const reader = await h.openReader({ width: 1300, height: 800 });
     await reader.openReady('pages-100.pdf');
     await reader.page.getByRole('button', { name: TEXT.open, exact: true }).focus();
-    const seen: { name: string; ring: boolean }[] = [];
+    await reader.page.keyboard.press('Tab');
+    await reader.page.getByRole('button', { name: 'Open PDF' }).focus();
+    const seen: { name: string; cue: boolean }[] = [];
     for (let i = 0; i < 14; i++) {
       const info = await reader.page.evaluate(() => {
         const el = document.activeElement as HTMLElement | null;
@@ -207,10 +210,20 @@ test.describe('keyboard only', () => {
         const style = getComputedStyle(el);
         const name =
           el.getAttribute('aria-label') ?? el.textContent?.trim() ?? el.getAttribute('title') ?? '';
-        const ring =
-          (style.outlineStyle !== 'none' && parseFloat(style.outlineWidth) > 0) ||
-          (style.boxShadow !== 'none' && style.boxShadow !== '');
-        return { name, ring };
+        const surface = () =>
+          [
+            style.backgroundColor,
+            style.backgroundImage,
+            style.boxShadow,
+            style.borderColor,
+            style.textDecorationLine,
+          ].join('|');
+        const focused = surface();
+        const visible = el.matches(':focus-visible');
+        el.blur();
+        const resting = surface();
+        el.focus();
+        return { name, cue: visible && focused !== resting };
       });
       if (info) seen.push(info);
       await reader.page.keyboard.press('Tab');
@@ -218,7 +231,7 @@ test.describe('keyboard only', () => {
     expect(seen.length).toBeGreaterThanOrEqual(9);
     for (const control of seen) {
       expect(control.name.length, 'accessible name').toBeGreaterThan(0);
-      expect(control.ring, `${control.name}: visible focus indicator`).toBe(true);
+      expect(control.cue, `${control.name}: visible focus indicator`).toBe(true);
     }
     const names = seen.map((s) => s.name);
     for (const expected of [

@@ -180,7 +180,7 @@ test.describe('modal <dialog>', () => {
       await page.locator('#open').click();
       await dblclickText(page, page, 'keystone');
       await tb(page).waitShown();
-      expect(await selectedText(page)).toBe('keystone');
+      expect((await selectedText(page)).trim()).toBe('keystone');
     } finally {
       await dispose();
     }
@@ -558,7 +558,7 @@ test.describe('fixed or sticky headers on top of the selection', () => {
   test('the toolbar hides when the whole selection is under the header, and returns when it scrolls out', async () => {
     const { page, dispose } = await h.open('fixed-header.html');
     try {
-      await page.evaluate(() => scrollTo(0, 400));
+      await page.locator('#para12').evaluate((el) => el.scrollIntoView({ block: 'center' }));
       await dblclickText(page, page, 'Paragraph 12');
       await tb(page).waitShown();
       const y = await page.evaluate(

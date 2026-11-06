@@ -507,7 +507,10 @@ export function createToolbar(
     // A zoomed or scaled <html> scales the host's pixels: convert viewport pixels back to its own.
     // (`offsetWidth` is rounded to a whole pixel, which would skew the scale by up to a percent.)
     const layoutWidth = Number.parseFloat(win.getComputedStyle(el).width) || el.offsetWidth;
-    const scale = box.width > 0 && layoutWidth > 0 ? box.width / layoutWidth : 1;
+    const measuredScale = box.width > 0 && layoutWidth > 0 ? box.width / layoutWidth : 1;
+    // CSS serializes computed widths with less precision than DOMRect. Ignore that rounding
+    // noise at unit scale, otherwise snapping can produce 0.0001px offsets on high-DPI screens.
+    const scale = Math.abs(measuredScale - 1) < 0.0001 ? 1 : measuredScale;
     const placement = place({
       width: box.width || el.offsetWidth,
       height: box.height || el.offsetHeight,

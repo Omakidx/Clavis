@@ -193,7 +193,8 @@ test('429: "Rate limit reached", a countdown that holds Try again inactive, no r
   });
   sameOnAll(shapes);
   expect(shapes.webpage.code).toBe('RATE_LIMITED');
-  expect(shapes.webpage.paragraphs[0]).toBe('Rate limit reached');
+  expect(shapes.webpage.paragraphs[0]).toBe('Groq returned an error');
+  expect(shapes.webpage.paragraphs.join(' ')).toContain('HTTP 429');
 });
 
 test('offline: says the computer is offline and offers Try again, which recovers; same on all surfaces', async () => {

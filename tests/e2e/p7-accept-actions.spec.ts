@@ -20,10 +20,8 @@ import { SEL, tb } from './spike-b-support/toolbar';
 // by the test, and the request is inspected: selection, same-page context (at most 1,000
 // characters combined), nothing about the file, the key only in the Authorization header.
 let h: AcceptHarness;
-let noVoices = false;
 test.beforeAll(async () => {
   h = await startAcceptHarness({ key: true });
-  noVoices = await h.noVoices();
 });
 test.afterAll(async () => {
   await h?.close();
@@ -82,8 +80,8 @@ test('a double-clicked word shows the shared toolbar with Listen and Explain, an
   });
 });
 
-test('Listen on this machine (no voices): the honest message and the Linux hint, no spinner, and no Groq call', async () => {
-  test.skip(!noVoices, 'This machine has voices; the no-voice path does not apply.');
+test('Listen without voices: an honest message with platform advice, no spinner, and no Groq call', async () => {
+  await installScriptedTts(h.ext.serviceWorker, []);
   await withReader('basic-1page.pdf', async (reader) => {
     h.groq.reset();
     await dblclickWord(reader.page, 1, 'zeppelin');
@@ -93,10 +91,12 @@ test('Listen on this machine (no voices): the honest message and the Linux hint,
     await listen.waitMessage();
     expect(await listen.toolbar.text(LISTEN.message)).toBe("Voice isn't available on this device.");
     expect(await listen.toolbar.text(LISTEN.hint)).toBe(
-      'Install speech-dispatcher and a voice such as espeak-ng, then restart Chrome.',
+      process.platform === 'linux'
+        ? 'Install speech-dispatcher and a voice such as espeak-ng, then restart Chrome.'
+        : 'Install a text-to-speech voice in your system settings, then restart Chrome.',
     );
     expect(await listen.listenButton()).toMatchObject({
-      label: 'Listen',
+      label: 'Speak',
       state: null,
       disabled: null,
       spinner: false,
@@ -450,7 +450,7 @@ test.describe('Listen with a (scripted) voice, the positive path', () => {
       });
       // Stop.
       await listen.click('listen');
-      await listen.waitLabel('Listen');
+      await listen.waitLabel('Speak');
       expect(await scriptedStops(worker)).toBeGreaterThan(0);
       // Slow, then the audio finishes: Replay.
       await listen.click('slow');

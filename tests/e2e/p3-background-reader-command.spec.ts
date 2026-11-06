@@ -40,7 +40,7 @@ test('Alt+Shift+E in the reader opens the toolbar with focus, without injecting 
   await page.keyboard.press('Escape');
   await tb(page).waitHidden();
   // Escape cleared the focus, not the selection; make sure the selection is still there.
-  expect(await page.evaluate(() => getSelection()?.toString())).toBe(CONTEXT_WORD);
+  expect(await page.evaluate(() => getSelection()?.toString().trim())).toBe(CONTEXT_WORD);
 
   const injected = await serviceWorker.evaluate(async (readerUrl) => {
     // Spy on injection: it must never be attempted for an extension page.

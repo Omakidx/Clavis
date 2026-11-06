@@ -374,6 +374,7 @@ test.describe('journey 2 with the real browser UI: site access declined, found f
     const settingsHelp = await settings.getByTestId('site-access-help').first().innerText();
     // The button the help names is on this screen, and so is the toolbar setting it mentions.
     await expect(settings.getByRole('button', { name: paths.enableButton })).toBeVisible();
+    await settings.getByRole('link', { name: 'Preferences', exact: true }).click();
     await expect(
       settings.getByRole('group', { name: 'When to show the toolbar' }).getByRole('radio', {
         name: new RegExp(`^${paths.toolbarSetting}`),
@@ -489,6 +490,7 @@ test.describe('journey 2 with the real browser UI: site access declined, found f
     await auto.close();
 
     // "Only when I ask": the toolbar stays hidden by itself even with access on (the help warns of it) ...
+    await settings.getByRole('link', { name: 'Preferences', exact: true }).click();
     await settings.getByRole('radio', { name: /^Only when I ask/ }).check();
     await settings.waitForTimeout(600);
     const quiet = await openArticle(world, '?auto=3');

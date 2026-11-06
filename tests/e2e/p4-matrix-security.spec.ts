@@ -63,6 +63,11 @@ test('with a toolbar showing, the page gets no shadow root, cannot press or dism
     );
     expect(await expectShown(page)).toBe(true);
 
+    const setup = await log.read();
+    expect(setup.filter((m) => m.fromTab).map((m) => JSON.parse(m.json))).toEqual([
+      { v: 1, type: 'LOAD_TOOLBAR' },
+    ]);
+
     // The page aims synthetic clicks at the middle of the Explain button.
     const [box, offset] = await Promise.all([
       toolbar(page).box(SEL.action('explain')),
@@ -94,7 +99,7 @@ test('with a toolbar showing, the page gets no shadow root, cannot press or dism
     expect(await toolbar(page).isShown(SEL.card)).toBe(false);
     expect(await toolbar(page).isShown()).toBe(true);
     expect(
-      (await log.read()).filter((m) => m.fromTab),
+      (await log.read()).slice(setup.length).filter((m) => m.fromTab),
       'no action reached the background',
     ).toEqual([]);
 

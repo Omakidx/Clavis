@@ -196,6 +196,9 @@ export async function keyboardExtend(
   await page.keyboard.down('Shift');
   for (let i = 0; i < characters; i++) await page.keyboard.press(forward);
   await page.keyboard.up('Shift');
+  // Unlike a pointer release, keyboard capture is debounced. The toolbar can still be visible
+  // for the initial double-clicked word; let the final Shift+arrow selection reach it before clicks.
+  await page.waitForTimeout(80);
 }
 
 /**

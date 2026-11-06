@@ -182,7 +182,10 @@ test('Lookup opens recursive results in one card and Back restores cached parent
       if (await card.exists(LOOKUP)) await card.click(LOOKUP);
       expect(prompts.map((prompt) => prompt.selected)).toEqual(['cartographer']);
 
-      // Restore the original card after the outside selection; reopening the cached parent is free.
+      // An outside selection can clear the previous root asynchronously. Start a fresh document
+      // for the recursive-navigation assertions instead of racing that selection observer timer.
+      await page.reload();
+      prompts.length = 0;
       await dblclickText(page, page, 'cartographer');
       await toolbar.waitShown();
       await toolbar.click('explain');

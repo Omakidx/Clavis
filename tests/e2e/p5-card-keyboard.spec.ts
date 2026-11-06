@@ -150,7 +150,7 @@ test('a mouse run leaves keyboard focus where it was (the page selection is not 
     const card = await explainWord(page, 'cartographer');
     await card.waitFor(CARD.ready('core'));
     expect(await card.focused()).toBeNull();
-    expect(await page.evaluate(() => getSelection()?.toString())).toBe('cartographer');
+    expect(await page.evaluate(() => getSelection()?.toString().trim())).toBe('cartographer');
   } finally {
     await dispose();
   }

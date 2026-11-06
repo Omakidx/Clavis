@@ -2,6 +2,8 @@ name: CI
 
 on:
   push:
+    branches: [main]
+    tags: ['v*']
   pull_request:
 
 # Least privilege: no job needs to write to the repository or to issues/PRs.
@@ -88,19 +90,23 @@ jobs:
         with:
           name: clavis-chrome-zip
           path: .output/*-chrome.zip
+          # .output is hidden; only the audited ZIPs selected by this pattern are uploaded.
+          include-hidden-files: true
           if-no-files-found: error
           retention-days: 14
 
-  e2e:
-    name: E2E (${{ matrix.os }})
+  e2e-shards:
+    name: Browser suite (${{ matrix.os }}, shard ${{ matrix.shard }})
     needs: checks
     runs-on: ${{ matrix.os }}
-    # The Phase 9 performance specs (memory on an 800-page PDF, toolbar latency in rounds, AI card
-    # overhead) add a few minutes; they assert generous ceilings, never tight timings.
+    # Keep one browser worker per runner, but split the full suite across four runners per OS.
+    # The unsharded 1,000+ tests exceed the job limit, especially with failure retries.
     timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
+        shard: [1, 2, 3, 4]
+        os: [ubuntu-latest, windows-latest, macos-latest]
         include:
           - os: ubuntu-latest
             # Linux needs the system libraries Chromium links against.
@@ -124,27 +130,49 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build extension
-        run: npm run build
+      - name: Build and package extension
+        # ZIP acceptance tests inspect the package on this runner, not the artifact of another job.
+        run: npm run zip
 
       # Playwright's bundled Chromium, not Chrome: branded Chrome 137+ ignores --load-extension.
       - name: Install Playwright Chromium
         run: npm run e2e:install -- ${{ matrix.playwright-install-args }}
 
+      - name: Install Japanese fonts for vertical-writing fixtures
+        if: runner.os == 'Linux'
+        run: sudo apt-get install -y fonts-noto-cjk
+
       # The fixture uses Chromium's new headless mode, which supports extensions, so no xvfb is needed.
       - name: Run E2E tests
-        run: npm run test:e2e
+        run: npm run test:e2e -- --shard=${{ matrix.shard }}/4
 
       - name: Upload Playwright report
         if: failure()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: playwright-report-${{ matrix.os }}
+          name: playwright-report-${{ matrix.os }}-${{ matrix.shard }}
           path: |
             playwright-report/
             test-results/
           if-no-files-found: ignore
           retention-days: 7
+
+  # Preserve the required branch-protection check names. A gate succeeds only when every
+  # browser shard on all supported operating systems succeeded; skips/cancellation fail closed.
+  e2e:
+    name: E2E (${{ matrix.os }})
+    needs: e2e-shards
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    steps:
+      - name: Require every browser shard to pass
+        env:
+          BROWSER_RESULT: ${{ needs.e2e-shards.result }}
+        run: test "$BROWSER_RESULT" = success
 
   # Drives Chrome's real native UI (permission prompt, toolbar popup, context menu, keyboard
   # shortcut) with xdotool on a virtual display. Catches bugs that tab-opened extension pages
@@ -259,5 +287,6 @@ jobs:
           path: |
             .output/clavis-*-chrome.zip
             .output/clavis-*-chrome.zip.sha256
+          include-hidden-files: true
           if-no-files-found: error
           retention-days: 90

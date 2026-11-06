@@ -45,7 +45,7 @@ export function Reader() {
   const findBar = useFindBar(controller, containerRef);
   const hasPages = SHOWS_PAGES.has(state.phase);
 
-  useReaderSelection(containerRef, renderCount);
+  useReaderSelection(containerRef, renderCount, hasPages ? openCount : null);
   useReaderShortcuts({
     controller,
     containerRef,

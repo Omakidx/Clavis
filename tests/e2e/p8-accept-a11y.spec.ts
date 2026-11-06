@@ -165,7 +165,7 @@ test('side panel: empty, loaded, loading error and long answer are accessible', 
   await dispose();
 });
 
-test('toolbar action buttons are touch-sized and visible focus rings exist', async () => {
+test('toolbar action buttons are touch-sized and show keyboard focus with a surface change', async () => {
   const { page, dispose } = await openWebpage(world, 'article.html?f=1');
   await page.bringToFront();
   await dblclickText(page, page, 'cartographer');
@@ -175,12 +175,26 @@ test('toolbar action buttons are touch-sized and visible focus rings exist', asy
     expect(box.height, action).toBeGreaterThanOrEqual(32);
     expect(box.width, action).toBeGreaterThanOrEqual(44);
   }
+  await page.keyboard.press('Tab');
   await tb(page).focusAction('explain');
-  const ring = await tb(page).evalIn<{ style: string; width: number }>(
+  const focus = await tb(page).evalIn<{
+    outline: string;
+    visible: boolean;
+    background: string;
+    resting: string;
+  }>(
     SEL.action('explain'),
-    `function () { const s = getComputedStyle(this); return { style: s.outlineStyle, width: parseFloat(s.outlineWidth) }; }`,
+    `function () {
+      const s = getComputedStyle(this);
+      const background = s.backgroundColor;
+      const outline = s.outlineStyle;
+      const visible = this.matches(':focus-visible');
+      this.blur();
+      return { background, outline, visible, resting: getComputedStyle(this).backgroundColor };
+    }`,
   );
-  expect(ring?.style).not.toBe('none');
-  expect(ring?.width).toBeGreaterThanOrEqual(2);
+  expect(focus?.visible).toBe(true);
+  expect(focus?.outline).toBe('none');
+  expect(focus?.background).not.toBe(focus?.resting);
   await dispose();
 });

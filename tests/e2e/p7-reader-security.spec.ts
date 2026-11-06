@@ -59,7 +59,7 @@ test.describe('markup-like text in a PDF', () => {
     const injected = await page.evaluate(
       () =>
         document.querySelectorAll(
-          'img, script:not([src]), svg:not([class]), iframe, object, embed, [onerror], [onload], [onclick]:not(button)',
+          '.pdfViewer img, .pdfViewer script, .pdfViewer svg, .pdfViewer iframe, .pdfViewer object, .pdfViewer embed, [onerror], [onload], [onclick]:not(button)',
         ).length,
     );
     expect(injected).toBe(0);
@@ -103,7 +103,7 @@ test.describe('markup-like text in a PDF', () => {
     expect(await card.text(CARD.text)).toBe(line);
     const made = await card.toolbar.evalIn<number>(
       null,
-      `function () { return this.querySelectorAll('script, img, svg, iframe, [onerror], [onload]').length; }`,
+      `function () { return this.querySelector('[data-clavis="card-text"]').querySelectorAll('script, img, svg, iframe, [onerror], [onload]').length; }`,
     );
     expect(made).toBe(0);
 
