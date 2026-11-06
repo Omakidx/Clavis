@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { EXPLAIN_CARD_SCRIPT_FILE } from '../../../lib/config/constants';
+import { EXPLAIN_CARD_SCRIPT_FILE, TOOLBAR_SCRIPT_FILE } from '../../../lib/config/constants';
 import {
   loadExplainCardResultSchema,
   messageReplySchema,
@@ -18,7 +18,6 @@ import {
 } from './harness';
 
 const INVALID = { ok: false, error: { code: 'INVALID_REQUEST' } };
-const load = CARD_MESSAGES['LOAD_EXPLAIN_CARD'];
 const openSettings = CARD_MESSAGES['OPEN_SETTINGS'];
 
 const frame = (tabId: number, frameId: number, documentId?: string, url?: string) => ({
@@ -35,7 +34,11 @@ const deferred = () => {
   return { promise, resolve };
 };
 
-describe('LOAD_EXPLAIN_CARD', () => {
+describe.each([
+  ['LOAD_EXPLAIN_CARD', EXPLAIN_CARD_SCRIPT_FILE],
+  ['LOAD_TOOLBAR', TOOLBAR_SCRIPT_FILE],
+])('%s', (type, script) => {
+  const load = { v: 1, type };
   it('injects the card script into exactly the sender document (tab and document from the sender)', async () => {
     const h = createHarness();
     const response = await h.call(load, frame(7, 3, 'doc-a'));
@@ -46,15 +49,15 @@ describe('LOAD_EXPLAIN_CARD', () => {
     expect(h.injection.scripting.executeScript).toHaveBeenCalledTimes(1);
     expect(h.injection.scripting.executeScript).toHaveBeenCalledWith({
       target: { tabId: 7, documentIds: ['doc-a'] },
-      files: [EXPLAIN_CARD_SCRIPT_FILE],
+      files: [script],
     });
     // Without a documentId (never on Chrome 147+) it falls back to the frame.
     await h.call(load, frame(7, 3));
     expect(h.injection.scripting.executeScript).toHaveBeenLastCalledWith({
       target: { tabId: 7, frameIds: [3] },
-      files: [EXPLAIN_CARD_SCRIPT_FILE],
+      files: [script],
     });
-    expect(EXPLAIN_CARD_SCRIPT_FILE).toBe('explain-card.js');
+    expect(script).toBe(type === 'LOAD_TOOLBAR' ? 'toolbar.js' : 'explain-card.js');
   });
 
   it('never targets all frames, and the message cannot choose the target', async () => {

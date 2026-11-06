@@ -48,6 +48,7 @@ const CONTENT_ROUTES = [
   'GET_PUBLIC_SETTINGS',
   'GET_AI_STATUS',
   'LOAD_EXPLAIN_CARD',
+  'LOAD_TOOLBAR',
   'OPEN_SETTINGS',
   'OPEN_SIDE_PANEL',
 ] as const;
@@ -112,7 +113,7 @@ describe('the route table, against the policy', () => {
     expect(new Set(types).size).toBe(types.length);
   });
 
-  it('a website content script (in any frame) may call only the nine content routes and never a key, settings, voice, site-access, inject or panel-state route', () => {
+  it('a website content script (in any frame) may call only the declared content routes and never a key, settings, voice, site-access, inject or panel-state route', () => {
     for (const name of [
       'content',
       'content (iframe of a web page)',

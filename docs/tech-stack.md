@@ -12,7 +12,7 @@
 | Extension framework | **WXT** | Multiple entrypoints, MV3 manifest generation, build/zip workflow | Removes manifest/build boilerplate; supports React and TS |
 | Language | **TypeScript, strict mode** | Compile-time correctness | Shared request contracts for content, PDF and background |
 | UI | **React** | Onboarding, settings, reader, side panel, explanation card | Reusable compositional UI |
-| On-page toolbar | **Preact**, bundled in the observer (D-08, decided by Spike B) | Selection toolbar on websites | Measured 60 ms first-toolbar p95 vs ~230 ms for lazily loaded React |
+| On-page toolbar | **Preact**, injected on first selection (D-08, revised 2026-11-06) | Selection toolbar on websites | Measured 60 ms first-toolbar p95 vs ~230 ms for lazily loaded React |
 | Selection observer | **Plain TypeScript** + the Preact toolbar | Always-loaded content script on granted sites | 11.8 KB gzip total |
 | CSS | **Plain CSS with design tokens** (CSS custom properties), classes namespaced `clavis-*` (D-19) | Styling and responsive design | No global resets that would shift the PDF.js text layer; on-page styles stay inside the toolbar's Shadow DOM |
 | UI primitives | Semantic HTML first; individual **Radix UI** primitives only where a pattern needs them (e.g. tabs in the Phase 5 card) | Dialogs, tabs, popovers and a11y patterns | Avoid custom keyboard/focus logic; no shadcn/Tailwind dependency (D-19) |
@@ -150,8 +150,8 @@ This is **illustrative**. Validate module availability and WXT config shape for 
 
 | Item | Target (revisit after Spike B) |
 | --- | --- |
-| Always-loaded observer (with the bundled Preact toolbar) | ≤ 18 KB gzipped (D-20; was 15 KB); no work until a `selectionchange` |
-| UI loaded on first qualifying selection | ≤ 60 KB gzipped including styles |
+| Always-loaded observer (UI injected separately) | ≤ 18 KB gzipped (D-20; was 15 KB); no work until a `selectionchange` |
+| UI loaded on first qualifying selection | ≤ 18 KB gzipped including Preact, artwork, and styles (`toolbar.js`) |
 | First toolbar on a page | ≤ 150 ms p95 from selection end, including UI load |
 | Later toolbars on the same page | ≤ 50 ms p95 |
 

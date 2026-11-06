@@ -1,4 +1,4 @@
-import { bundledPreactLoader } from '../components/tooltip/bundled-loader';
+import { loadToolbar } from '../lib/selection/toolbar-loader';
 import { t } from '../lib/i18n';
 import { createSelectionController } from '../lib/selection/controller';
 import { loadedExplainCard, loadExplainCard } from '../lib/selection/card-loader';
@@ -13,9 +13,8 @@ import {
 } from '../lib/selection/ui-api';
 import { isOpenSelectionMessage } from '../lib/site-access/messages';
 
-// Framework-free selection observer with a bundled Preact toolbar (D-08, spike B option c;
-// budget <= 18 KB gzipped for the whole file, D-20). Do not import React or the explanation card
-// (components/explanation) here: the card is its own bundle, loaded on the first Explain click.
+// Framework-free selection observer (budget <= 18 KB gzip, D-20). Toolbar and card UI are
+// injected separately by the background on first use. Never import their UI or artwork here.
 //
 // D-02: registered at RUNTIME via browser.scripting.registerContentScripts after the
 // user grants optional host permissions (lib/site-access), so it never appears in the
@@ -58,7 +57,7 @@ export default defineUnlistedScript({
       dismiss: (context) => loadedExplainCard()?.dismiss(context.snapshot.selectionId),
     };
 
-    const controller = createSelectionController({ loadToolbar: bundledPreactLoader, actions });
+    const controller = createSelectionController({ loadToolbar, actions });
     const onMessage = (
       message: unknown,
       sender: { id?: string } | undefined,

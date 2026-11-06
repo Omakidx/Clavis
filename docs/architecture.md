@@ -22,7 +22,7 @@
 | A-010 | Future provider interface from day one | Later OpenRouter/Gemini support | v1 contains only `GroqProvider`; no premature complex router |
 | A-011 | Optional all-sites access + runtime content-script registration, with `activeTab` fallback (D-02) | Automatic toolbar for consenting users; on-demand use for everyone else | Two injection paths to test; manifest has no static `content_scripts` for websites |
 | A-012 | Core request + lazy per-tab requests (D-05) | One request per Explain; free-tier friendly | Mode set and schemas differ from a "one mode per tab" design; per-selection in-memory result cache |
-| A-013 | Tiny always-on observer with a bundled Preact toolbar; card loaded on first Explain (D-08) | Page weight and 150 ms toolbar target | Chosen by Spike B measurement (see §5) |
+| A-013 | Tiny always-on observer; Preact toolbar injected on first selection and card on first Lookup (D-08) | Page weight and 150 ms toolbar target | Chosen by Spike B measurement (see §5) |
 | A-014 | Extension-page CSP allows `wasm-unsafe-eval` only and blocks media, frames, form posts and `<base>` (D-17) | PDF.js wasm decoders | ZIP audit enforces the exact CSP |
 
 ## 2. Container/context architecture
@@ -190,7 +190,7 @@ All result strings are **plain text** (D-10). The UI renders them as text nodes;
 
 **Response normalization:** ask Groq for a **mode-specific minimal JSON schema** — `core` returns `title`, `summary`, `contextualMeaning`, `definition`, `examples` (2), optional `caveat`; each lazy mode returns only its own field(s). The adapter converts valid output into the unified response. Check which structured-output modes the chosen model supports; do not assume strict JSON Schema support on every Groq model. If schema mode fails due to unsupported capability, fall back to supported JSON mode with strong validation, or show an actionable error.
 
-**Phase 5 additions.** `AI_EXPLAIN` may carry `acknowledgeDisclosure: true` (only from content scripts, `/reader.html`, `/practice.html`, after a trusted click on the one-time first-send prompt); when the disclosure was never acknowledged the reply is `SETUP_REQUIRED` with `reason: 'disclosure'`. `LOAD_EXPLAIN_CARD` (website content scripts only) injects `explain-card.js` into exactly the sender's frame, once per document. `OPEN_SETTINGS` opens Settings at an optional section. The card renders into a slot inside the toolbar's closed shadow root via an isolated-world registry; it never reaches the page.
+**Phase 5 additions.** `AI_EXPLAIN` may carry `acknowledgeDisclosure: true` (only from content scripts, `/reader.html`, `/practice.html`, after a trusted click on the one-time first-send prompt); when the disclosure was never acknowledged the reply is `SETUP_REQUIRED` with `reason: 'disclosure'`. `LOAD_EXPLAIN_CARD` and `LOAD_TOOLBAR` (website content scripts only) inject their fixed packaged UI scripts into exactly the sender document. No message may choose a target or script path. `OPEN_SETTINGS` opens Settings at an optional section. The card renders into a slot inside the toolbar's closed shadow root via an isolated-world registry; it never reaches the page.
 
 **Phase 8 additions (side panel, FR-042).** Two routes with their own contract file (`lib/contracts/sidepanel.ts`) and the only message size bound above 32 KiB (`LIMITS.maxHandoffBytes`, 128 KiB: a snapshot plus up to six loaded results at full field size):
 
@@ -290,7 +290,9 @@ sequenceDiagram
 
 Whichever is chosen must meet the 150 ms p95 target for the first selection on a page.
 
-**Decision (Spike B, D-08): option (c).** Measured on the dev machine (n=30 page loads, first selection → toolbar visible, p50/p95): (a) 138/239 ms, (b) 129/231 ms, (c) **33/60 ms**; at 4× CPU slowdown (c) was 97/144 ms. The always-loaded observer with the Preact toolbar is 11.8 KB gzip. The explanation card is loaded on the first Explain click, not on selection. Details: [spike-b-toolbar.md](decisions/spike-b-toolbar.md).
+**Original decision (Spike B, D-08): option (c).** Measured on the dev machine (n=30 page loads, first selection → toolbar visible, p50/p95): (a) 138/239 ms, (b) 129/231 ms, (c) **33/60 ms**; at 4× CPU slowdown (c) was 97/144 ms. The always-loaded observer with the Preact toolbar is 11.8 KB gzip. The explanation card is loaded on the first Explain click, not on selection. Details: [spike-b-toolbar.md](decisions/spike-b-toolbar.md).
+
+**2026-11-06 revision:** the redesigned artwork made the bundled observer 22.36 KB gzip, exceeding the unchanged 18 KB limit. `observer.js` now requests `LOAD_TOOLBAR` only on the first qualifying selection or explicit toolbar action. The background injects packaged `toolbar.js` into the exact sender document; its Preact factory registers on an isolated-world symbol and is reused until navigation/runtime teardown. The new route has a strict payload with no target/file fields, accepts website content scripts only, and shares the existing card injection authorization and document targeting. Concurrent loads share an injection, while failed loads can retry. The controller already discards stale selections and destroys late handles after stop. Neither UI script is web-accessible, and no permissions or external requests are added. The toolbar has its own 18 KB gzip gate; the first/repeat selection latency targets remain unchanged.
 
 ### Tooltip UI state machine
 

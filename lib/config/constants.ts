@@ -136,6 +136,8 @@ export const MODE_FEATURE_FLAGS = {
  * named `explain-card` at this path.
  */
 export const EXPLAIN_CARD_SCRIPT_FILE = 'explain-card.js';
+/** Toolbar UI, injected only for the first selection in a website document. */
+export const TOOLBAR_SCRIPT_FILE = 'toolbar.js';
 
 /** Settings page sections OPEN_SETTINGS can jump to (anchor ids in the options page). */
 export const SETTINGS_SECTION_ANCHORS = {

@@ -84,6 +84,7 @@ export const PUBLIC_MESSAGES: Record<string, unknown> = {
 
 /** Public routes with their own, narrower sender rules (not part of the generic public matrix). */
 export const CARD_MESSAGES: Record<string, unknown> = {
+  LOAD_TOOLBAR: { v: 1, type: 'LOAD_TOOLBAR' },
   LOAD_EXPLAIN_CARD: { v: 1, type: 'LOAD_EXPLAIN_CARD' },
   OPEN_SETTINGS: { v: 1, type: 'OPEN_SETTINGS' },
 };

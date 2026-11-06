@@ -92,7 +92,7 @@ export const GET_SIDE_PANEL_STATE_SENDERS: SenderRule = { pages: [sidepanel] };
 export const KEY_SENDERS: SenderRule = { pages: [options, onboarding] };
 
 /**
- * LOAD_EXPLAIN_CARD: website content scripts only. It injects into the SENDER's own frame, so a
+ * LOAD_EXPLAIN_CARD / LOAD_TOOLBAR: website content scripts only. They inject into the SENDER's own frame, so a
  * page that is not ours (the reader, the practice page) has nothing to load, and no extension
  * page may inject a script into a tab on a content script's behalf.
  */
@@ -247,6 +247,9 @@ export function buildRoutes(services: RouteServices): Route[] {
     publicRoute('GET_PUBLIC_SETTINGS', () => ai.getPublicSettings(), { allow: PANEL_SENDERS }),
     publicRoute('GET_AI_STATUS', () => ai.getAiStatus()),
     publicRoute('LOAD_EXPLAIN_CARD', (_message, context) => card.loadExplainCard(context), {
+      allow: CARD_LOAD_SENDERS,
+    }),
+    publicRoute('LOAD_TOOLBAR', (_message, context) => card.loadToolbar(context), {
       allow: CARD_LOAD_SENDERS,
     }),
     publicRoute(

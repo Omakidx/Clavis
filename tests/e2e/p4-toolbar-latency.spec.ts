@@ -22,7 +22,7 @@ import { tb } from './spike-b-support/toolbar';
 // Phase 4 re-measurement of the toolbar latency budgets (docs/tech-stack.md section 6) on the
 // PRODUCTION build (the Spike B variant builds are gone, D-08): selection end -> toolbar visible.
 //
-//   first   the first selection on a fresh page load (UI is bundled, nothing is loaded)
+//   first   the first selection on a fresh page load (includes on-demand toolbar injection)
 //   repeat  Escape, then select another word on the same page
 //
 // Method (see tests/e2e/spike-b-support/measure.ts and docs/decisions/spike-b-toolbar.md):

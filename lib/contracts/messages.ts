@@ -35,6 +35,9 @@ export const loadExplainCardMessageSchema = z.strictObject({
   type: z.literal('LOAD_EXPLAIN_CARD'),
 });
 
+/** Inject only the packaged toolbar into the browser-supplied sender document. */
+export const loadToolbarMessageSchema = z.strictObject({ v, type: z.literal('LOAD_TOOLBAR') });
+
 /** Card / practice page / reader → background: open the Settings page, optionally at a section. */
 export const openSettingsMessageSchema = z.strictObject({
   v,
@@ -83,6 +86,7 @@ export const publicMessageSchema = z.discriminatedUnion('type', [
   getPublicSettingsMessageSchema,
   getAiStatusMessageSchema,
   loadExplainCardMessageSchema,
+  loadToolbarMessageSchema,
   openSettingsMessageSchema,
 ]);
 export type PublicMessage = z.infer<typeof publicMessageSchema>;

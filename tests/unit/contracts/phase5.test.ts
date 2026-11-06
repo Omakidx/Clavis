@@ -5,6 +5,7 @@ import {
   etymologyModelOutputSchema,
   explainResultSchema,
   loadExplainCardMessageSchema,
+  loadToolbarMessageSchema,
   messageReplySchema,
   openSettingsMessageSchema,
   parsePrivilegedMessage,
@@ -36,7 +37,7 @@ describe('Phase 5 contract additions', () => {
     ).toBe(false);
   });
 
-  it('LOAD_EXPLAIN_CARD and OPEN_SETTINGS are public routes with strict shapes', () => {
+  it('LOAD_EXPLAIN_CARD, LOAD_TOOLBAR and OPEN_SETTINGS are public routes with strict shapes', () => {
     expect(
       loadExplainCardMessageSchema.safeParse({ v: 1, type: 'LOAD_EXPLAIN_CARD' }).success,
     ).toBe(true);
@@ -55,6 +56,10 @@ describe('Phase 5 contract additions', () => {
     expect(
       openSettingsMessageSchema.safeParse({ v: 1, type: 'OPEN_SETTINGS', section: 'other' })
         .success,
+    ).toBe(false);
+    expect(parsePublicMessage({ v: 1, type: 'LOAD_TOOLBAR' }).ok).toBe(true);
+    expect(
+      loadToolbarMessageSchema.safeParse({ v: 1, type: 'LOAD_TOOLBAR', files: ['bad.js'] }).success,
     ).toBe(false);
     expect(parsePublicMessage({ v: 1, type: 'LOAD_EXPLAIN_CARD' }).ok).toBe(true);
     expect(parsePublicMessage({ v: 1, type: 'OPEN_SETTINGS' }).ok).toBe(true);

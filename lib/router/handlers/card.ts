@@ -1,4 +1,4 @@
-import { EXPLAIN_CARD_SCRIPT_FILE } from '../../config/constants';
+import { EXPLAIN_CARD_SCRIPT_FILE, TOOLBAR_SCRIPT_FILE } from '../../config/constants';
 import type { LoadExplainCardResult, MessageReply } from '../../contracts';
 import { logger } from '../../security/logger';
 import {
@@ -24,18 +24,22 @@ function isCardInjectable(url: string | undefined): boolean {
 type LoadReply = MessageReply<LoadExplainCardResult>;
 
 /**
- * LOAD_EXPLAIN_CARD: inject the card script (D-08, loaded on the first Explain, never with the
+ * LOAD_EXPLAIN_CARD / LOAD_TOOLBAR: inject packaged UI (D-08, loaded on demand, never with the
  * observer) into exactly the sender's frame: `target: { tabId, frameIds: [frameId] }`, both read
  * from the browser-provided sender, never from the message. The card script is a content script
  * bundle that guards itself with an isolated-world global, so injecting twice is harmless; the
- * handler also avoids it: one injection per document (`documentId` changes on navigation), and
- * concurrent requests for the same frame share one `executeScript` call.
+ * concurrent requests for the same script and document share one `executeScript` call.
  */
 export function createCardHandlers(deps: CardLoaderDeps) {
   const file = deps.file ?? EXPLAIN_CARD_SCRIPT_FILE;
   const pending = new Map<string, Promise<LoadReply>>();
 
-  async function inject(tabId: number, frameId: number, documentId: string | undefined) {
+  async function inject(
+    tabId: number,
+    frameId: number,
+    documentId: string | undefined,
+    script: string,
+  ) {
     try {
       await deps.scripting.executeScript({
         // The exact document when Chrome told us which: a frame that navigated while this request
@@ -46,7 +50,7 @@ export function createCardHandlers(deps: CardLoaderDeps) {
             : { tabId, documentIds: [documentId] },
         // Typed as WXT's generated public paths in the injection module; the card entrypoint
         // belongs to another workstream, so the path is a plain string constant here.
-        files: [file as never],
+        files: [script as never],
       });
     } catch (error) {
       const reason = classifyInjectError(error);
@@ -58,19 +62,21 @@ export function createCardHandlers(deps: CardLoaderDeps) {
     return success<LoadExplainCardResult>({ loaded: true });
   }
 
+  async function load(context: RouteContext, script: string): Promise<LoadReply> {
+    const { tabId, frameId, documentId, url } = context.sender;
+    // A content script always has a tab and a frame; anything else is not a page we can target.
+    if (tabId === undefined || frameId === undefined) return failure('INVALID_REQUEST');
+    if (!isCardInjectable(url)) return failure('UNSUPPORTED_SITE');
+    const key = `${script}:${documentId ?? `${tabId}:${frameId}`}`;
+    const inFlight = pending.get(key);
+    if (inFlight !== undefined) return inFlight;
+    const run = inject(tabId, frameId, documentId, script).finally(() => pending.delete(key));
+    pending.set(key, run);
+    return run;
+  }
   return {
-    async loadExplainCard(context: RouteContext): Promise<LoadReply> {
-      const { tabId, frameId, documentId, url } = context.sender;
-      // A content script always has a tab and a frame; anything else is not a page we can target.
-      if (tabId === undefined || frameId === undefined) return failure('INVALID_REQUEST');
-      if (!isCardInjectable(url)) return failure('UNSUPPORTED_SITE');
-      const key = documentId ?? `${tabId}:${frameId}`;
-      const inFlight = pending.get(key);
-      if (inFlight !== undefined) return inFlight;
-      const run = inject(tabId, frameId, documentId).finally(() => pending.delete(key));
-      pending.set(key, run);
-      return run;
-    },
+    loadExplainCard: (context: RouteContext) => load(context, file),
+    loadToolbar: (context: RouteContext) => load(context, TOOLBAR_SCRIPT_FILE),
   };
 }
 
