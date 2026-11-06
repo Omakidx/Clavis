@@ -1,5 +1,7 @@
 import { createHash } from 'node:crypto';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { expect, test } from '@playwright/test';
 import * as pdfjs from 'pdfjs-dist/legacy/build/pdf.mjs';
 import { acceptDir, acceptManifest, acceptPath } from './p7-accept-support/manifest';
@@ -92,7 +94,9 @@ test('every authored line is present in the real PDF.js text of its page', async
     const task = pdfjs.getDocument({
       data: new Uint8Array(readFileSync(acceptPath(entry.file))),
       verbosity: 0,
-      cMapUrl: new URL('../../node_modules/pdfjs-dist/cmaps/', import.meta.url).pathname,
+      cMapUrl: fileURLToPath(new URL('../../node_modules/pdfjs-dist/cmaps/', import.meta.url))
+        .split(path.sep)
+        .join('/'),
       cMapPacked: true,
       ...(entry.password === undefined ? {} : { password: entry.password }),
     });

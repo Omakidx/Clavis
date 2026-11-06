@@ -238,6 +238,29 @@ describe('selection controller', () => {
     expect(toolbar.shown).toHaveLength(1);
   });
 
+  it('Escape also dismisses a keyboard extension that has not passed its capture debounce', async () => {
+    const toolbar = fakeToolbar();
+    controller = createSelectionController({
+      loadToolbar: (options) => {
+        handed = options.actions;
+        return Promise.resolve(toolbar);
+      },
+    });
+    selectText('river');
+    mouseUp();
+    await vi.advanceTimersByTimeAsync(0);
+    selectText('river and the old mill');
+    document.dispatchEvent(new KeyboardEvent('keyup', { key: 'ArrowRight', bubbles: true }));
+    loadedActions(toolbar)?.dismiss?.({
+      snapshot: toolbar.shown[0]!.snapshot,
+      overLimit: false,
+      reason: 'escape',
+    });
+    document.dispatchEvent(new KeyboardEvent('keyup', { key: 'Escape', bubbles: true }));
+    await vi.advanceTimersByTimeAsync(200);
+    expect(toolbar.shown).toHaveLength(1);
+  });
+
   it('showNotice loads the toolbar once and shows the message without any selection', async () => {
     const toolbar = fakeToolbar();
     const loadToolbar = vi.fn<ToolbarLoader>(() => Promise.resolve(toolbar));

@@ -67,7 +67,9 @@ function findZip(): string | undefined {
 function walk(dir: string, base = dir): string[] {
   return readdirSync(dir).flatMap((name) => {
     const full = path.join(dir, name);
-    return statSync(full).isDirectory() ? walk(full, base) : [path.relative(base, full)];
+    return statSync(full).isDirectory()
+      ? walk(full, base)
+      : [path.relative(base, full).split(path.sep).join('/')];
   });
 }
 
