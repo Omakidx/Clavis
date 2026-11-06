@@ -88,6 +88,8 @@ jobs:
         with:
           name: clavis-chrome-zip
           path: .output/*-chrome.zip
+          # .output is hidden; only the audited ZIPs selected by this pattern are uploaded.
+          include-hidden-files: true
           if-no-files-found: error
           retention-days: 14
 
@@ -259,5 +261,6 @@ jobs:
           path: |
             .output/clavis-*-chrome.zip
             .output/clavis-*-chrome.zip.sha256
+          include-hidden-files: true
           if-no-files-found: error
           retention-days: 90
