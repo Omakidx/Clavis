@@ -352,7 +352,9 @@ test.describe('unreadable answers (error catalog: "Bad/unsafe model JSON")', () 
     await page.setViewportSize({ width: 640, height: 360 });
     const card = await explainWord(page, WORD);
     await card.waitFor(CARD.ready('core'));
-    const box = await card.toolbar.box(CARD.card);
+    // The result expands before its ResizeObserver placement runs. Assert the settled visual
+    // bounds, rather than combining the new height with the loading card's previous position.
+    const box = await card.toolbar.stableBox(CARD.card);
     expect(box.y + box.height).toBeLessThanOrEqual(360 + 1);
     expect(box.x + box.width).toBeLessThanOrEqual(640 + 1);
     // The side panel is suggested for such a long answer (FR-042).

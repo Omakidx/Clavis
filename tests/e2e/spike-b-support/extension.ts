@@ -86,9 +86,22 @@ export async function launchExtension(options: ExtensionOptions = {}): Promise<L
     ...(options.headed === true ? { viewport: null } : {}),
     args: [`--disable-extensions-except=${copy.dir}`, `--load-extension=${copy.dir}`],
   });
-  const serviceWorker =
-    context.serviceWorkers()[0] ??
-    (await context.waitForEvent('serviceworker', { timeout: 15_000 }));
+  let serviceWorker: Worker;
+  try {
+    // Fresh-profile installation can take longer on Windows runners. This is a setup deadline,
+    // separate from the functional request, cancellation, and toolbar latency budgets.
+    serviceWorker =
+      context.serviceWorkers()[0] ??
+      (await context.waitForEvent('serviceworker', { timeout: 30_000 }));
+  } catch (error) {
+    // A failed beforeAll never receives the handle below, so it cannot close this browser itself.
+    await context.close().catch(() => undefined);
+    await copy.cleanup();
+    await rm(userDataDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }).catch(
+      () => undefined,
+    );
+    throw error;
+  }
   return {
     context,
     serviceWorker,

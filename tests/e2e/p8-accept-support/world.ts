@@ -41,6 +41,10 @@ export async function startWorld(options: WorldOptions): Promise<World> {
   const ext = await launchExtension({
     grantedSiteAccess: options.granted,
     ...(options.headed === true ? { headed: true } : {}),
+  }).catch(async (error: unknown) => {
+    // No World is returned on startup failure; release its fixture server before rethrowing.
+    await server.close();
+    throw error;
   });
   const groqUrls = trackGroqRequests(ext.context);
   const groq = await fakeGroq(ext.context);
