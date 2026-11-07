@@ -321,9 +321,10 @@ test.describe('FR-054 pages, zoom, page count, fit width', () => {
       const reader = await h.openReader({ width, height: 800 });
       await reader.openReady('basic-1page.pdf');
       await reader.setZoom('1');
-      const since = await reader.renderCount();
-      await reader.page.getByTestId(HOOK.fitWidth).click();
-      await reader.settle({ since });
+      // At the narrow breakpoint the toolbar button is hidden; the visible zoom select exposes
+      // the same preset and still lets us verify fit-width layout at this window size.
+      if (width === 700) await reader.setZoom('page-width');
+      else await reader.clickFitWidth();
       const m = await reader.viewer.evaluate((el) => ({
         client: el.clientWidth,
         scroll: el.scrollWidth,
@@ -341,8 +342,7 @@ test.describe('FR-054 pages, zoom, page count, fit width', () => {
   test('fit width FOLLOWS a window resize: the page shrinks and grows with the window, no horizontal scrollbar appears', async () => {
     const reader = await h.openReader({ width: 1200, height: 800 });
     await reader.openReady('basic-1page.pdf');
-    await reader.page.getByTestId(HOOK.fitWidth).click();
-    await reader.settle();
+    await reader.clickFitWidth();
     const measure = () =>
       reader.viewer.evaluate((el) => ({
         client: el.clientWidth,
@@ -405,8 +405,7 @@ test.describe('FR-054 pages, zoom, page count, fit width', () => {
     expect(await reader.currentPage()).toBe(50);
     await reader.setZoom('0.5');
     expect(await reader.currentPage()).toBe(50);
-    await reader.page.getByTestId(HOOK.fitWidth).click();
-    await reader.settle();
+    await reader.clickFitWidth();
     expect(await reader.currentPage()).toBe(50);
     await reader.page.close();
   });
@@ -425,8 +424,7 @@ test.describe('FR-054 pages, zoom, page count, fit width', () => {
       expect(Math.abs(box.width - (w * 4) / 3), `page ${n} width`).toBeLessThanOrEqual(2);
       expect(Math.abs(box.height - (h2 * 4) / 3), `page ${n} height`).toBeLessThanOrEqual(2);
     }
-    await reader.page.getByTestId(HOOK.fitWidth).click();
-    await reader.settle();
+    await reader.clickFitWidth();
     await reader.goToPage(5);
     expect(await reader.pageText(5)).toContain('1500 by 300 points');
     await reader.expectQuiet();
@@ -435,7 +433,7 @@ test.describe('FR-054 pages, zoom, page count, fit width', () => {
 });
 
 test.describe('FR-058 and FR-060 are not presented in v1', () => {
-  test('no way to open a URL, and no OCR, annotation or translation controls, in the empty or open reader', async () => {
+  test('no URL, OCR, annotation, sign, stamp or document translation controls; local highlights are allowed', async () => {
     const reader = await h.openReader();
     const surface = async () =>
       reader.page.evaluate(() => ({
@@ -449,10 +447,22 @@ test.describe('FR-058 and FR-060 are not presented in v1', () => {
       if (phase === 'open') await reader.openReady('basic-1page.pdf');
       const { urlInputs, controls } = await surface();
       expect(urlInputs, phase).toBe(0);
+      const highlightControls = controls.filter((name) => /\bhighlight\b/i.test(name));
+      expect(highlightControls.sort(), `${phase}: local highlight controls`).toEqual(
+        phase === 'open'
+          ? ['Highlight in blue', 'Highlight in green', 'Highlight in pink', 'Highlight in yellow']
+          : [],
+      );
       for (const name of controls) {
-        expect(name, `${phase}: control "${name}"`).not.toMatch(
-          /\b(url|web address|remote|ocr|recogni[sz]e|annotat|highlight|draw|sign|stamp|translate document|edit)\b/i,
-        );
+        if (/\bhighlight\b/i.test(name)) {
+          expect(name, `${phase}: nonlocal highlight control`).toMatch(
+            /^highlight in (yellow|green|blue|pink)$/i,
+          );
+        } else {
+          expect(name, `${phase}: control "${name}"`).not.toMatch(
+            /\b(url|web address|remote|ocr|recogni[sz]e|annotat|draw|sign|stamp|translate document|edit)\b/i,
+          );
+        }
       }
     }
     await reader.page.close();

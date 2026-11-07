@@ -276,8 +276,30 @@ export class Reader {
     const select = this.tid(HOOK.zoomSelect);
     if ((await select.inputValue()) === value) return;
     const since = await this.renderCount();
+    const beforeScale = await this.page
+      .locator('.pdfViewer')
+      .evaluate((el) => getComputedStyle(el).getPropertyValue('--scale-factor'));
     await select.selectOption(value);
-    await this.settle({ since });
+    await expect(select).toHaveValue(value);
+    const afterScale = await this.page
+      .locator('.pdfViewer')
+      .evaluate((el) => getComputedStyle(el).getPropertyValue('--scale-factor'));
+    // Selecting Fit width can preserve the current numeric scale. PDF.js does not rerender when
+    // the scale is unchanged, but it still applies the preset; in that case wait for quiet only.
+    await this.settle(beforeScale === afterScale ? {} : { since });
+  }
+
+  async clickFitWidth(): Promise<void> {
+    const since = await this.renderCount();
+    const beforeScale = await this.page
+      .locator('.pdfViewer')
+      .evaluate((el) => getComputedStyle(el).getPropertyValue('--scale-factor'));
+    await this.tid(HOOK.fitWidth).click();
+    await expect(this.tid(HOOK.zoomSelect)).toHaveValue('page-width');
+    const afterScale = await this.page
+      .locator('.pdfViewer')
+      .evaluate((el) => getComputedStyle(el).getPropertyValue('--scale-factor'));
+    await this.settle(beforeScale === afterScale ? {} : { since });
   }
 
   async zoomValue(): Promise<string> {
