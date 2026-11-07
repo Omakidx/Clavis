@@ -223,10 +223,24 @@ export class ToolbarProbe {
 
   /** Match locator actionability: do not click coordinates from a card's first, moving render. */
   async stableBox(selector: string) {
+    await this.page.bringToFront();
     let previous = await this.box(selector);
     const deadline = Date.now() + 1000;
     for (;;) {
-      await this.page.waitForTimeout(32);
+      // Two actual frames, rather than assuming a 60 Hz display: a loaded runner can take far
+      // longer than 32 ms to paint and apply the card's scheduled placement update.
+      await this.target.evaluate(
+        () =>
+          new Promise<void>((resolve, reject) => {
+            const timer = setTimeout(() => reject(new Error('Layout frames did not arrive')), 1000);
+            requestAnimationFrame(() =>
+              requestAnimationFrame(() => {
+                clearTimeout(timer);
+                resolve();
+              }),
+            );
+          }),
+      );
       const current = await this.box(selector);
       if (
         current.width > 0 &&

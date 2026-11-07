@@ -168,9 +168,13 @@ test.describe('stale answers', () => {
     const { page, dispose } = await h.open();
     let card = await explainWord(page, 'cartographer');
     await card.waitFor(CARD.ready('core'));
+    // The ready DOM can precede the ResizeObserver placement update. Wait until the expanded
+    // card settles so the click on the article cannot land on a moving card control instead.
+    await card.toolbar.stableBox(CARD.card);
     await selectWord(page, 'river');
-    // The toolbar follows the new selection at once; the old card is gone until Explain is pressed.
-    expect(await card.exists(CARD.card).catch(() => false)).toBe(false);
+    // Selection capture is debounced. Once it processes the new selection, the old card must be
+    // gone before Lookup is pressed; merely seeing the already-visible toolbar is not readiness.
+    await expect.poll(() => card.exists(CARD.card)).toBe(false);
     await tb(page).click('explain');
     card = cardOf(page);
     await card.waitFor(CARD.ready('core'));

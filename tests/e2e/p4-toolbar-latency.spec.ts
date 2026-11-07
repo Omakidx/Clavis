@@ -36,6 +36,10 @@ const RUNS = Number(process.env['CLAVIS_MEASURE_RUNS'] ?? 30);
 const STRICT = process.env['CLAVIS_LATENCY_STRICT'] === '1';
 const THROTTLE = 4;
 
+// Snapshot/screencast tracing changes frame timing, especially on macOS runners. Keep the
+// benchmark uninstrumented; its page-clock samples and machine-load report remain recorded.
+test.use({ trace: 'off' });
+
 interface Row {
   scenario: string;
   first: { dom: Stats; frame: Stats };
@@ -98,6 +102,8 @@ async function measureOnce(
     await installProbe(page);
     await page.goto(`${server.origin}/article.html`);
     await worlds.waitForObserver();
+    await page.bringToFront();
+    await expect.poll(() => page.evaluate(() => document.visibilityState)).toBe('visible');
 
     await resetProbe(page);
     await dblclickText(page, page, 'cartographer');

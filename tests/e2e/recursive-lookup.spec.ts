@@ -80,6 +80,7 @@ async function selectGeneratedWord(
   card: CardProbe,
   word: string,
 ) {
+  await card.toolbar.stableBox(CARD.card);
   const box = await resultWordBox(card, word);
   const offset = await frameOffset(target);
   await page.mouse.dblclick(offset.x + box.x + box.width / 2, offset.y + box.y + box.height / 2);
@@ -178,8 +179,15 @@ test('Lookup opens recursive results in one card and Back restores cached parent
       expect(prompts.map((prompt) => prompt.selected)).toEqual(['cartographer']);
 
       // Replacing the selected range from page script cannot turn a stale candidate into Lookup.
+      // Capture its position before replacing the range: the observer is allowed to remove the
+      // button immediately afterward. A real click there must be harmless in either ordering.
+      const staleLookup = await card.toolbar.stableBox(LOOKUP);
       expect(await programmaticallySelectPageText(page, ARTICLE_CONTEXT)).toBe(true);
-      if (await card.exists(LOOKUP)) await card.click(LOOKUP);
+      await page.mouse.click(
+        staleLookup.x + staleLookup.width / 2,
+        staleLookup.y + staleLookup.height / 2,
+      );
+      await card.waitGone(LOOKUP);
       expect(prompts.map((prompt) => prompt.selected)).toEqual(['cartographer']);
 
       // An outside selection can clear the previous root asynchronously. Start a fresh document

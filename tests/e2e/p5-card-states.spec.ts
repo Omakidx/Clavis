@@ -268,18 +268,23 @@ test.describe('cancellation and stale answers', () => {
     const h = await startCardHarness();
     try {
       let release: () => void = () => undefined;
+      let requestStarted = false;
       const aborted: string[] = [];
       h.ext.context.on('requestfailed', (request) => {
         if (request.url().includes('api.groq.com'))
           aborted.push(request.failure()?.errorText ?? '');
       });
       await overrideChat(h.ext.context, async (route) => {
+        requestStarted = true;
         await new Promise<void>((resolve) => (release = resolve));
         await route.fallback().catch(() => undefined);
       });
       const { page, dispose } = await h.open();
       const card = await explainWord(page, 'cartographer');
       await card.waitFor(`${CARD.panel('core')}[data-status="loading"]`);
+      // Loading UI appears before the background necessarily starts fetch. Only an actual
+      // in-flight request can emit requestfailed when cancelled; verify that precondition first.
+      await expect.poll(() => requestStarted).toBe(true);
       await page.keyboard.press('Escape');
       await tb(page).waitHidden();
       await expect.poll(() => aborted.length, { timeout: 8000 }).toBeGreaterThan(0);

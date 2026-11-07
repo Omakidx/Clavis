@@ -41,6 +41,10 @@ const FIRST_BUDGET_MS = 150;
 const REPEAT_BUDGET_MS = 50;
 const SLACK = STRICT ? 1 : 3;
 
+// Trace screenshots and DOM snapshots distort the frame being timed. Preserve the JSON timing
+// report and every existing budget assertion while measuring a foreground page without tracing.
+test.use({ trace: 'off' });
+
 interface Round {
   first: { p50: number; p95: number };
   repeat: { p50: number; p95: number };
@@ -78,6 +82,8 @@ async function measureOnce(
     await installProbe(page);
     await page.goto(`${server.origin}/article.html`);
     await worlds.waitForObserver();
+    await page.bringToFront();
+    await expect.poll(() => page.evaluate(() => document.visibilityState)).toBe('visible');
 
     await resetProbe(page);
     await dblclickText(page, page, 'cartographer');

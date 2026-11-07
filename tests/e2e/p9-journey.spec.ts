@@ -30,6 +30,9 @@ test.describe.configure({ timeout: 90_000 });
 let world: World;
 let ledger: Ledger;
 test.beforeAll(async () => {
+  // Budget the fresh Windows profile copy and extension installation independently of the
+  // journey's functional assertions; a slow setup must not strand its browser during teardown.
+  test.setTimeout(60_000);
   world = await startWorld({ granted: true });
   ledger = await installLedger(world.ext.context);
 });
