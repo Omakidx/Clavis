@@ -28,7 +28,7 @@ function fakePdfJs(options: {
     viewerOptions: [] as Record<string, unknown>[],
     buses: [] as EventBus[],
     scaleWrites: [] as string[],
-    viewers: [] as Array<{ currentScaleValue: string }>,
+    viewers: [] as Array<{ currentScale: number; currentScaleValue: string }>,
     findDispatches: [] as Record<string, unknown>[],
   };
   const releaseLoad: Array<() => void> = [];
@@ -62,7 +62,14 @@ function fakePdfJs(options: {
   }
   class PDFFindController {}
   class PDFViewer {
-    currentScale = 1.3;
+    #currentScale = 1.3;
+    get currentScale(): number {
+      return this.#currentScale;
+    }
+    set currentScale(value: number) {
+      this.#currentScale = value;
+      this.currentScaleValue = String(value);
+    }
     #scaleValue = 'page-width';
     get currentScaleValue(): string {
       return this.#scaleValue;
@@ -644,6 +651,21 @@ describe('PdfReaderController follows the container size (fit width)', () => {
     notify();
     flushFrames();
     expect(fake.calls.scaleWrites).toEqual([]);
+  });
+
+  it('records an explicit numeric zoom when it matches the current fit-width scale', async () => {
+    const size = { width: 1200 };
+    const { controller, fake } = await open(size);
+    const viewer = fake.calls.viewers[0]!;
+    expect(viewer.currentScaleValue).toBe('page-width');
+
+    controller.setZoom(viewer.currentScale);
+
+    expect(controller.getSnapshot().view).toMatchObject({
+      zoom: viewer.currentScale,
+      scaleValue: String(viewer.currentScale),
+    });
+    expect(fake.calls.scaleWrites).toContain(String(viewer.currentScale));
   });
 });
 

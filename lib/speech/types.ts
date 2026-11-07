@@ -25,6 +25,13 @@ export interface SpeechStateEvent {
   detail?: string | undefined;
 }
 
+/** A real word boundary reported by the speech engine; offsets refer to the spoken text. */
+export interface SpeechBoundaryEvent {
+  requestId: string;
+  charIndex: number;
+  length?: number | undefined;
+}
+
 export interface SpeakInput {
   requestId: string;
   text: string;
@@ -53,10 +60,9 @@ export interface SpeakResult {
 }
 
 /** What an engine reports about one utterance. */
-export interface EngineEvent {
-  state: SpeechState;
-  detail?: string | undefined;
-}
+export type EngineEvent =
+  | { state: SpeechState; detail?: string | undefined }
+  | { state: 'word'; charIndex: number; length?: number | undefined };
 
 export interface EngineSpeakRequest {
   requestId: string;

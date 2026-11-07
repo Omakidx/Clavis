@@ -8,6 +8,7 @@ import { readFileSync, readdirSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { gzipSync } from 'node:zlib';
+import { createBundleGraph } from './bundle-graph.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -59,7 +60,7 @@ const summarize = (files, verbose) =>
 
 const kb = (bytes) => `${(bytes / 1024).toFixed(2)} KB`;
 
-function main() {
+async function main() {
   const opts = parseArgs(process.argv.slice(2));
   const config = JSON.parse(readFileSync(opts.budgets, 'utf8'));
   const envDir = process.env['WXT_OUT_DIR']
@@ -75,9 +76,12 @@ function main() {
 
   const rows = [];
   const problems = [];
+  const graph = createBundleGraph(buildDir);
 
   for (const budget of config.budgets) {
-    const matched = [...new Set(budget.files.flatMap((pattern) => expand(buildDir, pattern)))];
+    const matched = [
+      ...new Set(budget.files.flatMap((pattern) => expand(buildDir, pattern))),
+    ].sort();
     const label =
       budget.files.length > 1
         ? `${budget.files[0]} (+${budget.files.length - 1} more)`
@@ -91,12 +95,26 @@ function main() {
       }
       continue;
     }
-    const measured = matched.map((file) => {
+    let included = budget.includeStaticImports ? await graph.staticClosure(matched) : matched;
+    if (budget.excludeStaticImportsOf) {
+      const excludedRoots = [
+        ...new Set(budget.excludeStaticImportsOf.flatMap((pattern) => expand(buildDir, pattern))),
+      ];
+      if (excludedRoots.length === 0)
+        throw new Error(
+          `${budget.id}: exclusion root not found (${budget.excludeStaticImportsOf.join(', ')})`,
+        );
+      const excluded = new Set(await graph.staticClosure(excludedRoots));
+      included = included.filter((file) => !excluded.has(file));
+    }
+    if (budget.required && included.length === 0)
+      throw new Error(`${budget.id}: no files remain after excluding shared imports`);
+    const measured = included.map((file) => {
       const raw = readFileSync(path.join(buildDir, file));
       return { file, raw: raw.length, gzip: gzipSync(raw, { level: 9 }).length };
     });
     const groups = budget.aggregate
-      ? [{ label: summarize(matched, opts.verbose), items: measured }]
+      ? [{ label: summarize(included, opts.verbose), items: measured }]
       : measured.map((m) => ({ label: m.file, items: [m] }));
     for (const group of groups) {
       const raw = group.items.reduce((sum, m) => sum + m.raw, 0);
@@ -145,7 +163,7 @@ function main() {
 }
 
 try {
-  process.exitCode = main();
+  process.exitCode = await main();
 } catch (error) {
   console.error(error instanceof Error ? error.message : error);
   process.exitCode = 2;

@@ -1,6 +1,7 @@
 import type { StorageAreaLike } from './area';
 import { StorageUnavailableError } from './errors';
 import { STORAGE_NAMESPACE } from './keys';
+import { withHighlightStorageLock } from '../pdf/highlights';
 
 /**
  * FR-078: remove every Clavis record (key, key metadata, preferences, onboarding state
@@ -12,13 +13,15 @@ import { STORAGE_NAMESPACE } from './keys';
  */
 export async function clearClavisStorage(areas: StorageAreaLike[]): Promise<void> {
   try {
-    await Promise.all(
-      areas.map(async (area) => {
-        const keys = Object.keys(await area.get(null)).filter((key) =>
-          key.startsWith(STORAGE_NAMESPACE),
-        );
-        if (keys.length > 0) await area.remove(keys);
-      }),
+    await withHighlightStorageLock(() =>
+      Promise.all(
+        areas.map(async (area) => {
+          const keys = Object.keys(await area.get(null)).filter((key) =>
+            key.startsWith(STORAGE_NAMESPACE),
+          );
+          if (keys.length > 0) await area.remove(keys);
+        }),
+      ),
     );
   } catch {
     throw new StorageUnavailableError();

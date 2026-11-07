@@ -60,6 +60,8 @@ export const ttsSpeakMessageSchema = z.strictObject({
   rate: ttsRateSchema,
   /** Speak with this exact voice (Settings "Test voice"); otherwise the preference or best match. */
   voiceName: voiceNameSchema.optional(),
+  /** Request real word-boundary pushes during this utterance. */
+  trackWords: z.boolean().optional(),
 });
 
 export const ttsStopMessageSchema = z.strictObject({

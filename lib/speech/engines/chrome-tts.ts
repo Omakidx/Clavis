@@ -21,7 +21,12 @@ export interface TtsApi {
       extensionId?: string;
       rate: number;
       enqueue: boolean;
-      onEvent: (event: { type: string; errorMessage?: string | undefined }) => void;
+      onEvent: (event: {
+        type: string;
+        errorMessage?: string | undefined;
+        charIndex?: number | undefined;
+        length?: number | undefined;
+      }) => void;
     },
   ): Promise<void>;
   stop(): void;
@@ -34,7 +39,7 @@ export interface TtsApi {
     | undefined;
 }
 
-/** Map a chrome.tts event type to a Clavis state. Word/sentence/marker/pause/resume are ignored. */
+/** Map a chrome.tts lifecycle event to a Clavis state. Other event types are ignored. */
 export function mapTtsEvent(type: string, errorMessage?: string): EngineEvent | undefined {
   switch (type) {
     case 'start':
@@ -115,6 +120,12 @@ export class ChromeTtsEngine implements SpeechEngine {
       rate: request.rate,
       enqueue: false,
       onEvent: (event) => {
+        if (event.type === 'word') {
+          if (event.charIndex !== undefined) {
+            sink({ state: 'word', charIndex: event.charIndex, length: event.length });
+          }
+          return;
+        }
         const mapped = mapTtsEvent(event.type, event.errorMessage);
         if (mapped !== undefined) sink(mapped);
       },

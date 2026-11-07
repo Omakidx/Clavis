@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { MESSAGE_VERSION } from '../config/constants';
+import { LIMITS, MESSAGE_VERSION } from '../config/constants';
 import { idSchema, languageTagSchema } from './primitives';
 
 // Phase 6 contracts for Listen (pronunciation). Shared by the background speech module, the
@@ -40,6 +40,16 @@ export const ttsEventMessageSchema = z.strictObject({
   state: z.enum(['ended', 'cancelled', 'error']),
 });
 export type TtsEventMessage = z.infer<typeof ttsEventMessageSchema>;
+
+/** Background → requesting page: a word boundary supplied by the speech engine. */
+export const ttsBoundaryMessageSchema = z.strictObject({
+  v,
+  type: z.literal('TTS_BOUNDARY'),
+  requestId: idSchema,
+  charIndex: z.number().int().min(0).max(LIMITS.maxSelectionChars),
+  length: z.number().int().min(0).max(LIMITS.maxSelectionChars).optional(),
+});
+export type TtsBoundaryMessage = z.infer<typeof ttsBoundaryMessageSchema>;
 
 /** One voice an engine reports. */
 export const voiceInfoSchema = z.strictObject({

@@ -143,7 +143,8 @@ test.describe('keyboard and focus', () => {
       'Fit width',
       'Find',
     ]);
-    expect(stops[9]).toBe('PDF pages');
+    expect(stops.slice(9, 13)).toEqual(['Listen to document', 'Play', 'Speed', 'Follow along']);
+    expect(stops[13]).toBe('PDF pages');
   });
 
   test('page changes and the open/close of a document reach a polite live region', async ({

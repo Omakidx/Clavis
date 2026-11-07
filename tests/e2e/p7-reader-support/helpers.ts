@@ -191,8 +191,15 @@ export async function setZoom(page: Page, zoom: string): Promise<void> {
   const select = page.getByTestId('zoom-select');
   if ((await select.inputValue()) === zoom) return;
   const since = await renderCount(page);
+  const scale = () =>
+    page
+      .locator('.pdfViewer')
+      .evaluate((el) => getComputedStyle(el).getPropertyValue('--scale-factor'));
+  const before = await scale();
   await select.selectOption(zoom);
-  await waitForRendersToSettle(page, { since });
+  await expect(select).toHaveValue(zoom);
+  // Fit width can already equal the numeric scale. PDF.js correctly avoids a redundant render.
+  await waitForRendersToSettle(page, (await scale()) === before ? {} : { since });
 }
 
 export interface Geometry {

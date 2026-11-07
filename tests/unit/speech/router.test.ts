@@ -9,8 +9,12 @@ import {
   type SpeechSender,
 } from '../../../lib/speech/background';
 import { SpeechService } from '../../../lib/speech/service';
-import type { TtsEventMessage } from '../../../lib/contracts';
-import { voicesReportSchema } from '../../../lib/contracts';
+import type { TtsBoundaryMessage, TtsEventMessage } from '../../../lib/contracts';
+import {
+  parsePublicMessage,
+  ttsBoundaryMessageSchema,
+  voicesReportSchema,
+} from '../../../lib/contracts';
 import { FakeEngine, ID_A, ID_B, voice } from './helpers';
 
 interface SetupOptions {
@@ -25,7 +29,7 @@ function setup(options: SetupOptions = {}) {
     options.chromeVoices ?? [voice('chrome-tts', 'en-US')],
   );
   const service = new SpeechService({ engine: chrome, startTimeoutMs: 1_000 });
-  const pushed: { target: PushTarget; message: TtsEventMessage }[] = [];
+  const pushed: { target: PushTarget; message: TtsEventMessage | TtsBoundaryMessage }[] = [];
   const preferences = vi.fn(() => Promise.resolve(options.preferences ?? {}));
   const handlers = createSpeechHandlers({
     service,
@@ -61,6 +65,23 @@ afterEach(() => {
 });
 
 describe('speech handlers', () => {
+  it('accepts optional trackWords and validates strict, bounded boundary pushes', () => {
+    expect(parsePublicMessage(speakMsg({ trackWords: true })).ok).toBe(true);
+    expect(parsePublicMessage(speakMsg({ trackWords: false })).ok).toBe(true);
+    expect(parsePublicMessage(speakMsg({ trackWords: 'yes' })).ok).toBe(false);
+    const message = { v: 1, type: 'TTS_BOUNDARY', requestId: ID_A, charIndex: 5, length: 4 };
+    expect(ttsBoundaryMessageSchema.safeParse(message).success).toBe(true);
+    for (const invalid of [
+      { ...message, charIndex: -1 },
+      { ...message, charIndex: 1.5 },
+      { ...message, length: -1 },
+      { ...message, length: 2001 },
+      { ...message, text: 'bank' },
+    ])
+      expect(ttsBoundaryMessageSchema.safeParse(invalid).success).toBe(false);
+    expect(parsePublicMessage(message).ok).toBe(false);
+  });
+
   it('replies to TTS_SPEAK with an ok envelope only once audio has started', async () => {
     const { handlers } = setup();
     const reply = await handlers.speak(speakMsg({ lang: 'en-US' }), SELF);
@@ -197,7 +218,12 @@ describe('speech handlers', () => {
       await handlers.speak(speakMsg({ requestId: ID_A }), { tabId: 1, frameId: 0 });
       // Tab 2 asks too; its request supersedes tab 1's, so tab 1 no longer owns what plays.
       await handlers.speak(speakMsg({ requestId: ID_B }), { tabId: 2, frameId: 0 });
-      expect(pushed.map((p) => p.message.state)).toEqual(['cancelled']);
+      expect(
+        pushed
+          .map((p) => p.message)
+          .filter((message) => message.type === 'TTS_EVENT')
+          .map((message) => message.state),
+      ).toEqual(['cancelled']);
       expect(await handlers.stop(stopMsg(), { tabId: 1 })).toMatchObject({
         data: { stopped: false },
       });
@@ -498,6 +524,32 @@ describe('speech handlers', () => {
   });
 
   describe('events go to exactly the asking document', () => {
+    it('pushes real boundaries only for opted requests to their original document', async () => {
+      const { handlers, chrome, pushed } = setup();
+      const target = { tabId: 7, frameId: 2, documentId: 'DOC-1' };
+      await handlers.speak(speakMsg({ text: 'secret bank', trackWords: true }), target);
+      chrome.emit({ state: 'word', charIndex: 7, length: 4 });
+      expect(pushed).toEqual([
+        {
+          target,
+          message: { v: 1, type: 'TTS_BOUNDARY', requestId: ID_A, charIndex: 7, length: 4 },
+        },
+      ]);
+      expect(JSON.stringify(pushed)).not.toContain('secret');
+      chrome.emit({ state: 'ended' });
+      chrome.emit({ state: 'word', charIndex: 0 });
+      expect(pushed.map(({ message }) => message.type)).toEqual(['TTS_BOUNDARY', 'TTS_EVENT']);
+    });
+
+    it('does not push boundaries for ordinary TTS clients', async () => {
+      const { handlers, chrome, pushed } = setup();
+      await handlers.speak(speakMsg({ text: 'bank' }), SELF);
+      chrome.emit({ state: 'word', charIndex: 0, length: 4 });
+      expect(pushed).toEqual([]);
+      chrome.emit({ state: 'ended' });
+      expect(pushed.map(({ message }) => message.type)).toEqual(['TTS_EVENT']);
+    });
+
     it('targets the sender document, frame and tab', async () => {
       const { handlers, chrome, pushed } = setup();
       await handlers.speak(speakMsg(), { tabId: 7, frameId: 2, documentId: 'DOC-1' });

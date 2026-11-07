@@ -1,7 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { LIMITS, TTS_RATES } from '../../../lib/config/constants';
 import { SpeechService, normalizeRate } from '../../../lib/speech/service';
-import { SpeechError, type SpeechStateEvent } from '../../../lib/speech/types';
+import {
+  SpeechError,
+  type SpeechBoundaryEvent,
+  type SpeechStateEvent,
+} from '../../../lib/speech/types';
 import { FakeEngine, ID_A, ID_B, voice } from './helpers';
 
 function setup(chromeVoices = [voice('chrome-tts', 'en-US')]) {
@@ -121,6 +125,45 @@ describe('validation', () => {
 });
 
 describe('state events', () => {
+  it('emits only valid word boundaries after start and before terminal state', async () => {
+    const { chrome, service, events } = setup();
+    const boundaries: SpeechBoundaryEvent[] = [];
+    const off = service.onBoundary((event) => boundaries.push(event));
+    chrome.autoStart = false;
+    const pending = service.speak(input({ text: 'bank account' }));
+    await vi.advanceTimersByTimeAsync(0);
+    chrome.emit({ state: 'word', charIndex: 0, length: 4 });
+    chrome.emit({ state: 'started' });
+    await pending;
+    for (const charIndex of [-1, 12, 1.5, Number.NaN, LIMITS.maxSelectionChars + 1]) {
+      chrome.emit({ state: 'word', charIndex });
+    }
+    chrome.emit({ state: 'word', charIndex: 5, length: 100 });
+    chrome.emit({ state: 'word', charIndex: 0, length: 4 });
+    chrome.emit({ state: 'word', charIndex: 5 });
+    chrome.emit({ state: 'ended' });
+    chrome.emit({ state: 'word', charIndex: 5, length: 7 });
+    expect(boundaries).toEqual([
+      { requestId: ID_A, charIndex: 0, length: 4 },
+      { requestId: ID_A, charIndex: 5 },
+    ]);
+    expect(events.map((event) => event.state)).toEqual(['started', 'ended']);
+    off();
+  });
+
+  it('ignores stale boundaries and stops notifying unsubscribed boundary listeners', async () => {
+    const { chrome, service } = setup();
+    const seen: number[] = [];
+    const off = service.onBoundary((event) => seen.push(event.charIndex));
+    await service.speak(input({ requestId: ID_A, text: 'first' }));
+    await service.speak(input({ requestId: ID_B, text: 'second' }));
+    chrome.emit({ state: 'word', charIndex: 0 }, 0);
+    chrome.emit({ state: 'word', charIndex: 1 }, 1);
+    off();
+    chrome.emit({ state: 'word', charIndex: 2 }, 1);
+    expect(seen).toEqual([1]);
+  });
+
   it('maps started, ended in order and clears the active request', async () => {
     const { chrome, service, events } = setup();
     await service.speak(input());

@@ -1,6 +1,6 @@
 # Clavis privacy policy — DRAFT
 
-> **Status:** draft for v1, last updated on 2026-10-29 for automatic online voice fallback. Not yet published. It will be hosted on GitHub Pages (D-15) and must be re-checked against the shipped code, the permission list in [architecture.md §3](architecture.md#3-extension-entry-points-and-message-routes) and the data flows in [architecture.md §9](architecture.md#9-persistence-privacy-and-telemetry) before store submission. The Chrome Web Store answers that go with this policy are in [store/permission-justifications.md](store/permission-justifications.md).
+> **Status:** draft for v1, last updated on 2026-11-07 for PDF narration and local highlights. Not yet published. It will be hosted on GitHub Pages (D-15) and must be re-checked against the shipped code, the permission list in [architecture.md §3](architecture.md#3-extension-entry-points-and-message-routes) and the data flows in [architecture.md §9](architecture.md#9-persistence-privacy-and-telemetry) before store submission. The Chrome Web Store answers that go with this policy are in [store/permission-justifications.md](store/permission-justifications.md).
 >
 > Placeholders: `[PUBLISHER]`, `[SUPPORT_EMAIL]`, `[EFFECTIVE_DATE]`, `[POLICY_URL]`.
 >
@@ -15,7 +15,7 @@ Clavis is a Chrome extension that helps you understand and pronounce text you se
 
 - Clavis has **no server of its own**. The publisher does not receive, store or sell your data.
 - When you ask for an explanation, the selected text and a small amount of nearby text go to **Groq**, the AI provider, using **your own** Groq API key. Selecting text alone sends nothing.
-- **Listen** sends nothing to Groq. Automatic tries a matching on-device voice first, then a matching online voice if no local voice is available or can start. Online voices send the selected text to their provider.
+- **Listen** sends nothing to Groq. Automatic tries a matching on-device voice first, then a matching online voice if no local voice is available or can start. Online voices send the spoken text to their provider, including text from a PDF document or section you ask to hear.
 - PDFs you open in Clavis are read inside your browser and never uploaded.
 - Your settings and API key are stored only in your Chrome profile, and you can delete them at any time.
 
@@ -25,7 +25,7 @@ Clavis is a Chrome extension that helps you understand and pronounce text you se
 | --- | --- | --- |
 | Text you select on a website or in a PDF | When you select it | Stays on your device. Used to show the Clavis toolbar. |
 | Selected text, up to 1,000 characters of nearby text and a few settings (see [What Groq receives](#what-groq-receives)) | Only when you ask for an explanation (see below) | Sent over HTTPS to Groq with your API key, to generate the explanation. |
-| Selected text, or translated output you ask to hear | When you click **Listen** or the speaker beside a translation | Passed to a speech engine on your computer (Chrome's text-to-speech or your system voices). Not sent to Groq. Automatic tries a matching on-device voice first, then a matching online voice if no local voice is available or can start. You can also choose a specific voice in Settings → Voice. When an online voice is used, the selected text is sent to that voice's provider (for example Google) to be spoken, under that provider's terms; Settings identifies online voices and explains the automatic fallback. Playback adds no visible status label. Your operating system's speech engine may have its own data practices. |
+| Selected text, translated output, or PDF document/range text you ask to hear | When you click **Listen**, the speaker beside a translation, or **Play** in the PDF reader | Passed to a speech engine on your computer (Chrome's text-to-speech or your system voices). Not sent to Groq. Automatic tries a matching on-device voice first, then a matching online voice if no local voice is available or can start. You can also choose a specific voice in Settings → Voice. When an online voice is used, the spoken text is sent to that voice's provider (for example Google) to be spoken, under that provider's terms; Settings identifies online voices and explains the automatic fallback. Translation pronunciation adds no visible status label; PDF narration shows playback controls and follows the spoken passage. Your operating system's speech engine may have its own data practices. |
 | Your Groq API key | When you enter it | Stored in Chrome's extension storage on your device, either until you remove it or only while Chrome keeps the session, as you choose. Sent only to Groq, in the request header. |
 | PDF files you open | When you open them | Read in your browser's memory and released when you close the reader. Never uploaded. |
 | Settings and setup state (see [What Clavis stores](#what-clavis-stores)) | When you change them | Stored in Chrome's extension storage on your device. Not synced. |
@@ -73,6 +73,7 @@ Clavis keeps this on your device in Chrome's extension storage. It is not synced
 - **Setup state:** whether setup is finished, when you accepted the data disclosure, and whether you granted or declined website access.
 - **Key details:** whether your key is stored on this device or only for the session, its last four characters (for display), whether the last check passed and when, and the list of models Groq said your key can use.
 - **Your Groq API key.**
+- **PDF highlights:** a SHA-256 content hash that identifies each PDF, and each mark’s random ID, page number, text offsets, color and creation time. No PDF bytes, filename, or quoted text are saved. Up to 200 marks per PDF across 30 PDFs remain in this profile until you remove them, clear all Clavis data, or uninstall Clavis.
 - **Model capability notes:** which request options your chosen model accepted. Clavis keeps these in memory-based session storage, so they last only for the browser session.
 
 Clavis does **not** store the text you select, nearby text, or Groq's answers. Looking up a word inside an answer sends that selected generated text and a small amount of context from the same answer paragraph. Earlier layers remain only in memory for Back navigation while the original selection is retained; they are never saved as browsing or lookup history. An answer lives in the page's memory while the card is open. See [Side panel](#side-panel) for the one place a copy is held longer, and only in memory.
@@ -115,7 +116,7 @@ Your API key is kept in Chrome's extension storage, which websites and Clavis's 
 ## Deleting your data
 
 - **Remove your API key:** Clavis Settings → Groq API key → **Remove key**. This does not cancel the key at Groq; do that on the Groq keys page.
-- **Clear everything Clavis stores:** Clavis Settings → Privacy and data → **Clear all data**. This removes your key, preferences, setup progress and the list of turned-off sites, and drops any explanation held for the side panel.
+- **Clear everything Clavis stores:** Clavis Settings → Privacy and data → **Clear all data**. This removes your key, preferences, setup progress, PDF highlights and document hashes, and the list of turned-off sites, and drops any explanation held for the side panel.
 - **Remove website access:** **Clear all data does not remove website access**, because that is a Chrome permission. Remove it in Clavis Settings → Website access → **Remove website access**, or in Chrome at `chrome://extensions` → Clavis → Details → Site access.
 - **Remove everything:** uninstall Clavis from `chrome://extensions`. Chrome deletes all of its stored data and permissions.
 
