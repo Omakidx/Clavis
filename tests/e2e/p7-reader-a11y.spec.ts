@@ -8,6 +8,7 @@ import {
   openFixtureReady,
   openReader,
   waitForPhase,
+  waitForRendersToSettle,
 } from './p7-reader-support/helpers';
 import { HOSTILE_URLS, hostilePdf } from './p7-reader-support/pdfs';
 
@@ -158,6 +159,10 @@ test.describe('keyboard and focus', () => {
     await openFixtureReady(page, 'text-100pages.pdf');
     await expect(live).toHaveText('Opened text-100pages.pdf. Page count: 100.');
     await page.keyboard.press('n');
+    // Refit before PDF.js's deferred scroll-location update: navigation must not be undone.
+    await page.setViewportSize({ width: 900, height: 700 });
+    await waitForRendersToSettle(page);
+    await expect(page.getByTestId('page-input')).toHaveValue('2');
     await expect(live).toHaveText('Page 2 of 100', { timeout: 5000 });
     await page.getByRole('button', { name: 'Close PDF' }).click();
     await expect(live).toHaveText('PDF closed.');

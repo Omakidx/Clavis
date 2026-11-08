@@ -473,6 +473,9 @@ export class PdfReaderController {
       frame = 0;
       const value = viewer.currentScaleValue;
       if (!this.#doc || !value || !Number.isNaN(Number(value))) return;
+      // Navigation can precede PDF.js's deferred scroll update. Refresh its cached location
+      // before a fit preset restores it, so a resize cannot send the reader back a page.
+      viewer.update();
       viewer.currentScaleValue = value;
     };
     new ResizeObserver(() => {

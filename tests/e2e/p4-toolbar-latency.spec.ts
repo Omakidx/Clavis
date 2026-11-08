@@ -53,14 +53,18 @@ const loadBefore = os.loadavg();
 test.beforeAll(async () => {
   // Cold profile installation (30s) plus observer registration has a separate setup deadline.
   test.setTimeout(60_000);
+  const started = Date.now();
   server = await startFixtureServer();
+  console.log(`[p4 setup] fixture server ready after ${Date.now() - started}ms`);
   ext = await launchExtension({
     grantedSiteAccess: true,
     // macOS headless scheduling distorts frame latency. Measure a foreground native window
     // while retaining the same viewport, sample counts, and timing assertions.
     ...(process.platform === 'darwin' ? { headless: false } : {}),
   });
+  console.log(`[p4 setup] browser ready after ${Date.now() - started}ms`);
   await waitForRegistration(ext.serviceWorker);
+  console.log(`[p4 setup] observer registered after ${Date.now() - started}ms`);
 });
 
 test.afterAll(async () => {
