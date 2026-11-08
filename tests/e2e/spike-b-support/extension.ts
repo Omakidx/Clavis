@@ -33,6 +33,8 @@ export interface ExtensionOptions {
    * context menu can be driven with xdotool.
    */
   headed?: boolean;
+  /** Override browser mode while retaining Playwright's normal viewport (timing benchmarks). */
+  headless?: boolean;
 }
 
 export interface LaunchedExtension {
@@ -82,7 +84,10 @@ export async function launchExtension(options: ExtensionOptions = {}): Promise<L
   const userDataDir = await mkdtemp(path.join(tmpdir(), 'clavis-profile-'));
   const context = await chromium.launchPersistentContext(userDataDir, {
     channel: 'chromium',
-    headless: options.headed === true ? false : process.env['CLAVIS_E2E_HEADED'] !== '1',
+    headless:
+      options.headed === true
+        ? false
+        : (options.headless ?? process.env['CLAVIS_E2E_HEADED'] !== '1'),
     ...(options.headed === true ? { viewport: null } : {}),
     args: [`--disable-extensions-except=${copy.dir}`, `--load-extension=${copy.dir}`],
   });

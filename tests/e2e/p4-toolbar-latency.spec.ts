@@ -51,12 +51,20 @@ let ext: LaunchedExtension;
 const loadBefore = os.loadavg();
 
 test.beforeAll(async () => {
+  // Cold profile installation (30s) plus observer registration has a separate setup deadline.
+  test.setTimeout(60_000);
   server = await startFixtureServer();
-  ext = await launchExtension({ grantedSiteAccess: true });
+  ext = await launchExtension({
+    grantedSiteAccess: true,
+    // macOS headless scheduling distorts frame latency. Measure a foreground native window
+    // while retaining the same viewport, sample counts, and timing assertions.
+    ...(process.platform === 'darwin' ? { headless: false } : {}),
+  });
   await waitForRegistration(ext.serviceWorker);
 });
 
 test.afterAll(async () => {
+  test.setTimeout(60_000);
   await ext?.close();
   await server?.close();
   mkdirSync('test-results', { recursive: true });
