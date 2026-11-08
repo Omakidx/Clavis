@@ -63,11 +63,18 @@ let server: FixtureServer;
 let ext: LaunchedExtension;
 
 test.beforeAll(async () => {
+  // Cold profile installation (30s) plus observer registration has a separate setup deadline.
+  test.setTimeout(60_000);
   server = await startFixtureServer();
-  ext = await launchExtension({ grantedSiteAccess: true });
+  ext = await launchExtension({
+    grantedSiteAccess: true,
+    // Match the native macOS window used by the Phase 4 benchmark, with the normal viewport.
+    ...(process.platform === 'darwin' ? { headless: false } : {}),
+  });
   await waitForRegistration(ext.serviceWorker);
 });
 test.afterAll(async () => {
+  test.setTimeout(60_000);
   await ext?.close();
   await server?.close();
 });

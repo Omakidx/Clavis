@@ -191,8 +191,15 @@ export async function setZoom(page: Page, zoom: string): Promise<void> {
   const select = page.getByTestId('zoom-select');
   if ((await select.inputValue()) === zoom) return;
   const since = await renderCount(page);
+  const scale = () =>
+    page
+      .locator('.pdfViewer')
+      .evaluate((el) => getComputedStyle(el).getPropertyValue('--scale-factor'));
+  const before = await scale();
   await select.selectOption(zoom);
-  await waitForRendersToSettle(page, { since });
+  await expect(select).toHaveValue(zoom);
+  // Fit width can already equal the numeric scale. PDF.js correctly avoids a redundant render.
+  await waitForRendersToSettle(page, (await scale()) === before ? {} : { since });
 }
 
 export interface Geometry {
@@ -289,6 +296,16 @@ export async function dragSelectSpan(
 ): Promise<void> {
   const vertical = options.vertical ?? false;
   const endIndex = options.endIndex ?? text.length - 1;
+  // Opening a document mounts the reading controls and can refit the page. Scroll first, then
+  // wait for the text layer to settle before measuring pointer coordinates on the final nodes.
+  await page.evaluate((needle) => {
+    const span = [...document.querySelectorAll<HTMLElement>('.textLayer span')].find(
+      (s) => s.textContent === needle,
+    );
+    if (!span) throw new Error(`span not found: ${needle}`);
+    span.scrollIntoView({ block: 'center', inline: 'center' });
+  }, text);
+  await waitForRendersToSettle(page, { quietMs: 500 });
   const ends = await page.evaluate(
     ([needle, endAt]) => {
       const span = [...document.querySelectorAll<HTMLElement>('.textLayer span')].find(
@@ -298,7 +315,6 @@ export async function dragSelectSpan(
       if (!span || !node || node.nodeType !== Node.TEXT_NODE) {
         throw new Error(`span not found: ${needle}`);
       }
-      span.scrollIntoView({ block: 'center', inline: 'center' });
       const charRect = (index: number) => {
         const range = document.createRange();
         range.setStart(node, index);
@@ -340,9 +356,6 @@ export async function dragSelectSpan(
   const to = vertical
     ? { x: (last.left + last.right) / 2, y: lerp(last.top, last.bottom, 0.8) }
     : { x: lerp(last.left, last.right, 0.8), y: (last.top + last.bottom) / 2 };
-  // The text layer is rebuilt after zoom/scroll renders; dragging into a half-built layer gives a
-  // short selection, so wait for the viewer to be idle first.
-  await waitForRendersToSettle(page, { quietMs: 500 });
   await page.mouse.move(from.x, from.y);
   await page.mouse.down();
   // Many small moves, all over glyphs: PDF.js resolves each pointer position relative to the

@@ -12,6 +12,7 @@ import {
   type PublicMessage,
   type SpeakResult,
   type StopResult,
+  type TtsBoundaryMessage,
   type TtsEventMessage,
   type VoiceInfo,
   type VoicesReport,
@@ -23,6 +24,7 @@ import { ChromeTtsEngine } from './engines/chrome-tts';
 import { SpeechService } from './service';
 import {
   SpeechError,
+  type SpeechBoundaryEvent,
   type SpeechMessageKey,
   type SpeechStateEvent,
   type SpeechVoice,
@@ -43,7 +45,7 @@ export interface PushTarget {
 
 export interface SpeechHandlerDeps {
   service: SpeechService;
-  push(target: PushTarget, message: TtsEventMessage): Promise<unknown>;
+  push(target: PushTarget, message: TtsEventMessage | TtsBoundaryMessage): Promise<unknown>;
   /** The speech preferences. A failing read behaves like "no preferences". */
   preferences(): Promise<Pick<Preferences, 'ttsLang' | 'ttsVoice'>>;
   /** `runtime.getPlatformInfo().os` mapped to the report's platform names. */
@@ -159,6 +161,7 @@ export function toPlatform(os: string | undefined): Platform {
 export function createSpeechHandlers(deps: SpeechHandlerDeps) {
   const { service } = deps;
   const targets = new Map<string, PushTarget>();
+  const wordTracked = new Set<string>();
   /** Bumped by every speak(), so a request that was overtaken while reading preferences yields. */
   let latestSpeak = 0;
   /** Requests accepted but not yet handed to the service (reading preferences). */
@@ -203,6 +206,7 @@ export function createSpeechHandlers(deps: SpeechHandlerDeps) {
     if (event.state === 'started') return;
     const target = targets.get(event.requestId);
     targets.delete(event.requestId);
+    wordTracked.delete(event.requestId);
     if (target === undefined) return;
     deps
       .push(target, {
@@ -213,6 +217,23 @@ export function createSpeechHandlers(deps: SpeechHandlerDeps) {
       })
       .catch(() => {
         // The page is gone (navigated or closed); nothing is waiting for the event.
+      });
+  });
+
+  service.onBoundary((event: SpeechBoundaryEvent) => {
+    if (!wordTracked.has(event.requestId)) return;
+    const target = targets.get(event.requestId);
+    if (target === undefined) return;
+    deps
+      .push(target, {
+        v: MESSAGE_VERSION,
+        type: 'TTS_BOUNDARY',
+        requestId: event.requestId,
+        charIndex: event.charIndex,
+        ...(event.length === undefined ? {} : { length: event.length }),
+      })
+      .catch(() => {
+        // The page is gone (navigated or closed); speech can continue without word tracking.
       });
   });
 
@@ -238,6 +259,8 @@ export function createSpeechHandlers(deps: SpeechHandlerDeps) {
         frameId: sender.frameId,
         documentId: sender.documentId,
       });
+      if (message.trackWords === true) wordTracked.add(requestId);
+      else wordTracked.delete(requestId);
       preparing.add(requestId);
       try {
         const preferences = await readPreferences();
@@ -286,6 +309,7 @@ export function createSpeechHandlers(deps: SpeechHandlerDeps) {
         preparing.delete(requestId);
         stoppedEarly.delete(requestId);
         targets.delete(requestId);
+        wordTracked.delete(requestId);
         return failedSpeak(error, requestId);
       }
     },

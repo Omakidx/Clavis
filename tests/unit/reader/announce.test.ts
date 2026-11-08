@@ -84,6 +84,20 @@ describe('announcementFor', () => {
     ).toBeNull();
   });
 
+  it('ignores automatic fit-preset resizing while still announcing a chosen preset', () => {
+    for (const scaleValue of ['page-width', 'page-fit', 'auto']) {
+      expect(
+        announcementFor(
+          input(ready(), view({ scaleValue })),
+          input(ready(), view({ zoom: 1.12, scaleValue })),
+        ),
+      ).toBeNull();
+      expect(
+        announcementFor(input(ready(), view()), input(ready(), view({ zoom: 1.12, scaleValue }))),
+      ).toEqual({ key: 'readerZoomLive', subs: ['112'] });
+    }
+  });
+
   it('says nothing when nothing relevant changed', () => {
     expect(announcementFor(input(ready(), view()), input(ready(), view()))).toBeNull();
     expect(announcementFor(input(ready()), input(ready()))).toBeNull();

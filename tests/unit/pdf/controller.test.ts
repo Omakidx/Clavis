@@ -28,7 +28,12 @@ function fakePdfJs(options: {
     viewerOptions: [] as Record<string, unknown>[],
     buses: [] as EventBus[],
     scaleWrites: [] as string[],
-    viewers: [] as Array<{ currentScaleValue: string }>,
+    viewers: [] as Array<{
+      currentScale: number;
+      currentScaleValue: string;
+      currentPageNumber: number;
+      update: () => void;
+    }>,
     findDispatches: [] as Record<string, unknown>[],
   };
   const releaseLoad: Array<() => void> = [];
@@ -62,7 +67,14 @@ function fakePdfJs(options: {
   }
   class PDFFindController {}
   class PDFViewer {
-    currentScale = 1.3;
+    #currentScale = 1.3;
+    get currentScale(): number {
+      return this.#currentScale;
+    }
+    set currentScale(value: number) {
+      this.#currentScale = value;
+      this.currentScaleValue = String(value);
+    }
     #scaleValue = 'page-width';
     get currentScaleValue(): string {
       return this.#scaleValue;
@@ -85,6 +97,7 @@ function fakePdfJs(options: {
       if (doc) queueMicrotask(() => this.#bus.dispatch('pagesinit', {}));
     }
     cleanup() {}
+    update() {}
     nextPage() {
       return true;
     }
@@ -644,6 +657,43 @@ describe('PdfReaderController follows the container size (fit width)', () => {
     notify();
     flushFrames();
     expect(fake.calls.scaleWrites).toEqual([]);
+  });
+
+  it('keeps a newly selected page when a refit races the PDF.js scroll-location update', async () => {
+    const size = { width: 1200 };
+    const { controller, fake } = await open(size);
+    const viewer = fake.calls.viewers[0]!;
+    const notify = observed[0]!;
+    notify();
+    // PDF.js caches its last visible location asynchronously after a scroll. A scale change
+    // restores that cached page, which can still be page 1 immediately after navigation to 2.
+    let cachedPage = 1;
+    vi.spyOn(viewer, 'currentScaleValue', 'set').mockImplementation(() => {
+      viewer.currentPageNumber = cachedPage;
+    });
+    vi.spyOn(viewer, 'update').mockImplementation(() => {
+      cachedPage = viewer.currentPageNumber;
+    });
+    controller.goToPage(2);
+    size.width = 800;
+    notify();
+    flushFrames();
+    expect(viewer.currentPageNumber).toBe(2);
+  });
+
+  it('records an explicit numeric zoom when it matches the current fit-width scale', async () => {
+    const size = { width: 1200 };
+    const { controller, fake } = await open(size);
+    const viewer = fake.calls.viewers[0]!;
+    expect(viewer.currentScaleValue).toBe('page-width');
+
+    controller.setZoom(viewer.currentScale);
+
+    expect(controller.getSnapshot().view).toMatchObject({
+      zoom: viewer.currentScale,
+      scaleValue: String(viewer.currentScale),
+    });
+    expect(fake.calls.scaleWrites).toContain(String(viewer.currentScale));
   });
 });
 

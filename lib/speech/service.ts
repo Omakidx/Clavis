@@ -3,6 +3,7 @@ import { logger } from '../security/logger';
 import { SPEECH_TIMING } from './constants';
 import {
   SpeechError,
+  type SpeechBoundaryEvent,
   type EngineEvent,
   type SpeakInput,
   type SpeakResult,
@@ -55,10 +56,12 @@ export interface SpeechServiceOptions {
 }
 
 type StateListener = (event: SpeechStateEvent) => void;
+type BoundaryListener = (event: SpeechBoundaryEvent) => void;
 
 /** One in-flight utterance. Exactly one exists at a time. */
 interface Utterance {
   requestId: string;
+  textLength: number;
   engine: SpeechEngine;
   started: boolean;
   /** Reached ended / cancelled / error, or failed before start. Later events are ignored. */
@@ -110,6 +113,7 @@ export class SpeechService {
   private readonly speakDeadlineMs: number;
   private readonly defaultLanguage: string | undefined;
   private readonly listeners = new Set<StateListener>();
+  private readonly boundaryListeners = new Set<BoundaryListener>();
   private active: Utterance | undefined;
   /** The `speak()` that has not started audio yet (looking up voices, between attempts). */
   private pending: { requestId: string; generation: number } | undefined;
@@ -131,6 +135,14 @@ export class SpeechService {
     this.listeners.add(listener);
     return () => {
       this.listeners.delete(listener);
+    };
+  }
+
+  /** Subscribe to real engine word boundaries. Returns an unsubscribe function. */
+  onBoundary(listener: BoundaryListener): () => void {
+    this.boundaryListeners.add(listener);
+    return () => {
+      this.boundaryListeners.delete(listener);
     };
   }
 
@@ -387,6 +399,7 @@ export class SpeechService {
     return new Promise<SpeakResult>((resolve, reject) => {
       const utterance: Utterance = {
         requestId: request.requestId,
+        textLength: request.text.length,
         engine,
         started: false,
         settled: false,
@@ -438,6 +451,36 @@ export class SpeechService {
 
   private handleEngineEvent(utterance: Utterance, event: EngineEvent): void {
     if (utterance.settled || this.active !== utterance) return;
+
+    if (event.state === 'word') {
+      const { charIndex, length } = event;
+      if (
+        !utterance.started ||
+        !Number.isInteger(charIndex) ||
+        charIndex < 0 ||
+        charIndex >= utterance.textLength ||
+        charIndex > LIMITS.maxSelectionChars ||
+        (length !== undefined &&
+          (!Number.isInteger(length) ||
+            length < 0 ||
+            length > LIMITS.maxSelectionChars ||
+            charIndex + length > utterance.textLength))
+      )
+        return;
+      const boundary: SpeechBoundaryEvent = {
+        requestId: utterance.requestId,
+        charIndex,
+        ...(length === undefined ? {} : { length }),
+      };
+      for (const listener of this.boundaryListeners) {
+        try {
+          listener(boundary);
+        } catch (error) {
+          logger.error('speech_listener_failed', { status: describeError(error) });
+        }
+      }
+      return;
+    }
 
     if (!utterance.started) {
       if (event.state === 'started') {

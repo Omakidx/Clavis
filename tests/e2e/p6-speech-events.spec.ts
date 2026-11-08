@@ -54,10 +54,14 @@ async function installScriptedTts(
   await ext.serviceWorker.evaluate(
     (input) => {
       const list = input.voices;
+      type Api = { runtime?: { id?: string }; tts: Record<string, unknown> };
       const g = globalThis as unknown as {
-        chrome: { tts: Record<string, unknown> };
+        chrome: Api;
+        browser?: Api;
         __tts?: unknown;
       };
+      // Match the namespace selected by wxt/browser in the built speech engine.
+      const api = g.browser?.runtime?.id ? g.browser : g.chrome;
       const state = {
         voices: list,
         calls: [] as { voiceName?: string; lang?: string; rate?: number; chars: number }[],
@@ -66,8 +70,8 @@ async function installScriptedTts(
       };
       g.__tts = state;
       state.failStartVoiceNames = input.failStartVoiceNames;
-      g.chrome.tts['getVoices'] = () => Promise.resolve(state.voices);
-      g.chrome.tts['speak'] = (
+      api.tts['getVoices'] = () => Promise.resolve(state.voices);
+      api.tts['speak'] = (
         text: string,
         opts: {
           voiceName?: string;
@@ -95,7 +99,7 @@ async function installScriptedTts(
         }, 5);
         return Promise.resolve();
       };
-      g.chrome.tts['stop'] = () => {
+      api.tts['stop'] = () => {
         const current = state.current;
         state.current = undefined;
         current?.({ type: 'interrupted' });
@@ -161,6 +165,14 @@ test.beforeEach(async () => {
   await waitForRegistration(ext.serviceWorker);
   await installScriptedTts(VOICES);
   options = await openExtensionPage(ext.context, ext.extensionId, 'options');
+  // Prove the real app-visible engine reads the mock, rather than the runner's native voices.
+  const report = (await sendFromPage(options, { v: 1, type: 'GET_VOICES' })) as VoicesReply;
+  expect(report).toMatchObject({
+    ok: true,
+    data: {
+      engines: { chromeTts: { voices: VOICES.map((voice) => ({ name: voice.voiceName })) } },
+    },
+  });
   pageA = await ext.context.newPage();
   worldA = await contentWorld(pageA);
   await pageA.goto(`${server.origin}/article.html`);

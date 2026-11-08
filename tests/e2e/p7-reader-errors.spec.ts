@@ -25,7 +25,8 @@ test.describe('empty state and drop target', () => {
     await expect(empty.getByRole('heading', { name: 'Read a PDF with Clavis' })).toBeVisible();
     await expect(empty).toContainText("Chrome's built-in PDF viewer can't show Clavis");
     await expect(empty).toContainText('drop one anywhere on this page');
-    await expect(empty).toContainText('Listening never sends anything');
+    await expect(empty).toContainText('Local voices keep spoken text on this device');
+    await expect(empty).toContainText('online voices send it to their voice service');
     // One toolbar button called "Open PDF"; the large button has its own name.
     await expect(page.getByRole('button', { name: 'Open PDF' })).toHaveCount(1);
     const chooser = page.waitForEvent('filechooser');

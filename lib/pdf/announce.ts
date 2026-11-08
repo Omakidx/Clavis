@@ -36,6 +36,9 @@ export function announcementFor(prev: AnnounceInput, next: AnnounceInput): Annou
     return { key: 'readerPageLive', subs: [String(to.page), String(to.pageCount)] };
   }
   if (from !== null && Math.abs(from.zoom - to.zoom) > 0.001) {
+    // Fit presets recalculate as the reader controls settle or the window resizes. This is
+    // layout, not a zoom command: do not replace the document-open announcement with it.
+    if (from.scaleValue === to.scaleValue && Number.isNaN(Number(to.scaleValue))) return null;
     return { key: 'readerZoomLive', subs: [String(Math.round(to.zoom * 100))] };
   }
   return null;

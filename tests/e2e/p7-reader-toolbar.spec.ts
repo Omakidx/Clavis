@@ -5,6 +5,7 @@ import {
   openReader,
   selectionEquals,
   sentMessages,
+  setZoom,
   waitForPhase,
   waitForRendersToSettle,
   type ReaderSession,
@@ -185,6 +186,10 @@ test.describe('Explain from the PDF reader', () => {
     await openContextPdf(session);
     // A real click at the start of the page, then Shift+click at the end: the browser selects
     // everything between (about 3,000 characters on page 2).
+    // Keep both drag endpoints visible below the new playback bar rather than dragging outside
+    // the browser viewport and relying on platform-specific selection autoscroll.
+    await setZoom(page, '0.75');
+    await gotoPage(page, 2);
     const ends = await page.evaluate(() => {
       const spans = [
         ...document.querySelectorAll<HTMLElement>('.page[data-page-number="2"] .textLayer span'),

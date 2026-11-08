@@ -106,6 +106,22 @@ describe('ChromeTtsEngine', () => {
     expect(seen.map((e) => e.state)).toEqual(['started', 'ended']);
   });
 
+  it('forwards real word offsets and omits events with no charIndex', async () => {
+    const { tts, options } = fakeTts();
+    const seen: EngineEvent[] = [];
+    await new ChromeTtsEngine(tts).speak(
+      { requestId: ID_A, text: 'bank account', rate: 1 },
+      (event) => seen.push(event),
+    );
+    options()?.onEvent({ type: 'word', charIndex: 5, length: 7 });
+    options()?.onEvent({ type: 'word', charIndex: 0 });
+    options()?.onEvent({ type: 'word' });
+    expect(seen).toEqual([
+      { state: 'word', charIndex: 5, length: 7 },
+      { state: 'word', charIndex: 0, length: undefined },
+    ]);
+  });
+
   it('propagates a rejected speak() so the service can fail the attempt', async () => {
     const { tts } = fakeTts();
     vi.mocked(tts.speak).mockRejectedValueOnce(new Error('Invalid lang'));

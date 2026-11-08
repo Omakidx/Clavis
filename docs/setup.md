@@ -86,6 +86,18 @@ If automatic access is off, select text first and use **Explain on this page** f
 
 Open the Clavis popup, choose **Open PDF reader**, and select a local PDF file. Select text in that reader to use the toolbar. Clavis does not add its toolbar to Chrome's built-in PDF viewer, and image-only scans need a text layer before words can be selected; OCR is not included.
 
+The reader also offers:
+
+- **Whole document → Play** to listen across pages, **Pause** and **Resume** to continue, and **Stop** to end playback. Speech uses your saved voice preferences, trying a matching local voice before an online voice when Automatic is selected.
+- **Selected text** to read just the words you highlight, or **Page range** to read a particular part of the PDF.
+- **Speed** to change the reading pace, and **Follow along** to keep the spoken passage in view. Scrolling or interacting with the document suspends automatic scrolling; toggle Follow along off and on to follow again.
+- Live word highlighting when the voice provides word timing. Otherwise the active passage stays highlighted. Resuming may replay the current word, or the current passage when word timing is unavailable.
+- **Highlights** to save a selected passage in yellow, green, blue, or pink. Open a saved mark to return to it, remove individual marks, or clear this document's highlights. On small screens, expand Highlights to see these controls.
+
+Highlights are stored only in this Chrome profile and reappear when you reopen the same PDF. They are separate from the original file and are not embedded in an exported PDF. Clavis stores the document's content hash and the marks' page positions and colors, rather than PDF text. **Settings → Privacy and data → Clear all data** removes these marks too. Storage holds up to 200 marks per PDF across 30 PDFs; remove marks from an older document if it is full.
+
+PDF reading order comes from the file's text layer. Complex columns or unusual layouts may not read in the intended order. Online voices send the spoken text to their voice service; local voices keep it on your device. Neither PDF narration nor color highlighting requires a Groq key.
+
 ## Update an unpacked installation
 
 1. Get the updated extension files. If you built from source, run `git pull --ff-only`, `npm ci`, and `npm run build` in the same repository folder.

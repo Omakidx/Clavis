@@ -8,11 +8,14 @@ import { FindBar } from './FindBar';
 import { LinkConfirm } from './LinkConfirm';
 import { PasswordPrompt } from './PasswordPrompt';
 import { ReaderToolbar } from './ReaderToolbar';
+import { ReaderPlayback } from './ReaderPlayback';
+import { ReaderHighlights } from './ReaderHighlights';
 import { StateMessage } from './StateMessage';
 import { useFindBar } from './useFindBar';
 import { useReaderController } from './useReaderController';
 import { useReaderSelection } from './useReaderSelection';
 import { useReaderShortcuts } from './useReaderShortcuts';
+import { useReaderNarration } from './useReaderNarration';
 
 /** Phases in which pages are on screen (the others show a message over the stage instead). */
 const SHOWS_PAGES = new Set(['ready', 'image-only']);
@@ -44,6 +47,13 @@ export function Reader() {
   const [dragging, setDragging] = useState(false);
   const findBar = useFindBar(controller, containerRef);
   const hasPages = SHOWS_PAGES.has(state.phase);
+  const narration = useReaderNarration(
+    controller,
+    containerRef,
+    openCount,
+    renderCount,
+    view?.pageCount ?? 0,
+  );
 
   useReaderSelection(containerRef, renderCount, hasPages ? openCount : null);
   useReaderShortcuts({
@@ -71,11 +81,12 @@ export function Reader() {
   const { reset: resetFind } = findBar;
   const openFile = useCallback(
     (file: File) => {
+      narration.stop();
       setOpenCount((n) => n + 1);
       resetFind();
       void controller.openFile(file);
     },
-    [controller, resetFind],
+    [controller, resetFind, narration],
   );
 
   const pickFile = useCallback(() => fileInput.current?.click(), []);
@@ -111,6 +122,7 @@ export function Reader() {
   };
 
   const closeFile = () => {
+    narration.stop();
     resetFind();
     void controller.close();
     // The Close button is about to be disabled: keep keyboard focus somewhere useful.
@@ -174,6 +186,14 @@ export function Reader() {
       </header>
 
       <main className="reader__main">
+        {hasPages && view ? (
+          <ReaderPlayback
+            narration={narration}
+            pageCount={view.pageCount}
+            currentPage={view.page}
+            blocked={pendingLink !== null}
+          />
+        ) : null}
         {state.phase === 'image-only' ? <StateMessage state={state} dragging={false} /> : null}
         {pageErrors > 0 ? (
           <p
@@ -191,44 +211,56 @@ export function Reader() {
           </p>
         ) : null}
 
-        <div className="reader__stage">
-          <div
-            ref={containerRef}
-            className="reader__viewer-container"
-            role="region"
-            aria-label={t('readerViewerLabel')}
-            tabIndex={0}
-            inert={pendingLink !== null || overlay}
-            data-testid="viewer-container"
-          >
-            <div ref={viewerRef} className="pdfViewer" />
+        <div className="reader__workspace">
+          <div className="reader__stage">
+            <div
+              ref={containerRef}
+              className="reader__viewer-container"
+              role="region"
+              aria-label={t('readerViewerLabel')}
+              tabIndex={0}
+              inert={pendingLink !== null || overlay}
+              data-testid="viewer-container"
+            >
+              <div ref={viewerRef} className="pdfViewer" />
+            </div>
+
+            {overlay ? (
+              <div className="reader__overlay">
+                {state.phase === 'password-required' ? (
+                  <PasswordPrompt
+                    key={`${openCount}-${state.incorrect ? 'again' : 'first'}`}
+                    fileName={state.name}
+                    incorrect={state.incorrect === true}
+                    onSubmit={(password) => controller.submitPassword(password)}
+                    onCancel={() => controller.cancelPassword()}
+                  />
+                ) : (
+                  <StateMessage state={state} dragging={dragging} onOpen={pickFile} />
+                )}
+              </div>
+            ) : null}
+
+            {pendingLink ? (
+              <div className="reader__overlay reader__overlay--modal">
+                <LinkConfirm url={pendingLink.url} onAnswer={answerLink} />
+              </div>
+            ) : null}
+
+            {dragging ? (
+              <div className="reader__drop" aria-hidden="true" data-testid="drop-target">
+                <p>{t('readerDropActive')}</p>
+              </div>
+            ) : null}
           </div>
-
-          {overlay ? (
-            <div className="reader__overlay">
-              {state.phase === 'password-required' ? (
-                <PasswordPrompt
-                  key={`${openCount}-${state.incorrect ? 'again' : 'first'}`}
-                  fileName={state.name}
-                  incorrect={state.incorrect === true}
-                  onSubmit={(password) => controller.submitPassword(password)}
-                  onCancel={() => controller.cancelPassword()}
-                />
-              ) : (
-                <StateMessage state={state} dragging={dragging} onOpen={pickFile} />
-              )}
-            </div>
-          ) : null}
-
-          {pendingLink ? (
-            <div className="reader__overlay reader__overlay--modal">
-              <LinkConfirm url={pendingLink.url} onAnswer={answerLink} />
-            </div>
-          ) : null}
-
-          {dragging ? (
-            <div className="reader__drop" aria-hidden="true" data-testid="drop-target">
-              <p>{t('readerDropActive')}</p>
+          {hasPages ? (
+            <div className="reader__sidebar" inert={pendingLink !== null}>
+              <ReaderHighlights
+                controller={controller}
+                containerRef={containerRef}
+                renderCount={renderCount}
+                documentKey={openCount}
+              />
             </div>
           ) : null}
         </div>

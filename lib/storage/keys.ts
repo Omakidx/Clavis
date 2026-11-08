@@ -9,6 +9,8 @@ export const STORAGE_NAMESPACE = 'clavis.' as const;
 export const STORAGE_SCHEMA_VERSION = 1 as const;
 
 export const STORAGE_KEYS = {
+  /** Page-local color marks, keyed inside the record by a PDF's SHA-256 digest. */
+  readerHighlights: 'clavis.reader-highlights',
   /** Preferences (non-secret). `chrome.storage.local`. */
   preferences: 'clavis.preferences',
   /** Onboarding progress (non-secret). `chrome.storage.local`. */

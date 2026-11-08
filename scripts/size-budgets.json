@@ -1,5 +1,5 @@
 {
-  "$comment": "Content-script budget from docs/tech-stack.md section 6 (the observer and the card are unlisted scripts built to observer.js and explain-card.js at the package root) (D-08, raised to 18 KB by D-20). KB means 1024 bytes. Sizes are gzip level 9 of the built file. The toolbar (Preact) is injected on the first selection with its own 18 KB gzip budget; the explanation card loads separately (Phase 5) with its own budget: it carries its own Preact copy, the card styles and the session logic, and must stay free of zod and React. Reader budgets (Phase 7): the reader page loads reader-page-js at start, reader-lazy-ui on the first selection/Explain, pdfjs-js on the first opened file, pdfjs-data files on demand. Hashed chunk names come from the bundler; patterns match by prefix. maxZipBytes (3.2 MB) caps the store ZIP and maxUnpackedBytes (7 MiB; the 1.0.0 build unpacks to 5.2 MiB) caps the sum of its entries; both are enforced by scripts/audit-zip.mjs after `npm run zip`.",
+  "$comment": "Content-script budget from docs/tech-stack.md section 6 (the observer and the card are unlisted scripts built to observer.js and explain-card.js at the package root) (D-08, raised to 18 KB by D-20). KB means 1024 bytes. Sizes are gzip level 9 of each built file. The toolbar (Preact) is injected on the first selection with its own 18 KB gzip budget; the explanation card loads separately (Phase 5) with its own budget. Reader and side panel page budgets follow static JavaScript imports from the entry chunk, ignoring dynamic imports. Reader lazy UI follows the toolbar and explanation chunks, then subtracts the startup closure so shared chunks are charged only to startup. Hashed chunk names come from the bundler; patterns match by prefix. maxZipBytes (3.2 MB) caps the store ZIP and maxUnpackedBytes (7 MiB; the 1.0.0 build unpacks to 5.2 MiB) caps the sum of its entries; both are enforced by scripts/audit-zip.mjs after `npm run zip`.",
   "buildDir": ".output/chrome-mv3",
   "maxZipBytes": 3355443,
   "maxUnpackedBytes": 7340032,
@@ -27,47 +27,30 @@
     },
     {
       "id": "reader-page-js",
-      "description": "PDF reader page JavaScript loaded at start (shell, React, selection controller, Listen); excludes PDF.js and the lazily loaded toolbar/card",
-      "files": [
-        "chunks/reader-*.js",
-        "chunks/i18n-*.js",
-        "chunks/constants-*.js",
-        "chunks/jsx-runtime-*.js",
-        "chunks/trust-*.js",
-        "chunks/listen-*.js"
-      ],
+      "description": "PDF reader startup JavaScript: entry chunk and every static import, including shared React and validation code; excludes dynamic PDF.js and UI imports",
+      "files": ["chunks/reader-*.js"],
+      "includeStaticImports": true,
       "aggregate": true,
       "maxGzipBytes": 98304,
       "required": true
     },
     {
       "id": "sidepanel-page-js",
-      "description": "Side panel page JavaScript (Phase 8, FR-042): the React shell, the shared React chunk (the chunk that holds react and react-dom, whatever the bundler names it), the zod contracts used to validate the hand-off, the shared session logic and Listen. Loaded only when the user opens the panel",
-      "files": [
-        "chunks/sidepanel-*.js",
-        "chunks/constants-*.js",
-        "chunks/jsx-runtime-*.js",
-        "chunks/ui-*.js",
-        "chunks/messages-*.js",
-        "chunks/errors-*.js",
-        "chunks/session-*.js",
-        "chunks/listen-*.js"
-      ],
+      "description": "Side panel page JavaScript (Phase 8, FR-042): entry chunk and every static import, loaded when the user opens the panel",
+      "files": ["chunks/sidepanel-*.js"],
+      "includeStaticImports": true,
       "aggregate": true,
       "maxGzipBytes": 112640,
       "required": true
     },
     {
       "id": "reader-lazy-ui",
-      "description": "Toolbar (Preact) and explanation card, loaded by the reader on the first selection and the first Explain",
-      "files": [
-        "chunks/toolbar-*.js",
-        "chunks/preact-*.js",
-        "chunks/explanation-*.js",
-        "chunks/errors-*.js"
-      ],
+      "description": "Toolbar (Preact) and explanation card static import closure, excluding chunks already loaded at reader startup; the baseline build measured 29,832 gzip bytes",
+      "files": ["chunks/toolbar-*.js", "chunks/explanation-*.js", "chunks/preact-renderer-*.js"],
+      "includeStaticImports": true,
+      "excludeStaticImportsOf": ["chunks/reader-*.js"],
       "aggregate": true,
-      "maxGzipBytes": 24576,
+      "maxGzipBytes": 30720,
       "required": true
     },
     {

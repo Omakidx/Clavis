@@ -15,11 +15,14 @@ test("the reader's empty state links to the PDF help in Settings", async ({
   extensionId,
 }) => {
   const { page } = await openReader(context, extensionId);
-  const opened = context.waitForEvent('page');
+  // Listen to this link's popup, excluding the install-time welcome tab created in parallel.
+  const opened = page.waitForEvent('popup');
   await page.getByRole('link', { name: /Why doesn't Clavis work in Chrome's PDF viewer/ }).click();
   const settings = await opened;
   await settings.waitForLoadState();
-  expect(settings.url()).toBe(`chrome-extension://${extensionId}/options.html#section-help-pdf`);
+  await expect(settings).toHaveURL(
+    `chrome-extension://${extensionId}/options.html#section-help-pdf`,
+  );
   const help = settings.getByTestId('pdf-help');
   await expect(help).toBeInViewport();
   await expect(help).toContainText("can't add a toolbar to");

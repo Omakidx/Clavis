@@ -88,7 +88,11 @@ const cases: Case[] = [
 for (const c of cases) {
   test(`${c.file}: text layer aligned with the canvas and mouse selection exact at 100%, 150%, 175% and fit width`, async () => {
     test.setTimeout(150_000);
-    const reader = await h.openReader(WINDOW);
+    // Embedded GS text reaches x=1336 at 175%. Leave enough room for the reader's persistent
+    // 244px highlight sidebar while keeping the acceptance zoom and real pointer selection.
+    const viewport =
+      c.file === 'font-gs-embedded.pdf' ? { width: 1650, height: WINDOW.height } : WINDOW;
+    const reader = await h.openReader(viewport);
     await reader.openReady(c.file);
     for (const zoom of c.zooms ?? ZOOMS) {
       await reader.setZoom(zoom);

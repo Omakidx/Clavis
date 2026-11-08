@@ -10,6 +10,7 @@ import { normalizeKangxiRadicals } from './radicals';
 import { loadPdfJs, type PdfJs } from './pdfjs';
 import { readFileBytes } from './read';
 import { isWasmAllowed } from './wasm';
+import { buildReaderPageText, type ReaderPageText } from './reader-text';
 import {
   EMPTY_STATE,
   clampPage,
@@ -140,6 +141,8 @@ export class PdfReaderController {
   #fileName = '';
   /** Incremented by every open/close so stale async continuations can bail out. */
   #token = 0;
+  #documentId: string | null = null;
+  readonly #textPages = new Map<number, Promise<ReaderPageText | null>>();
 
   #elements: ViewerElements | null;
   #confirm: LinkConfirmer;
@@ -178,6 +181,31 @@ export class PdfReaderController {
   };
 
   readonly getSnapshot = (): ReaderSnapshot => this.#snapshot;
+
+  /** Stable content identity for local reading marks; never derived from the filename. */
+  get documentId(): string | null {
+    return this.#documentId;
+  }
+
+  /** Text is loaded on demand, independently of rendered canvases. Keep at most three pages. */
+  readPageText(page: number): Promise<ReaderPageText | null> {
+    const doc = this.#doc;
+    if (!doc || !Number.isInteger(page) || page < 1 || page > doc.numPages)
+      return Promise.resolve(null);
+    const cached = this.#textPages.get(page);
+    if (cached) return cached;
+    const token = this.#token;
+    const pending = (async () => {
+      const pdfPage = await doc.getPage(page);
+      if (token !== this.#token) return null;
+      // Match TextLayerBuilder's normalization setting exactly so offsets map to visible spans.
+      const content = await pdfPage.getTextContent({ disableNormalization: true });
+      return token === this.#token ? buildReaderPageText(page, content) : null;
+    })();
+    this.#textPages.set(page, pending);
+    while (this.#textPages.size > 3) this.#textPages.delete(this.#textPages.keys().next().value!);
+    return pending;
+  }
 
   #setSnapshot(patch: Partial<ReaderSnapshot>): void {
     this.#snapshot = { ...this.#snapshot, ...patch };
@@ -236,6 +264,20 @@ export class PdfReaderController {
     if (!hasPdfHeader(bytes)) {
       this.#setSnapshot({ state: notAPdfState() });
       return;
+    }
+
+    // Hash before PDF.js transfers the buffer to its worker. No document bytes are persisted.
+    if (globalThis.crypto?.subtle) {
+      let digest: ArrayBuffer | null = null;
+      try {
+        digest = await crypto.subtle.digest('SHA-256', bytes as Uint8Array<ArrayBuffer>);
+      } catch {
+        // Reading still works if storage identity cannot be computed; annotations stay disabled.
+      }
+      if (token !== this.#token) return;
+      this.#documentId = digest
+        ? Array.from(new Uint8Array(digest), (b) => b.toString(16).padStart(2, '0')).join('')
+        : null;
     }
 
     try {
@@ -308,6 +350,8 @@ export class PdfReaderController {
   /** Tear down the current document and return a fresh token for the next load. */
   async #reset(): Promise<number> {
     const token = ++this.#token;
+    this.#documentId = null;
+    this.#textPages.clear();
     this.#gate.reset();
     const task = this.#task;
     this.#task = null;
@@ -429,6 +473,9 @@ export class PdfReaderController {
       frame = 0;
       const value = viewer.currentScaleValue;
       if (!this.#doc || !value || !Number.isNaN(Number(value))) return;
+      // Navigation can precede PDF.js's deferred scroll update. Refresh its cached location
+      // before a fit preset restores it, so a resize cannot send the reader back a page.
+      viewer.update();
       viewer.currentScaleValue = value;
     };
     new ResizeObserver(() => {
@@ -549,7 +596,12 @@ export class PdfReaderController {
   /** Set an exact zoom factor (1 = 100%). */
   setZoom(scale: number): void {
     const viewer = this.#ready;
-    if (viewer && Number.isFinite(scale) && scale > 0) viewer.currentScale = scale;
+    if (viewer && Number.isFinite(scale) && scale > 0) {
+      viewer.currentScale = scale;
+      // PDF.js does not emit scalechanging when a numeric scale equals the current fit preset.
+      // Still reflect the explicit choice so resize no longer treats it as Fit width.
+      this.#setView({ zoom: viewer.currentScale, scaleValue: viewer.currentScaleValue });
+    }
   }
 
   zoomIn(): void {

@@ -1,5 +1,5 @@
 import { useState, type FormEvent, type Ref } from 'react';
-import { ChevronIcon, ZoomIcon } from '../common/Icons';
+import { ChevronIcon, ZoomIcon } from '../common/NavigationIcons';
 import { t } from '../../lib/i18n';
 import type { PdfReaderController, ViewStatus } from '../../lib/pdf/controller';
 import { FIT_WIDTH, ZOOM_PRESETS } from '../../lib/pdf/limits';
@@ -55,13 +55,50 @@ export function ReaderToolbar({
         <button
           ref={openRef}
           type="button"
-          className="clavis-button clavis-button--primary"
+          className="clavis-button clavis-button--primary reader-toolbar__compact-action"
+          aria-label={t('readerOpen')}
+          title={t('readerOpen')}
           onClick={onOpen}
         >
-          {t('readerOpen')}
+          <svg
+            className="reader-toolbar__small-icon"
+            viewBox="0 0 20 20"
+            width="18"
+            height="18"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            aria-hidden="true"
+          >
+            <path
+              d="M2.5 5.5h5l1.5 2h8.5v7.5a1.5 1.5 0 0 1-1.5 1.5h-12A1.5 1.5 0 0 1 2.5 15V5.5Z"
+              strokeLinejoin="round"
+            />
+            <path d="M10 11.5h5m-2.5-2.5v5" strokeLinecap="round" />
+          </svg>
+          <span className="reader-toolbar__action-text">{t('readerOpen')}</span>
         </button>
-        <button type="button" className="clavis-button" disabled={disabled} onClick={onClose}>
-          {t('readerClose')}
+        <button
+          type="button"
+          className="clavis-button reader-toolbar__compact-action"
+          disabled={disabled}
+          onClick={onClose}
+          aria-label={t('readerClose')}
+          title={t('readerClose')}
+        >
+          <svg
+            className="reader-toolbar__small-icon"
+            viewBox="0 0 20 20"
+            width="18"
+            height="18"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            aria-hidden="true"
+          >
+            <path d="M4 4l12 12M16 4 4 16" strokeLinecap="round" />
+          </svg>
+          <span className="reader-toolbar__action-text">{t('readerClose')}</span>
         </button>
       </div>
 
@@ -149,7 +186,7 @@ export function ReaderToolbar({
         </button>
         <button
           type="button"
-          className="clavis-button"
+          className="clavis-button reader-toolbar__fit-button"
           disabled={disabled}
           onClick={() => controller.fitWidth()}
           data-testid="fit-width"
@@ -161,15 +198,30 @@ export function ReaderToolbar({
       <div className="reader-toolbar__group">
         <button
           type="button"
-          className="clavis-button reader-toggle"
+          className="clavis-button reader-toggle reader-toolbar__compact-action"
           disabled={disabled}
+          aria-label={t('readerFindToggle')}
+          title={t('readerFindToggle')}
           aria-pressed={findOpen}
           aria-controls={findOpen ? 'reader-find-bar' : undefined}
           aria-keyshortcuts="Control+F Meta+F"
           onClick={onToggleFind}
           data-testid="find-toggle"
         >
-          {t('readerFindToggle')}
+          <svg
+            className="reader-toolbar__small-icon"
+            viewBox="0 0 20 20"
+            width="18"
+            height="18"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            aria-hidden="true"
+          >
+            <circle cx="8.5" cy="8.5" r="5.5" />
+            <path d="m12.5 12.5 4 4" strokeLinecap="round" />
+          </svg>
+          <span className="reader-toolbar__action-text">{t('readerFindToggle')}</span>
         </button>
       </div>
     </div>

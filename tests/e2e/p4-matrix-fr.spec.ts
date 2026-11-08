@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { installScriptedTts } from './p6-listen-support/listen';
+import { installScriptedTts, scriptedCalls } from './p6-listen-support/listen';
 import {
   axeOnToolbar,
   expectHidden,
@@ -49,7 +49,6 @@ import {
 let harness: Harness;
 test.beforeAll(async () => {
   harness = await startHarness();
-  await installScriptedTts(harness.ext.serviceWorker);
 });
 test.afterAll(async () => {
   await harness?.close();
@@ -901,6 +900,12 @@ async function focusedCardControl(page: Page, name: string): Promise<boolean> {
 
 // --------------------------------------------------------------------------------------------
 test.describe('FR-013 Listen, Slow and Explain, by mouse and by keyboard', () => {
+  test.beforeEach(async () => {
+    // The full matrix can run for minutes before reaching speech. Install its engine at the
+    // point of use so every test owns its callbacks, independent of the worker's earlier life.
+    await installScriptedTts(harness.ext.serviceWorker);
+  });
+
   test('Listen, Slow and Explain are visible together with their names', async () => {
     await withFixture('plain-baseline', async ({ page }) => {
       await selectText(
@@ -929,6 +934,9 @@ test.describe('FR-013 Listen, Slow and Explain, by mouse and by keyboard', () =>
       expect(await expectShown(page)).toBe(true);
       // Speech is shown on its button; successful pronunciation has no extra status label.
       await clickAction(page, 'listen');
+      await expect
+        .poll(async () => (await scriptedCalls(harness.ext.serviceWorker)).length)
+        .toBe(1);
       await expect
         .poll(() => toolbar(page).attr(actionSelector('listen'), 'data-state'))
         .toBe('playing');
@@ -1001,6 +1009,9 @@ test.describe('FR-013 Listen, Slow and Explain, by mouse and by keyboard', () =>
       await page.keyboard.press('ArrowRight');
       expect(await toolbar(page).focusedAction()).toBe('listen');
       await page.keyboard.press('Space');
+      await expect
+        .poll(async () => (await scriptedCalls(harness.ext.serviceWorker)).length)
+        .toBe(1);
       await expect
         .poll(() => toolbar(page).attr(actionSelector('listen'), 'data-state'))
         .toBe('playing');
