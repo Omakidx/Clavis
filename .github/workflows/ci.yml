@@ -98,7 +98,7 @@ jobs:
   e2e-shards:
     name: Browser suite (${{ matrix.os }}, shard ${{ matrix.shard }})
     needs: checks
-    runs-on: ${{ matrix.runner || matrix.os }}
+    runs-on: ${{ matrix.os }}
     # Keep one browser worker per runner, but split the full suite across four runners per OS.
     # The unsharded 1,000+ tests exceed the job limit, especially with failure retries.
     timeout-minutes: 30
@@ -115,11 +115,6 @@ jobs:
             playwright-install-args: ''
           - os: macos-latest
             playwright-install-args: ''
-          # The latency benchmarks in shard 4 use native foreground windows on this pinned
-          # standard Intel image. Other macOS shards retain the usual ARM headless coverage.
-          - os: macos-latest
-            shard: 4
-            runner: macos-26-intel
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
