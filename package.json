@@ -28,7 +28,7 @@
     "ci": "npm run check && npm run build && npm run size && npm run zip && npm run audit:zip && node scripts/selftest.mjs && node scripts/scan-secrets.mjs"
   },
   "dependencies": {
-    "pdfjs-dist": "6.4.299",
+    "pdfjs-dist": "6.5.438",
     "preact": "^11.0.1",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
