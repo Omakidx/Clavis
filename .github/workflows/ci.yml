@@ -106,9 +106,7 @@ jobs:
       fail-fast: false
       matrix:
         shard: [1, 2, 3, 4]
-        # The 3-core/7-GB ARM macos-latest hosts repeatedly starved Chromium frames during
-        # latency checks. Use the standard 4-core/14-GB Intel macOS 26 image, retaining every
-        # browser test and its original timing ceiling rather than weakening the gate.
+        # Pin the standard macOS image/architecture so timing comparisons use the same hardware.
         os: [ubuntu-latest, windows-latest, macos-26-intel]
         include:
           - os: ubuntu-latest
@@ -145,8 +143,12 @@ jobs:
         if: runner.os == 'Linux'
         run: sudo apt-get install -y fonts-noto-cjk
 
-      # The fixture uses Chromium's new headless mode, which supports extensions, so no xvfb is needed.
+      # macOS headless runs starved frames even on the larger Intel runner. Exercise its native
+      # foreground window for speech and frame-timing checks; keep every latency ceiling intact.
+      # Linux/Windows use extension-capable new headless mode, so Linux needs no xvfb here.
       - name: Run E2E tests
+        env:
+          CLAVIS_E2E_HEADED: ${{ runner.os == 'macOS' && '1' || '0' }}
         run: npm run test:e2e -- --shard=${{ matrix.shard }}/4
 
       - name: Upload Playwright report

@@ -134,10 +134,15 @@ export async function installScriptedTts(
   voices: ScriptedVoice[] = SCRIPTED_VOICES,
 ): Promise<void> {
   await worker.evaluate((list) => {
+    type Api = { runtime?: { id?: string }; tts: Record<string, unknown> };
     const g = globalThis as unknown as {
-      chrome: { tts: Record<string, unknown> };
+      chrome: Api;
+      browser?: Api;
       __tts?: unknown;
     };
+    // Patch the same namespace the app imports through wxt/browser, including Chromium builds
+    // that expose a separate `browser` binding. Patching only `chrome` can leave real audio live.
+    const api = g.browser?.runtime?.id ? g.browser : g.chrome;
     const state = {
       voices: list,
       calls: [] as { voiceName?: string; lang?: string; rate?: number; chars: number }[],
@@ -145,8 +150,8 @@ export async function installScriptedTts(
       current: undefined as undefined | ((e: { type: string }) => void),
     };
     g.__tts = state;
-    g.chrome.tts['getVoices'] = () => Promise.resolve(state.voices);
-    g.chrome.tts['speak'] = (
+    api.tts['getVoices'] = () => Promise.resolve(state.voices);
+    api.tts['speak'] = (
       text: string,
       opts: {
         voiceName?: string;
@@ -170,7 +175,7 @@ export async function installScriptedTts(
       }, 5);
       return Promise.resolve();
     };
-    g.chrome.tts['stop'] = () => {
+    api.tts['stop'] = () => {
       state.stops += 1;
       const current = state.current;
       state.current = undefined;
