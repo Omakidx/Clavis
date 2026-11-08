@@ -29,7 +29,7 @@
   },
   "dependencies": {
     "pdfjs-dist": "6.4.299",
-    "preact": "^11.0.1",
+    "preact": "^11.1.1",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
     "zod": "^4.6.7"
