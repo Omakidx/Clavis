@@ -55,13 +55,17 @@ export const test = base.extend<ExtensionFixtures>({
     }
   },
 
-  serviceWorker: async ({ context }, provide) => {
-    // The worker may already be up before we listen, so check first, then wait.
-    const serviceWorker =
-      context.serviceWorkers()[0] ??
-      (await context.waitForEvent('serviceworker', { timeout: 15_000 }));
-    await provide(serviceWorker);
-  },
+  serviceWorker: [
+    async ({ context }, provide) => {
+      // Match the fresh-profile installation deadline in spike-b-support/extension.ts. Slow
+      // Windows installation is setup, separate from functional and request timing assertions.
+      const serviceWorker =
+        context.serviceWorkers()[0] ??
+        (await context.waitForEvent('serviceworker', { timeout: 30_000 }));
+      await provide(serviceWorker);
+    },
+    { timeout: 45_000 },
+  ],
 
   extensionId: async ({ serviceWorker }, provide) => {
     await provide(new URL(serviceWorker.url()).host);

@@ -106,14 +106,17 @@ jobs:
       fail-fast: false
       matrix:
         shard: [1, 2, 3, 4]
-        os: [ubuntu-latest, windows-latest, macos-latest]
+        # The 3-core/7-GB ARM macos-latest hosts repeatedly starved Chromium frames during
+        # latency checks. Use the standard 4-core/14-GB Intel macOS 26 image, retaining every
+        # browser test and its original timing ceiling rather than weakening the gate.
+        os: [ubuntu-latest, windows-latest, macos-26-intel]
         include:
           - os: ubuntu-latest
             # Linux needs the system libraries Chromium links against.
             playwright-install-args: '--with-deps'
           - os: windows-latest
             playwright-install-args: ''
-          - os: macos-latest
+          - os: macos-26-intel
             playwright-install-args: ''
     steps:
       - name: Checkout

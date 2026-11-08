@@ -160,6 +160,9 @@ test('whole-document playback advances only after each mocked utterance ends', a
     const status = (await page.locator('.reader-playback__status').textContent()) ?? '';
     if (/Reading page ([2-9]|[1-9]\d+) of 100/.test(status)) break;
     const before = (await speakMessages(page)).length;
+    // The page records its request before the worker installs the scripted audio callback.
+    // Finish the utterance only once that engine call exists, as real audio cannot end earlier.
+    await expect.poll(async () => (await scriptedCalls(serviceWorker)).length).toBe(before);
     await finishAudio(serviceWorker);
     await expect.poll(async () => (await speakMessages(page)).length).toBeGreaterThan(before);
   }
