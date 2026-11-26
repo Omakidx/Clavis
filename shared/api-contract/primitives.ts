@@ -2,8 +2,8 @@ import { z } from 'zod';
 
 export const Hex64 = z.string().regex(/^[0-9a-f]{64}$/);
 export const Uuid = z.uuid();
-/** Milliseconds since the epoch, no earlier than 2020-01-01. */
-export const EpochMs = z.number().int().min(1_577_836_800_000);
+/** Milliseconds since the epoch, from 2020-01-01 to the end of year 9999 (the range a Date and Postgres can hold). */
+export const EpochMs = z.number().int().min(1_577_836_800_000).max(253_402_300_799_999);
 /** A bigint sequence number carried as a decimal string. */
 export const Seq = z.string().regex(/^\d{1,19}$/);
 /** Plain text only; UIs render it as text nodes (D-10). */

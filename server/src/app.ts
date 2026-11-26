@@ -15,7 +15,10 @@ import { ApiException, errorBody, sendError } from './http/errors';
 import { RateLimiter } from './http/rate-limit';
 import type { AppEnv } from './http/types';
 import type { Logger } from './logger';
+import { documentRoutes } from './documents/routes';
 import { dashboardStatic, isApiPath } from './static';
+import { syncRoutes } from './sync/routes';
+import { wordRoutes } from './words/routes';
 
 export { errorBody } from './http/errors';
 
@@ -107,13 +110,27 @@ export function createApp({ config, logger, db, dashboardDir, now, google, limit
     now: clock,
     google,
   });
-  if (runtime) {
+  if (runtime && db?.db) {
     app.route('/v1/auth/extension', extensionRoutes(runtime));
     app.route('/', webRoutes(runtime));
     app.route('/', accountRoutes(runtime));
+    app.route('/', syncRoutes(runtime, db.db, logger));
+    app.route('/', wordRoutes(runtime, db.db));
+    app.route('/', documentRoutes(runtime, db.db, logger));
   } else {
     // Development without Google credentials or a database: say so instead of a misleading 404.
-    for (const p of ['/v1/auth/*', '/auth/*', '/v1/session', '/v1/account', '/v1/account/*']) {
+    for (const p of [
+      '/v1/auth/*',
+      '/auth/*',
+      '/v1/session',
+      '/v1/account',
+      '/v1/account/*',
+      '/v1/sync/*',
+      '/v1/words',
+      '/v1/words/*',
+      '/v1/documents',
+      '/v1/documents/*',
+    ]) {
       app.all(p, () => {
         throw new ApiException('UNAVAILABLE', 'Authentication is not configured');
       });

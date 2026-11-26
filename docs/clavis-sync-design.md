@@ -426,6 +426,12 @@ Client application of pulled changes:
 - skip if the local record is dirty and its `clientModifiedAt` is newer; it will be pushed and LWW decides;
 - otherwise overwrite;
 - a tombstone deletes the record locally; a word tombstone also deletes the word's messages; a document tombstone also deletes its highlights.
+- **children may arrive before their parent.** Rows keep their own seq, so a chat message or highlight can be pulled in an earlier page than its word or document (for example after the parent was re-saved). Apply children even when the parent is not local yet, and reconcile orphans only after `hasMore = false`. Never drop a pulled child for a missing parent mid-pull: once the cursor moves past it, it is gone.
+- **chat after a word delete and re-save.** A word delete hard-deletes its messages on the server without telling other devices. When a pull brings a live word, drop that word's local messages that are not dirty and have `seq` ≤ the word's seq but were not seen in this pull or any later one (in practice, during full resync step 2 and after a word the client had seen deleted).
+
+Client push results (confirmed by the server's convergence test): `stale` → overwrite with `current` and clear `dirty`; `rejected` with `NOT_FOUND` or `LIMIT_EXCEEDED` → drop the local record (the server never had it); other `rejected` → keep local, clear `dirty`, count it.
+
+Local document delete (signed in) must tombstone each of the document's highlights locally (each dirty), not just drop them: if the server answers `stale` for the document delete because another device edited it later, it does not cascade, and dropped highlights would stay live on the server.
 
 ### 4.7 Client scheduling, first sign-in, sign-out, account switching
 

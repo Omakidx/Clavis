@@ -1,6 +1,7 @@
 import type { Context } from 'hono';
 import { ERROR_STATUS, type ApiError, type ErrorCode } from '../../../shared/api-contract';
 import type { z } from 'zod';
+import { readJsonBody } from './body';
 
 /** An error that maps to the §5 envelope. Messages are static English text: never user content or secrets. */
 export class ApiException extends Error {
@@ -48,15 +49,5 @@ export async function parseJsonBody<S extends z.ZodType>(
   c: Context,
   schema: S,
 ): Promise<z.infer<S>> {
-  const type = (c.req.header('content-type') ?? '').split(';')[0]?.trim().toLowerCase();
-  if (type !== 'application/json') {
-    throw new ApiException('UNSUPPORTED_MEDIA_TYPE', 'Content-Type must be application/json');
-  }
-  let raw: unknown;
-  try {
-    raw = await c.req.json();
-  } catch {
-    throw new ApiException('VALIDATION_FAILED', 'Request body is not valid JSON');
-  }
-  return parseOrThrow(schema, raw);
+  return parseOrThrow(schema, await readJsonBody(c));
 }
