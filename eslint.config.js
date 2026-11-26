@@ -18,6 +18,9 @@ export default tseslint.config(
       '.claude/**',
       '.codex/**',
       '.agents/**',
+      // Own packages with their own eslint.config.js (docs/clavis-sync-design.md §9).
+      'server/**',
+      'dashboard/**',
     ],
   },
   js.configs.recommended,
@@ -75,6 +78,10 @@ export default tseslint.config(
         {
           patterns: [
             { group: ['node:*'], message: 'Node modules are not available in the extension.' },
+            {
+              group: ['**/server', '**/server/**', '**/dashboard', '**/dashboard/**'],
+              message: 'Server and dashboard code must never be bundled into the extension.',
+            },
           ],
         },
       ],

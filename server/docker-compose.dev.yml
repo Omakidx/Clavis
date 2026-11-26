@@ -1,0 +1,41 @@
+# Local development services (docs/clavis-sync-design.md §9). Development credentials only.
+# Ports are bound to loopback. Postgres is on 5433 because 5432 is commonly taken by another local Postgres.
+name: clavis-dev
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: clavis
+      POSTGRES_PASSWORD: clavis-dev-only
+      POSTGRES_DB: clavis
+    ports:
+      - '127.0.0.1:5433:5432'
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U clavis -d clavis']
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  # MinIO no longer publishes images on Docker Hub or quay.io; this is the last Bitnami build (dev only, frozen).
+  minio:
+    image: bitnamilegacy/minio:2025.7.23-debian-12-r5
+    environment:
+      MINIO_ROOT_USER: clavis-dev
+      MINIO_ROOT_PASSWORD: clavis-dev-only
+      MINIO_DEFAULT_BUCKETS: clavis-dev
+    ports:
+      - '127.0.0.1:9000:9000'
+      - '127.0.0.1:9001:9001'
+    volumes:
+      - miniodata:/bitnami/minio/data
+    healthcheck:
+      test: ['CMD-SHELL', 'curl -fs http://localhost:9000/minio/health/live']
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+volumes:
+  pgdata:
+  miniodata:

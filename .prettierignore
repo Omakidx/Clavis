@@ -11,3 +11,6 @@ docs
 .claude
 .codex
 .agents
+server/dist
+dashboard/dist
+server/migrations/meta

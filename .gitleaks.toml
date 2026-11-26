@@ -47,3 +47,12 @@ paths = ['''(^|/)tests/fixtures/pdf/accept/manifest\.json$''']
 description = "Test spec names mentioned in docs"
 targetRules = ["generic-api-key"]
 regexes = ['''^p9-secret-boundary$''']
+
+# The development manifest `key` in wxt.config.ts is the PUBLIC half of an RSA key; it only pins
+# the unpacked extension ID (Clavis Sync OAuth redirect and CORS). It grants no access and the
+# private half was never kept. Store ZIPs strip it before packaging.
+[[allowlists]]
+description = "Public development manifest key (extension ID pin)"
+targetRules = ["generic-api-key"]
+paths = ['''(^|/)wxt\.config\.ts$''']
+regexes = ['''MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA[A-Za-z0-9+/=]+''']

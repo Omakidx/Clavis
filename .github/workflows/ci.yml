@@ -300,3 +300,56 @@ jobs:
           include-hidden-files: true
           if-no-files-found: error
           retention-days: 90
+
+  # Clavis Sync backend (docs/clavis-sync-design.md §9). Independent of the extension jobs above:
+  # server/ and dashboard/ are separate npm packages, so nothing here touches the root install.
+  server:
+    name: Server (typecheck, lint, test, build)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: clavis
+          POSTGRES_PASSWORD: clavis-ci-only
+          POSTGRES_DB: clavis_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U clavis -d clavis_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      TEST_DATABASE_URL: postgres://clavis:clavis-ci-only@localhost:5432/clavis_test
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            server/package-lock.json
+            dashboard/package-lock.json
+
+      - name: Install server and dashboard dependencies
+        run: npm ci --prefix server && npm ci --prefix dashboard
+
+      - name: Check zod versions match across root, server and dashboard
+        run: node scripts/check-zod-version.mjs
+
+      - name: Build dashboard
+        run: npm run build --prefix dashboard
+
+      - name: Lint dashboard
+        run: npm run lint --prefix dashboard
+
+      - name: Typecheck, lint, test and build server
+        run: npm run ci --prefix server
