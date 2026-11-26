@@ -4,7 +4,41 @@ import { ConfigError, loadConfig } from '../src/config';
 const B64_32 = Buffer.alloc(32, 7).toString('base64');
 const EXT_ID = 'abcdefghijklmnopabcdefghijklmnop';
 
+const PROD_ENV = {
+  NODE_ENV: 'production',
+  DATABASE_URL: 'postgres://u:p@db.internal:5432/clavis',
+  GOOGLE_CLIENT_ID: 'id.apps.googleusercontent.com',
+  GOOGLE_CLIENT_SECRET: 'secret',
+  ALLOWED_EXTENSION_IDS: EXT_ID,
+  TOKEN_SIGNING_SECRET: Buffer.alloc(32, 1).toString('base64'),
+  STATE_COOKIE_SECRET: Buffer.alloc(32, 2).toString('base64'),
+  PUBLIC_ORIGIN: 'https://clavis-api-production.up.railway.app',
+};
+
 describe('loadConfig', () => {
+  it('requires every auth variable in production, naming each missing one without values', () => {
+    for (const name of [
+      'DATABASE_URL',
+      'GOOGLE_CLIENT_ID',
+      'GOOGLE_CLIENT_SECRET',
+      'ALLOWED_EXTENSION_IDS',
+      'TOKEN_SIGNING_SECRET',
+      'STATE_COOKIE_SECRET',
+    ]) {
+      const env: Record<string, string> = { ...PROD_ENV };
+      delete env[name];
+      expect(() => loadConfig(env)).toThrow(new RegExp(`${name}: is required in production`));
+    }
+    expect(() => loadConfig(PROD_ENV)).not.toThrow();
+  });
+
+  it('rejects reusing one secret for tokens and the state cookie', () => {
+    const s = Buffer.alloc(32, 9).toString('base64');
+    expect(() => loadConfig({ TOKEN_SIGNING_SECRET: s, STATE_COOKIE_SECRET: s })).toThrow(
+      /STATE_COOKIE_SECRET/,
+    );
+  });
+
   it('accepts an empty environment with defaults', () => {
     const c = loadConfig({});
     expect(c.nodeEnv).toBe('development');
@@ -40,7 +74,7 @@ describe('loadConfig', () => {
       /https/,
     );
     const c = loadConfig({
-      NODE_ENV: 'production',
+      ...PROD_ENV,
       PUBLIC_ORIGIN: 'https://clavis-api-production.up.railway.app/',
     });
     expect(c.publicOrigin).toBe('https://clavis-api-production.up.railway.app');

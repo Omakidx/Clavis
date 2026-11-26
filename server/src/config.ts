@@ -62,6 +62,28 @@ const EnvSchema = z
         });
       }
     }
+    if (env.NODE_ENV === 'production') {
+      // Sign-in cannot work without these, so a production boot must fail fast instead of serving 503s.
+      const required: Array<[string, unknown]> = [
+        ['DATABASE_URL', env.DATABASE_URL],
+        ['GOOGLE_CLIENT_ID', env.GOOGLE_CLIENT_ID],
+        ['GOOGLE_CLIENT_SECRET', env.GOOGLE_CLIENT_SECRET],
+        ['ALLOWED_EXTENSION_IDS', env.ALLOWED_EXTENSION_IDS?.split(',').some((s) => s.trim())],
+        ['TOKEN_SIGNING_SECRET', env.TOKEN_SIGNING_SECRET],
+        ['STATE_COOKIE_SECRET', env.STATE_COOKIE_SECRET],
+      ];
+      for (const [name, value] of required) {
+        if (!value)
+          ctx.addIssue({ code: 'custom', path: [name], message: 'is required in production' });
+      }
+    }
+    if (env.TOKEN_SIGNING_SECRET && env.TOKEN_SIGNING_SECRET === env.STATE_COOKIE_SECRET) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['STATE_COOKIE_SECRET'],
+        message: 'must differ from TOKEN_SIGNING_SECRET',
+      });
+    }
     if (env.PUBLIC_ORIGIN) {
       const u = new URL(env.PUBLIC_ORIGIN);
       if (u.pathname !== '/' || u.search || u.hash || u.username) {

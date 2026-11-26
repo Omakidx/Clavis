@@ -25,3 +25,15 @@ credentials are development-only (see `docker-compose.dev.yml`). MinIO bucket: `
 - `node dist/migrate.js` applies them (Railway pre-deploy). It is a no-op until `migrations/meta/_journal.json` exists.
 - DB client: `createDb(url, logger)` in `src/db/client.ts` returns `{ pool, db, ping, close }`.
 - Integration tests read `TEST_DATABASE_URL` and skip when it is unset. They must only touch a throwaway database.
+
+## Authentication (design §2)
+
+- Routes: `POST /v1/auth/extension/{google,refresh,logout}`, `GET /auth/google/{start,callback}`, `POST /auth/logout`,
+  `GET /v1/session`, `GET /v1/account`, `POST /v1/account/logout-all`, `GET /v1/meta`.
+- Code: `src/auth/` (Google client, tokens, store, middleware, routes), `src/http/` (errors, CORS, CSRF, rate limiter),
+  `src/account/` (account and meta routes).
+- Required in production (config fails fast, naming variables only): `DATABASE_URL`, `PUBLIC_ORIGIN` (https),
+  `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `ALLOWED_EXTENSION_IDS`, `TOKEN_SIGNING_SECRET`, `STATE_COOKIE_SECRET`
+  (the two secrets must differ). Outside production a missing variable makes the auth routes answer `503 UNAVAILABLE`.
+- Plain-http dev origins use cookie names without the `__Host-` prefix and without `Secure`.
+- Tests mock Google's token endpoint and JWKS (`test/auth/harness.ts`); integration tests need `TEST_DATABASE_URL`.
