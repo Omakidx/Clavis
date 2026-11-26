@@ -1,7 +1,9 @@
+import { createHash } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 import { ConfigError, loadConfig } from '../src/config';
 
-const B64_32 = Buffer.alloc(32, 7).toString('base64');
+const secretOf = (l: string) => createHash('sha256').update(l).digest('base64');
+const B64_32 = secretOf('s7');
 const EXT_ID = 'abcdefghijklmnopabcdefghijklmnop';
 
 const PROD_ENV = {
@@ -10,12 +12,70 @@ const PROD_ENV = {
   GOOGLE_CLIENT_ID: 'id.apps.googleusercontent.com',
   GOOGLE_CLIENT_SECRET: 'secret',
   ALLOWED_EXTENSION_IDS: EXT_ID,
-  TOKEN_SIGNING_SECRET: Buffer.alloc(32, 1).toString('base64'),
-  STATE_COOKIE_SECRET: Buffer.alloc(32, 2).toString('base64'),
+  TOKEN_SIGNING_SECRET: secretOf('s1'),
+  STATE_COOKIE_SECRET: secretOf('s2'),
+  TRUST_PROXY: '1',
   PUBLIC_ORIGIN: 'https://clavis-api-production.up.railway.app',
 };
 
 describe('loadConfig', () => {
+  it('requires TRUST_PROXY=1 in production', () => {
+    const env: Record<string, string> = { ...PROD_ENV };
+    delete env['TRUST_PROXY'];
+    expect(() => loadConfig(env)).toThrow(/TRUST_PROXY: must be 1 in production/);
+    expect(() => loadConfig({ ...env, TRUST_PROXY: '0' })).toThrow(/TRUST_PROXY/);
+    expect(loadConfig(PROD_ENV).trustProxy).toBe(true);
+    expect(() => loadConfig({})).not.toThrow(); // dev stays ergonomic
+  });
+
+  it('client IP source: safest default, validated override and hop count', () => {
+    const d = loadConfig({});
+    expect(d.clientIpHeader).toBe('xff-rightmost');
+    expect(d.trustedProxyHops).toBe(1);
+    expect(loadConfig({ CLIENT_IP_HEADER: 'x-real-ip', TRUSTED_PROXY_HOPS: '2' })).toMatchObject({
+      clientIpHeader: 'x-real-ip',
+      trustedProxyHops: 2,
+    });
+    expect(() => loadConfig({ CLIENT_IP_HEADER: 'x-evil' })).toThrow(/CLIENT_IP_HEADER/);
+    expect(() => loadConfig({ TRUSTED_PROXY_HOPS: '0' })).toThrow(/TRUSTED_PROXY_HOPS/);
+  });
+
+  it('rejects low-entropy secrets (repeated byte) without echoing them', () => {
+    const weak = Buffer.alloc(32, 65).toString('base64');
+    for (const name of [
+      'TOKEN_SIGNING_SECRET',
+      'STATE_COOKIE_SECRET',
+      'TOKEN_SIGNING_SECRET_PREVIOUS',
+    ]) {
+      let msg = '';
+      try {
+        loadConfig({ [name]: weak });
+      } catch (e) {
+        msg = (e as Error).message;
+      }
+      expect(msg).toMatch(new RegExp(`${name}: looks low-entropy`));
+      expect(msg).not.toContain(weak);
+    }
+  });
+
+  it('TOKEN_SIGNING_SECRET_PREVIOUS must differ from both other secrets', () => {
+    const a = secretOf('a');
+    const b = secretOf('b');
+    expect(() => loadConfig({ TOKEN_SIGNING_SECRET: a, TOKEN_SIGNING_SECRET_PREVIOUS: a })).toThrow(
+      /TOKEN_SIGNING_SECRET_PREVIOUS: must differ from TOKEN_SIGNING_SECRET/,
+    );
+    expect(() => loadConfig({ STATE_COOKIE_SECRET: b, TOKEN_SIGNING_SECRET_PREVIOUS: b })).toThrow(
+      /TOKEN_SIGNING_SECRET_PREVIOUS: must differ from STATE_COOKIE_SECRET/,
+    );
+    expect(() =>
+      loadConfig({
+        TOKEN_SIGNING_SECRET: a,
+        STATE_COOKIE_SECRET: b,
+        TOKEN_SIGNING_SECRET_PREVIOUS: secretOf('c'),
+      }),
+    ).not.toThrow();
+  });
+
   it('requires every auth variable in production, naming each missing one without values', () => {
     for (const name of [
       'DATABASE_URL',
@@ -33,7 +93,7 @@ describe('loadConfig', () => {
   });
 
   it('rejects reusing one secret for tokens and the state cookie', () => {
-    const s = Buffer.alloc(32, 9).toString('base64');
+    const s = secretOf('s9');
     expect(() => loadConfig({ TOKEN_SIGNING_SECRET: s, STATE_COOKIE_SECRET: s })).toThrow(
       /STATE_COOKIE_SECRET/,
     );

@@ -17,9 +17,12 @@ export const CLIENT_SECRET = 'test-client-secret-value';
 export const EXT_ORIGIN = `chrome-extension://${DEV_EXT_ID}`;
 export const EXT_REDIRECT = `https://${DEV_EXT_ID}.chromiumapp.org/`;
 
-export const SIGNING_SECRET = Buffer.alloc(32, 1).toString('base64');
-export const SIGNING_SECRET_2 = Buffer.alloc(32, 2).toString('base64');
-export const STATE_SECRET = Buffer.alloc(32, 3).toString('base64');
+/** Deterministic, non-degenerate 32-byte secret (config rejects repeated-byte secrets). */
+export const secretOf = (label: string) => createHash('sha256').update(label).digest('base64');
+
+export const SIGNING_SECRET = secretOf('signing-1');
+export const SIGNING_SECRET_2 = secretOf('signing-2');
+export const STATE_SECRET = secretOf('state-1');
 
 export function testEnv(extra: Record<string, string> = {}): Record<string, string> {
   return {
@@ -52,6 +55,8 @@ export interface CodeSpec {
   /** Sign with a key that is not in the JWKS. */
   wrongKey?: boolean;
   omitEmail?: boolean;
+  /** Seconds relative to now for the `auth_time` claim; omitted when undefined. */
+  authTimeOffsetS?: number | undefined;
   /** Make the token endpoint answer this status instead. */
   tokenStatus?: number;
 }
@@ -103,6 +108,7 @@ export async function createMockGoogle(now: () => number): Promise<MockGoogle> {
       nonce: spec.nonce,
       email_verified: 'email_verified' in spec ? spec.email_verified : true,
     };
+    if (spec.authTimeOffsetS !== undefined) claims['auth_time'] = nowS + spec.authTimeOffsetS;
     if (!spec.omitEmail) claims['email'] = spec.email ?? 'ada@example.test';
     const jwt = await new SignJWT(claims)
       .setProtectedHeader({ alg: 'RS256', kid: 'k1' })
@@ -193,12 +199,14 @@ export function postJson(
   path: string,
   body: unknown,
   headers: Record<string, string> = {},
-) {
-  return h.app.request(path, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json', ...headers },
-    body: JSON.stringify(body),
-  });
+): Promise<Response> {
+  return Promise.resolve(
+    h.app.request(path, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', ...headers },
+      body: JSON.stringify(body),
+    }),
+  );
 }
 
 export interface Pair {
@@ -272,13 +280,19 @@ export interface WebLogin {
 export async function webLogin(
   h: Harness,
   who: { sub?: string; email?: string; email_verified?: boolean } = {},
-  opts: { reauth?: boolean; cookie?: string } = {},
+  opts: { reauth?: boolean; cookie?: string; authTimeOffsetS?: number | null } = {},
 ): Promise<WebLogin> {
   const start = await h.app.request(`/auth/google/start${opts.reauth ? '?reauth=1' : ''}`);
   const loc = new URL(start.headers.get('location') as string);
   const oauth = cookiesOf(start)['__Host-clavis_oauth']?.value as string;
   const code = h.google.issueCode({
     ...who,
+    // Google includes auth_time when max_age was requested (reauth).
+    authTimeOffsetS: opts.reauth
+      ? opts.authTimeOffsetS === null
+        ? undefined
+        : (opts.authTimeOffsetS ?? 0)
+      : undefined,
     nonce: loc.searchParams.get('nonce') as string,
     codeChallenge: loc.searchParams.get('code_challenge') as string,
     redirectUri: `${ORIGIN}/auth/google/callback`,

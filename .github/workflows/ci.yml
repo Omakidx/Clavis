@@ -345,6 +345,9 @@ jobs:
       - name: Check zod versions match across root, server and dashboard
         run: node scripts/check-zod-version.mjs
 
+      - name: Audit production dependencies (server and dashboard)
+        run: npm audit --omit=dev --audit-level=high --prefix server && npm audit --omit=dev --audit-level=high --prefix dashboard
+
       - name: Build dashboard
         run: npm run build --prefix dashboard
 

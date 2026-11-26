@@ -8,6 +8,13 @@ export class FamilyCache {
     private readonly maxEntries = 10_000,
   ) {}
 
+  private generation = 0;
+
+  /** Call before a DB read; pass the result to `set` so a read that raced an eviction is not cached. */
+  begin(): number {
+    return this.generation;
+  }
+
   get(familyId: string): boolean | undefined {
     const e = this.entries.get(familyId);
     if (!e) return undefined;
@@ -18,13 +25,15 @@ export class FamilyCache {
     return e.active;
   }
 
-  set(familyId: string, active: boolean): void {
+  set(familyId: string, active: boolean, generation: number): void {
+    if (generation !== this.generation) return; // an eviction happened after the read started
     if (this.entries.size >= this.maxEntries) this.entries.clear();
     this.entries.set(familyId, { active, until: this.now() + this.ttlMs });
   }
 
   /** Called on local revocation so this process stops accepting the family immediately. */
   evict(familyId: string): void {
+    this.generation++;
     this.entries.set(familyId, { active: false, until: this.now() + this.ttlMs });
   }
 }

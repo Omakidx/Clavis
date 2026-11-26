@@ -37,3 +37,25 @@ credentials are development-only (see `docker-compose.dev.yml`). MinIO bucket: `
   (the two secrets must differ). Outside production a missing variable makes the auth routes answer `503 UNAVAILABLE`.
 - Plain-http dev origins use cookie names without the `__Host-` prefix and without `Secure`.
 - Tests mock Google's token endpoint and JWKS (`test/auth/harness.ts`); integration tests need `TEST_DATABASE_URL`.
+
+### Client IP and proxy trust (rate limits)
+
+Per-IP limits key on the client address, which behind Railway must come from a proxy header.
+
+- `TRUST_PROXY=1` is **required in production** (config refuses to boot otherwise). Without it every client would share
+  the proxy's address.
+- `CLIENT_IP_HEADER` (default `xff-rightmost`): `xff-rightmost` takes the Nth entry from the right of
+  `X-Forwarded-For`, where N is `TRUSTED_PROXY_HOPS` (default `1`); entries a client prepends sit to the left and are
+  ignored. `x-real-ip` trusts that header verbatim, so use it only if the edge overwrites any client-supplied value.
+  A missing or unparseable value falls back to the socket peer. IPv6 clients are grouped by `/64`.
+- **Confirm on the first Railway deploy** (the proxy chain is not assumed): call the API with a spoofed header, e.g.
+  `curl -H 'X-Forwarded-For: 203.0.113.9' https://<service>/v1/meta`, and check what arrives (temporarily log the raw
+  headers in a throwaway build, never in production code). If Railway appends the real client address as the last
+  entry, the defaults are right; if there are extra trusted hops, raise `TRUSTED_PROXY_HOPS`; if it sets a trustworthy
+  `X-Real-IP`, switch `CLIENT_IP_HEADER=x-real-ip`. Until confirmed, per-IP limits may be bypassable or shared.
+
+### Re-authentication
+
+`/auth/google/start?reauth=1` records the flag in the sealed state cookie. The callback then requires Google's
+`auth_time` claim to be within 10 minutes (plus 60 s skew) and stores it as `authenticated_at`; otherwise the login
+fails with `/?signin=failed` and nothing changes.

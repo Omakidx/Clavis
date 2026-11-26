@@ -91,12 +91,21 @@ export function purgeIdempotencyKeys(db: Database, hours = 24): Promise<number> 
   );
 }
 
+/**
+ * Deletes WHOLE families only, never single rows. A family is dead when any of its rows was revoked more than
+ * `days` ago (revocation always covers the whole family) or when its newest row expired more than `days` ago.
+ * Deleting rows one at a time could leave a lone unrevoked successor that looks like a live family.
+ */
 export function purgeRefreshTokens(db: Database, days = 7): Promise<number> {
   return count(
     db,
     sql`DELETE FROM refresh_tokens
-        WHERE expires_at < now() - make_interval(days => ${days})
-           OR revoked_at < now() - make_interval(days => ${days})`,
+        WHERE family_id IN (
+          SELECT family_id FROM refresh_tokens
+          GROUP BY family_id
+          HAVING min(revoked_at) < now() - make_interval(days => ${days})
+              OR max(expires_at) < now() - make_interval(days => ${days})
+        )`,
   );
 }
 

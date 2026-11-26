@@ -5,15 +5,21 @@ import { requireBearerOrCookie } from '../auth/middleware';
 import type { AuthRuntime } from '../auth/runtime';
 import { toUser } from '../auth/service';
 import { ApiException } from '../http/errors';
-import { enforce, perHour, perMinute, type RateLimiter } from '../http/rate-limit';
+import {
+  clientIp,
+  enforce,
+  perHour,
+  perMinute,
+  type ClientIpSource,
+  type RateLimiter,
+} from '../http/rate-limit';
 import type { AppEnv } from '../http/types';
-import { clientIp } from '../http/rate-limit';
 
 /** GET /v1/meta: public, no database. */
-export function metaRoutes(limiter: RateLimiter, trustProxy: boolean): Hono<AppEnv> {
+export function metaRoutes(limiter: RateLimiter, ipSource: ClientIpSource): Hono<AppEnv> {
   const app = new Hono<AppEnv>();
   app.get('/v1/meta', (c) => {
-    enforce(limiter, `ip:meta:${clientIp(c, trustProxy)}`, perMinute(60));
+    enforce(limiter, `ip:meta:${clientIp(c, ipSource)}`, perMinute(60));
     const body: MetaResponse = {
       apiVersion: 1,
       limits: {

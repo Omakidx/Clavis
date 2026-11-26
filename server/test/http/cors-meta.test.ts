@@ -12,6 +12,29 @@ import {
   postJson,
 } from '../auth/harness';
 
+describe('baseline security headers on every response (L4)', () => {
+  it('sets nosniff and HSTS on API, 404 and error responses over https', async () => {
+    const h = await createHarness();
+    for (const path of ['/v1/meta', '/nope', '/healthz', '/v1/session']) {
+      const res = await h.app.request(path);
+      expect(res.headers.get('x-content-type-options'), path).toBe('nosniff');
+      expect(res.headers.get('strict-transport-security'), path).toMatch(/^max-age=\d+/);
+    }
+    const pre = await h.app.request('/v1/account', {
+      method: 'OPTIONS',
+      headers: { origin: EXT_ORIGIN },
+    });
+    expect(pre.headers.get('x-content-type-options')).toBe('nosniff');
+  });
+
+  it('omits HSTS on a plain-http dev origin but keeps nosniff', async () => {
+    const h = await createHarness({ env: { PUBLIC_ORIGIN: 'http://localhost:8787' } });
+    const res = await h.app.request('/v1/meta');
+    expect(res.headers.get('strict-transport-security')).toBeNull();
+    expect(res.headers.get('x-content-type-options')).toBe('nosniff');
+  });
+});
+
 describe('GET /v1/meta', () => {
   it('returns the contract shape, no-store', async () => {
     const h = await createHarness();

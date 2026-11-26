@@ -14,7 +14,12 @@ const optionalString = z.string().min(1).optional();
 const secret = z
   .string()
   .regex(/^[A-Za-z0-9+/_-]+={0,2}$/, 'must be base64 or base64url')
-  .refine((v) => Buffer.from(v, 'base64').length >= 32, 'must decode to at least 32 bytes');
+  .refine((v) => Buffer.from(v, 'base64').length >= 32, 'must decode to at least 32 bytes')
+  .refine(
+    // Catches "AAAA..." and other obviously fake secrets; real random 32-byte values have ~30 distinct bytes.
+    (v) => new Set(Buffer.from(v, 'base64')).size >= 8,
+    'looks low-entropy: use at least 32 random bytes',
+  );
 
 const extensionId = z.string().regex(/^[a-p]{32}$/, 'extension IDs are 32 characters a-p');
 
@@ -43,6 +48,8 @@ const EnvSchema = z
     S3_SECRET_ACCESS_KEY: optionalString,
     S3_FORCE_PATH_STYLE: flag('0'),
     TRUST_PROXY: flag('0'),
+    CLIENT_IP_HEADER: z.enum(['xff-rightmost', 'x-real-ip']).default('xff-rightmost'),
+    TRUSTED_PROXY_HOPS: z.coerce.number().int().min(1).max(5).default(1),
     JOBS_ENABLED: flag('1'),
     STORAGE_ALERT_BYTES: z.coerce.number().int().positive().optional(),
   })
@@ -77,12 +84,38 @@ const EnvSchema = z
           ctx.addIssue({ code: 'custom', path: [name], message: 'is required in production' });
       }
     }
-    if (env.TOKEN_SIGNING_SECRET && env.TOKEN_SIGNING_SECRET === env.STATE_COOKIE_SECRET) {
+    if (env.NODE_ENV === 'production' && !env.TRUST_PROXY) {
+      // Behind Railway's proxy every socket peer is the proxy: without this all clients share one rate-limit key.
       ctx.addIssue({
         code: 'custom',
-        path: ['STATE_COOKIE_SECRET'],
-        message: 'must differ from TOKEN_SIGNING_SECRET',
+        path: ['TRUST_PROXY'],
+        message: 'must be 1 in production (per-IP rate limits need the client address)',
       });
+    }
+    const distinct: Array<[string, string | undefined, string, string | undefined]> = [
+      [
+        'STATE_COOKIE_SECRET',
+        env.STATE_COOKIE_SECRET,
+        'TOKEN_SIGNING_SECRET',
+        env.TOKEN_SIGNING_SECRET,
+      ],
+      [
+        'TOKEN_SIGNING_SECRET_PREVIOUS',
+        env.TOKEN_SIGNING_SECRET_PREVIOUS,
+        'TOKEN_SIGNING_SECRET',
+        env.TOKEN_SIGNING_SECRET,
+      ],
+      [
+        'TOKEN_SIGNING_SECRET_PREVIOUS',
+        env.TOKEN_SIGNING_SECRET_PREVIOUS,
+        'STATE_COOKIE_SECRET',
+        env.STATE_COOKIE_SECRET,
+      ],
+    ];
+    for (const [name, value, other, otherValue] of distinct) {
+      if (value && value === otherValue) {
+        ctx.addIssue({ code: 'custom', path: [name], message: `must differ from ${other}` });
+      }
     }
     if (env.PUBLIC_ORIGIN) {
       const u = new URL(env.PUBLIC_ORIGIN);
@@ -132,6 +165,8 @@ export interface Config {
       }
     | undefined;
   trustProxy: boolean;
+  clientIpHeader: 'xff-rightmost' | 'x-real-ip';
+  trustedProxyHops: number;
   jobsEnabled: boolean;
   storageAlertBytes: number | undefined;
 }
@@ -199,6 +234,8 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
           }
         : undefined,
     trustProxy: e.TRUST_PROXY,
+    clientIpHeader: e.CLIENT_IP_HEADER,
+    trustedProxyHops: e.TRUSTED_PROXY_HOPS,
     jobsEnabled: e.JOBS_ENABLED,
     storageAlertBytes: e.STORAGE_ALERT_BYTES,
   };

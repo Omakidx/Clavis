@@ -70,6 +70,14 @@ export function createApp({ config, logger, db, dashboardDir, now, google, limit
     if (isApiPath(c.req.path)) c.header('Cache-Control', 'no-store');
   });
 
+  // Baseline hardening on every response (API, errors and static). HSTS only where the origin is https.
+  const https = config.publicOrigin?.startsWith('https://') ?? false;
+  app.use(async (c, next) => {
+    await next();
+    c.header('X-Content-Type-Options', 'nosniff');
+    if (https) c.header('Strict-Transport-Security', 'max-age=31536000');
+  });
+
   app.use('/v1/*', bearerCors(config.allowedExtensionOrigins, { skip: (p) => NO_CORS.has(p) }));
   const limitJson = bodyLimit({
     maxSize: LIMITS.maxJsonBodyBytes,
@@ -90,7 +98,7 @@ export function createApp({ config, logger, db, dashboardDir, now, google, limit
     );
   });
 
-  app.route('/', metaRoutes(rateLimiter, config.trustProxy));
+  app.route('/', metaRoutes(rateLimiter, config));
 
   const runtime = createAuthRuntime({
     config,

@@ -30,6 +30,8 @@ export interface GoogleIdentity {
   sub: string;
   email: string;
   displayName: string | null;
+  /** Google's `auth_time` claim (epoch seconds): present when `max_age` was requested (re-auth). */
+  authTime: number | undefined;
 }
 
 export interface GoogleClientOptions {
@@ -58,6 +60,7 @@ const Claims = z.looseObject({
   email_verified: z.union([z.boolean(), z.enum(['true', 'false'])]).optional(),
   name: z.string().optional(),
   nonce: z.string().optional(),
+  auth_time: z.number().optional(),
   iat: z.number(),
 });
 
@@ -176,6 +179,11 @@ export class GoogleClient {
     }
     if (!c.email) throw new GoogleAuthError('oauth_failed', 'no email claim');
     const name = c.name?.trim();
-    return { sub: c.sub, email: c.email, displayName: name ? name.slice(0, 200) : null };
+    return {
+      sub: c.sub,
+      email: c.email,
+      displayName: name ? name.slice(0, 200) : null,
+      authTime: c.auth_time,
+    };
   }
 }

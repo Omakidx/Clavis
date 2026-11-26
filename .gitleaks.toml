@@ -54,5 +54,7 @@ regexes = ['''^p9-secret-boundary$''']
 [[allowlists]]
 description = "Public development manifest key (extension ID pin)"
 targetRules = ["generic-api-key"]
+# AND: suppress only this exact public-key literal, and only in wxt.config.ts.
+condition = "AND"
 paths = ['''(^|/)wxt\.config\.ts$''']
 regexes = ['''MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA[A-Za-z0-9+/=]+''']

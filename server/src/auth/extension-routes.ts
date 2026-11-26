@@ -12,18 +12,25 @@ import type { AuthRuntime } from './runtime';
 /** `/v1/auth/extension/*`: Bearer-style API for the extension (CORS applied by the caller). */
 export function extensionRoutes(rt: AuthRuntime): Hono<AppEnv> {
   const app = new Hono<AppEnv>();
-  const trust = rt.config.trustProxy;
+  const trust = rt.config;
   const ip = (name: string, limit: number) =>
     ipRateLimit(rt.limiter, name, perMinute(limit), trust);
 
   app.post('/google', ip('ext-google', 10), async (c) => {
-    // CORS alone does not stop non-browser clients, so the Origin is checked explicitly (design §2.2).
+    // Origin is client-asserted: browsers set it truthfully, other clients can send anything. It is a
+    // defence-in-depth check next to CORS (which only protects browser reads), not authentication; the code
+    // exchange with PKCE is what authenticates the request (design §2.2).
     const origin = c.req.header('origin');
     if (!origin || !rt.config.allowedExtensionOrigins.includes(origin)) {
       throw new ApiException('FORBIDDEN', 'Origin is not an allowed extension');
     }
     const body = await parseJsonBody(c, ExtensionGoogleRequest);
-    if (!rt.config.allowedExtensionRedirects.includes(body.redirectUri)) {
+    // The redirect must belong to the same extension that is calling, not merely to any allowed one.
+    const callerRedirect = `https://${origin.slice('chrome-extension://'.length)}.chromiumapp.org/`;
+    if (
+      body.redirectUri !== callerRedirect ||
+      !rt.config.allowedExtensionRedirects.includes(body.redirectUri)
+    ) {
       throw new ApiException('OAUTH_FAILED', 'redirectUri is not allowed');
     }
     const pair = await rt.service.signInWithGoogle(

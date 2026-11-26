@@ -107,8 +107,9 @@ export class AuthService {
     }
     let active = this.families.get(v.claims.familyId);
     if (active === undefined) {
+      const gen = this.families.begin();
       active = await this.d.store.isFamilyActive(v.claims.familyId);
-      this.families.set(v.claims.familyId, active);
+      this.families.set(v.claims.familyId, active, gen);
     }
     if (!active) throw new ApiException('SESSION_REVOKED', 'Session was revoked');
     return v.claims;

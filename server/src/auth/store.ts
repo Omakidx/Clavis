@@ -13,6 +13,17 @@ import type { GoogleIdentity } from './google';
 
 export type UserRow = typeof users.$inferSelect;
 
+type FamilyExec = Pick<Database, 'execute'>;
+
+/**
+ * Serialise every operation on one refresh-token family (rotate, reuse-revoke, logout) with a transaction-level
+ * advisory lock. Row locks alone are not enough: a revoke UPDATE cannot see a successor row that an in-flight
+ * rotation inserts, which would leave an unrevoked row in a revoked family.
+ */
+export async function lockFamily(exec: FamilyExec, familyId: string): Promise<void> {
+  await exec.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${'clavis:rtfam:' + familyId}))`);
+}
+
 export const WEB_IDLE_MS = 7 * 24 * 3600 * 1000;
 export const WEB_ABSOLUTE_MS = 30 * 24 * 3600 * 1000;
 /** `last_seen_at` is only rewritten when older than this, to avoid a write per request. */
@@ -108,6 +119,13 @@ export class AuthStore {
   async rotateRefresh(presented: string, now: Date): Promise<RotateResult> {
     const hash = hashRefreshToken(presented);
     return this.db.transaction(async (tx) => {
+      const [probe] = await tx
+        .select({ familyId: refreshTokens.familyId })
+        .from(refreshTokens)
+        .where(eq(refreshTokens.tokenHash, hash));
+      if (!probe) return { kind: 'invalid' } as const;
+      await lockFamily(tx, probe.familyId);
+      // Re-read under the family lock: the row may have been rotated or revoked while we waited.
       const [row] = await tx
         .select()
         .from(refreshTokens)
@@ -171,16 +189,26 @@ export class AuthStore {
       .from(refreshTokens)
       .where(eq(refreshTokens.tokenHash, hashRefreshToken(presented)));
     if (!row) return undefined;
-    await this.db
-      .update(refreshTokens)
-      .set({ revokedAt: now, revokedReason: 'logout' })
-      .where(and(eq(refreshTokens.familyId, row.familyId), isNull(refreshTokens.revokedAt)));
+    await this.db.transaction(async (tx) => {
+      await lockFamily(tx, row.familyId);
+      await tx
+        .update(refreshTokens)
+        .set({ revokedAt: now, revokedReason: 'logout' })
+        .where(and(eq(refreshTokens.familyId, row.familyId), isNull(refreshTokens.revokedAt)));
+    });
     return row.familyId;
   }
 
   /** Revoke every family and web session of a user. Returns the affected family ids (for cache eviction). */
   async revokeAllForUser(userId: string, now: Date): Promise<string[]> {
     return this.db.transaction(async (tx) => {
+      // Lock every family of the user in a fixed order (by lock key) so two logout-alls cannot deadlock, then
+      // revoke in a fresh statement: it sees any successor a concurrent rotation committed while we waited.
+      const keys = await tx.execute<{ k: number }>(
+        sql`SELECT DISTINCT hashtext('clavis:rtfam:' || family_id::text) AS k
+            FROM refresh_tokens WHERE user_id = ${userId} ORDER BY k`,
+      );
+      for (const { k } of keys.rows) await tx.execute(sql`SELECT pg_advisory_xact_lock(${k})`);
       const rows = await tx
         .update(refreshTokens)
         .set({ revokedAt: now, revokedReason: 'logout_all' })
@@ -209,6 +237,7 @@ export class AuthStore {
   async createWebSession(
     userId: string,
     now: Date,
+    authenticatedAt: Date = now,
   ): Promise<{ token: string; csrfToken: string; maxAgeS: number }> {
     const token = randomToken(32);
     const csrfToken = randomToken(32);
@@ -218,7 +247,7 @@ export class AuthStore {
       csrfToken,
       createdAt: now,
       lastSeenAt: now,
-      authenticatedAt: now,
+      authenticatedAt,
       expiresAt: new Date(now.getTime() + WEB_ABSOLUTE_MS),
     });
     return { token, csrfToken, maxAgeS: WEB_ABSOLUTE_MS / 1000 };

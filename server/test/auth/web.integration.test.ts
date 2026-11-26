@@ -5,6 +5,7 @@ import {
   ORIGIN,
   bearer,
   cookiesOf,
+  secretOf,
   createHarness,
   extSignIn,
   webLogin,
@@ -182,7 +183,7 @@ describe.skipIf(!adminUrl)('dashboard auth (real Postgres, mocked Google)', () =
       // A cookie sealed with another key (e.g. a different deployment) is useless.
       const other = await createHarness({
         db: tdb.handle,
-        env: { STATE_COOKIE_SECRET: Buffer.alloc(32, 9).toString('base64') },
+        env: { STATE_COOKIE_SECRET: secretOf('other-deployment') },
       });
       const foreign = cookiesOf(await other.app.request('/auth/google/start'))[
         '__Host-clavis_oauth'
