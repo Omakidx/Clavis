@@ -3,6 +3,21 @@ import { defineConfig } from 'wxt';
 /** Left in every chunk of a CLAVIS_FORCE_FEATURES build; audit-zip.mjs fails the release ZIP if it finds it. */
 const FORCED_FEATURES_MARKER = 'CLAVIS_FORCED_FEATURES_BUILD_NEVER_SHIP';
 
+/**
+ * Public half of the development signing key. Unpacked builds (`npm run dev`, `npm run build`)
+ * carry it as the manifest `key`, so Chrome gives them the same extension ID on every machine and
+ * from any folder: `ebfpdncfkebjagolnbmfdhikaipiflbl`. Clavis Sync needs a stable ID for its
+ * Google OAuth redirect (`https://<id>.chromiumapp.org/`) and the API's allowed origins. The
+ * private half was never kept; unpacked loading does not need it.
+ *
+ * The store ZIP (`npm run zip`) leaves `key` out: the `zip:extension:start` hook below removes it
+ * from the built manifest just before packaging, because the Chrome Web Store assigns its own ID and
+ * rejects packages that carry one, and scripts/audit-zip.mjs refuses the `key` field. After a zip,
+ * run `npm run build` again to get an unpacked build with the stable ID.
+ */
+const DEV_MANIFEST_KEY =
+  'MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA8ZPxbrxFmeU0tk88IcgJXRaQvXxwPLsAEWn4UCVcMURdHtuu33TsqduTOkb+XGMLl7DIENWTpmZj9Xn+61zuwyFG5tyZi9O/L0vCki9CyQiRROBx6apcZ00aMwmqggYbfyI283JKs7c5ftXXHn/TWXqlW9adfFLzrra5QGnFtaU+Ok9yTAP9OG1p9Go6yBYpG1Lz16lQ3cR8JpaJbmkkAzqt0ErQdHNi3sAgwpT2I85OLvp9/lJ9vwqRqTQW8FfIzMfU7grpkup71rp6Dqt8qqm8tgseA02YHADZ+mGfDusqCmxm/rxC7xJgbpLFdkGBAYtoGaNNN/8iK6tZ80j88QIDAQAB';
+
 // Manifest permissions are normative in docs/architecture.md §3.
 // Change them there first, then here, and update the privacy policy.
 export default defineConfig({
@@ -11,6 +26,7 @@ export default defineConfig({
   // overwriting each other. Defaults to WXT's standard `.output`.
   outDir: process.env.WXT_OUT_DIR ?? '.output',
   manifest: {
+    key: DEV_MANIFEST_KEY,
     name: '__MSG_extName__',
     description: '__MSG_extDescription__',
     default_locale: 'en',
@@ -76,6 +92,17 @@ export default defineConfig({
         : [],
   }),
   hooks: {
+    // Store packages never carry the development `key` (see DEV_MANIFEST_KEY). WXT writes the
+    // production manifest as compact JSON, so rewriting it compactly keeps the ZIP reproducible.
+    'zip:extension:start': async (wxt) => {
+      const { readFile, writeFile } = await import('node:fs/promises');
+      const { join } = await import('node:path');
+      const file = join(wxt.config.outDir, 'manifest.json');
+      const manifest = JSON.parse(await readFile(file, 'utf8')) as Record<string, unknown>;
+      if (!('key' in manifest)) return;
+      delete manifest.key;
+      await writeFile(file, JSON.stringify(manifest));
+    },
     // WXT turns entrypoints/sidepanel into `side_panel.default_path`, which would offer ONE shared
     // panel on every tab (it would keep showing one tab's explanation after a tab switch). The
     // panel is per tab instead: lib/router/handlers/sidepanel.ts enables it for one tab with
