@@ -90,6 +90,20 @@ export interface ReaderControllerOptions {
 
 export { toSafeExternalUrl };
 
+/** Where the reader is in a document: a page and how far down it (0 = its top, 1 = its bottom). */
+export interface ReadingPosition {
+  page: number;
+  pageOffset: number;
+}
+
+const clampUnit = (value: number): number =>
+  Number.isFinite(value) ? Math.min(1, Math.max(0, value)) : 0;
+
+/** The fraction of a page that has scrolled past the top of the scroll container, clamped to 0..1. */
+export function pageOffsetOf(scrollTop: number, pageTop: number, pageHeight: number): number {
+  return pageHeight > 0 ? clampUnit((scrollTop - pageTop) / pageHeight) : 0;
+}
+
 /**
  * An XFA-only form: the file says it has XFA (`IsXFAPresent`) and has no AcroForm fields. With XFA
  * off (`enableXfa: false`, `isPureXfa` is always false) PDF.js would draw only the "Please wait,
@@ -139,6 +153,7 @@ export class PdfReaderController {
   #findConfirmed = false;
   #annotationTypes: ReadonlySet<number> = new Set();
   #fileName = '';
+  #fileBytes = 0;
   /** Incremented by every open/close so stale async continuations can bail out. */
   #token = 0;
   #documentId: string | null = null;
@@ -187,6 +202,46 @@ export class PdfReaderController {
     return this.#documentId;
   }
 
+  /** Size of the file being shown, in bytes; 0 when none is open. */
+  get fileBytes(): number {
+    return this.#fileBytes;
+  }
+
+  /**
+   * The page on screen and how far down it the top of the viewer is (design 7.3): the scroll
+   * container's `scrollTop` relative to that page's `offsetTop` and `offsetHeight`, clamped to
+   * 0..1. Null while no document is shown.
+   */
+  getPosition(): ReadingPosition | null {
+    const container = this.#elements?.container;
+    const page = this.#ready?.currentPageNumber;
+    const div = page === undefined ? undefined : this.#ready?.getPageView(page - 1)?.div;
+    if (container === undefined || page === undefined || div === undefined) return null;
+    return {
+      page,
+      pageOffset: pageOffsetOf(
+        container.scrollTop,
+        div.offsetTop + div.clientTop,
+        div.offsetHeight,
+      ),
+    };
+  }
+
+  /** Go to a page, then scroll `pageOffset` of that page's height further down. False when no document is shown. */
+  restorePosition(position: ReadingPosition): boolean {
+    const viewer = this.#ready;
+    const container = this.#elements?.container;
+    if (!viewer || !container) return false;
+    const page = clampPage(position.page, viewer.pagesCount);
+    viewer.currentPageNumber = page;
+    const div = viewer.getPageView(page - 1)?.div;
+    if (div) {
+      container.scrollTop =
+        div.offsetTop + div.clientTop + clampUnit(position.pageOffset) * div.offsetHeight;
+    }
+    return true;
+  }
+
   /** Text is loaded on demand, independently of rendered canvases. Keep at most three pages. */
   readPageText(page: number): Promise<ReaderPageText | null> {
     const doc = this.#doc;
@@ -228,6 +283,7 @@ export class PdfReaderController {
   async openFile(file: File): Promise<void> {
     const token = await this.#reset();
     this.#fileName = file.name;
+    this.#fileBytes = file.size;
     const meta = validateFileMeta(file, this.#opts.maxBytes ?? MAX_PDF_BYTES);
     if (meta) {
       this.#setSnapshot({ state: meta, fileName: file.name });
@@ -336,6 +392,7 @@ export class PdfReaderController {
   async close(): Promise<void> {
     await this.#reset();
     this.#fileName = '';
+    this.#fileBytes = 0;
     this.#setSnapshot({ state: EMPTY_STATE, view: null, find: IDLE_FIND, fileName: '' });
   }
 

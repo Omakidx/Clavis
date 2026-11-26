@@ -209,15 +209,17 @@ test('keyboard only: Tab to Open in side panel and press Enter; Escape dismisses
     await card.waitFor(CARD.ready('core'));
     expect(await card.focused()).toBe('card:explain');
     const order: Array<string | null | undefined> = [];
-    for (let i = 0; i < 5; i += 1) {
+    for (let i = 0; i < 6; i += 1) {
       await page.keyboard.press('Tab');
       order.push(await card.focused());
     }
+    // Save word (Clavis Sync P1) sits between Copy and Open in side panel, in the same action row.
     expect(order).toEqual([
       'card-close:',
       'card-tab:core',
       'card-panel:core',
       'card-copy:',
+      'card-save:',
       'card-side-panel:',
     ]);
     const before = (await realPanelUrls(h.ext.serviceWorker)).length;

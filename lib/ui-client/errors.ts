@@ -22,6 +22,8 @@ export interface ClientError {
   retryAfterMs?: number;
   /** Extra, localized advice shown under `message` (for example how to install a voice). */
   hint?: string;
+  /** The reply's machine-readable detail, when it had one (`disclosure`: the first-send prompt is owed). */
+  reason?: ErrorReason;
 }
 
 interface Mapping {
@@ -46,6 +48,8 @@ const MAPPING = {
   INVALID_REQUEST: { key: 'errInvalidRequest', action: 'none' },
   STORAGE_UNAVAILABLE: { key: 'errStorage', action: 'retry' },
   INTERNAL_ERROR: { key: 'errGeneric', action: 'retry' },
+  NOT_FOUND: { key: 'errNotFound', action: 'none' },
+  LIMIT_EXCEEDED: { key: 'errLimitExceeded', action: 'none' },
   NO_RESPONSE: { key: 'errNoResponse', action: 'retry' },
   BAD_REPLY: { key: 'errInvalidResponse', action: 'retry' },
 } as const satisfies Record<ClientErrorCode, Mapping>;
@@ -72,6 +76,7 @@ export function describeError(
     action: mapping.action,
     ...(retryAfterMs === undefined ? {} : { retryAfterMs }),
     ...(voice?.hint === undefined ? {} : { hint: t(voice.hint) }),
+    ...(reason === undefined ? {} : { reason }),
   };
 }
 

@@ -51,7 +51,14 @@ const CONTENT_ROUTES = [
   'LOAD_TOOLBAR',
   'OPEN_SETTINGS',
   'OPEN_SIDE_PANEL',
+  // Saved words (docs/clavis-sync-design.md 7.4): the card hosts save; the source is derived in the handler.
+  'SAVE_WORD',
+  'UNSAVE_WORD',
+  'GET_WORD_SAVED',
 ] as const;
+/** Chat about a saved word (S-05: library only) and the sync nudge (pages that write local data). */
+const LIBRARY_ROUTES = ['WORD_CHAT_SEND', 'WORD_CHAT_CANCEL'] as const;
+const SYNC_ROUTES = ['SYNC_KICK'] as const;
 const PANEL_ROUTES = ['GET_SIDE_PANEL_STATE'] as const;
 
 const CLASSIFIED = new Set<string>([
@@ -59,6 +66,8 @@ const CLASSIFIED = new Set<string>([
   ...SETTINGS_ROUTES,
   ...INTERNAL_ROUTES,
   ...CONTENT_ROUTES,
+  ...LIBRARY_ROUTES,
+  ...SYNC_ROUTES,
   ...PANEL_ROUTES,
 ]);
 
@@ -78,6 +87,7 @@ const SENDERS: Record<string, SenderLike> = {
   reader: pageSender('/reader.html'),
   practice: pageSender('/practice.html'),
   sidepanel: panelSender(5),
+  library: pageSender('/library.html'),
   'an extension page that is not ours to trust (removed offscreen page)': offscreenSender(),
   'another extension': {
     id: 'someoneelseabcdefghijklmnopqrstu',
@@ -129,6 +139,8 @@ describe('the route table, against the policy', () => {
         ...SETTINGS_ROUTES,
         ...INTERNAL_ROUTES,
         ...PANEL_ROUTES,
+        ...LIBRARY_ROUTES,
+        ...SYNC_ROUTES,
       ]) {
         expect(allowed, `${name} must not reach ${privileged}`).not.toContain(privileged);
       }
@@ -182,6 +194,9 @@ describe('the route table, against the policy', () => {
       'GET_PUBLIC_SETTINGS',
       'OPEN_SETTINGS',
       'GET_SIDE_PANEL_STATE',
+      'SAVE_WORD',
+      'UNSAVE_WORD',
+      'GET_WORD_SAVED',
     ];
     expect(allowed.filter((t) => !permitted.includes(t))).toEqual([]);
     expect(allowed).toContain('GET_SIDE_PANEL_STATE');
@@ -204,6 +219,48 @@ describe('the route table, against the policy', () => {
       expect(allowed.includes('GET_SIDE_PANEL_STATE'), `GET_SIDE_PANEL_STATE for ${name}`).toBe(
         name === 'sidepanel',
       );
+    }
+  });
+
+  it('only the library may chat about a saved word, and it reaches no key, settings (but ACCEPT_DISCLOSURE), voice or inject route', () => {
+    for (const [name, sender] of Object.entries(SENDERS)) {
+      const allowed = allowedFor(sender);
+      for (const route of LIBRARY_ROUTES) {
+        expect(allowed.includes(route), `${route} for ${name}`).toBe(name === 'library');
+      }
+    }
+    const allowed = allowedFor(SENDERS['library']!);
+    expect(allowed.filter((t) => (KEY_ROUTES as readonly string[]).includes(t))).toEqual([]);
+    expect(allowed.filter((t) => (SETTINGS_ROUTES as readonly string[]).includes(t))).toEqual([
+      'ACCEPT_DISCLOSURE',
+    ]);
+    expect(allowed).not.toContain('CLAVIS_INJECT_TAB');
+    expect(allowed).not.toContain('AI_EXPLAIN');
+    expect(allowed).not.toContain('OPEN_SIDE_PANEL');
+    expect(allowed).not.toContain('SAVE_WORD');
+  });
+
+  it('SYNC_KICK is for the pages that write local data: reader, library, options', () => {
+    for (const [name, sender] of Object.entries(SENDERS)) {
+      expect(allowedFor(sender).includes('SYNC_KICK'), `SYNC_KICK for ${name}`).toBe(
+        ['reader', 'library', 'options'].includes(name),
+      );
+    }
+  });
+
+  it('the saved-word routes are for the card hosts and the side panel only', () => {
+    for (const [name, sender] of Object.entries(SENDERS)) {
+      const host = [
+        'content',
+        'content (iframe of a web page)',
+        'content (about:blank frame of a web page)',
+        'reader',
+        'practice',
+        'sidepanel',
+      ].includes(name);
+      for (const route of ['SAVE_WORD', 'UNSAVE_WORD', 'GET_WORD_SAVED']) {
+        expect(allowedFor(sender).includes(route), `${route} for ${name}`).toBe(host);
+      }
     }
   });
 
@@ -233,6 +290,7 @@ describe('the route table, against the policy', () => {
             '/reader.html',
             '/practice.html',
             '/sidepanel.html',
+            '/library.html',
           ],
           `${route.type} lists ${path}`,
         ).toContain(path);

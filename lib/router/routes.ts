@@ -8,13 +8,22 @@ import {
   type PublicMessage,
   type SidePanelMessage,
 } from '../contracts';
+import {
+  parseLibraryMessage,
+  parseWordMessage,
+  type LibraryMessage,
+  type WordMessage,
+} from '../contracts/words';
 import { injectTabForPopup, type InjectionDeps } from '../site-access/injection';
 import { isInjectTabMessage, type InjectTabMessage } from '../site-access/messages';
 import { rejectedSpeakReply, type SpeechHandlers } from '../speech/background';
 import type { createAiHandlers } from './handlers/ai';
 import type { CardHandlers } from './handlers/card';
 import type { NavigationHandlers } from './handlers/navigation';
+import type { ChatHandlers } from './handlers/chat';
 import type { SidePanelHandlers } from './handlers/sidepanel';
+import type { SyncHandlers } from './handlers/sync';
+import type { WordHandlers } from './handlers/words';
 import type { KeyService } from './handlers/key';
 import type { SettingsHandlers } from './handlers/settings';
 import {
@@ -32,7 +41,7 @@ import { panelTabOf, PRACTICE_PAGE_PATH } from './sender';
 // Allowed senders
 // ---------------------------------------------------------------------------
 
-const { options, onboarding, popup, reader, sidepanel } = EXTENSION_PAGES;
+const { options, onboarding, popup, reader, sidepanel, library } = EXTENSION_PAGES;
 
 /**
  * Public routes: content scripts, the reader, the practice page and the other extension
@@ -106,6 +115,31 @@ export const OPEN_SETTINGS_SENDERS: SenderRule = {
 
 /** Other privileged routes: settings and status. Adds the popup. */
 export const SETTINGS_SENDERS: SenderRule = { pages: [options, onboarding, popup] };
+
+/**
+ * ACCEPT_DISCLOSURE: the settings senders plus the library, for that one route only. The library
+ * shows the one-time "Send this to Groq?" copy before its first chat message (S-05); it gets no
+ * other settings route.
+ */
+export const ACCEPT_DISCLOSURE_SENDERS: SenderRule = {
+  pages: [options, onboarding, popup, library],
+};
+
+/**
+ * SAVE_WORD, UNSAVE_WORD and GET_WORD_SAVED: the contexts that host the card (web page content
+ * scripts, the reader and the practice page) and the side panel. Untrusted callers: the source of
+ * a saved word is taken from the browser's sender fields, never from the message (handler).
+ */
+export const WORD_SENDERS: SenderRule = {
+  content: true,
+  pages: [reader, PRACTICE_PAGE_PATH, sidepanel],
+};
+
+/** WORD_CHAT_SEND and WORD_CHAT_CANCEL: the library only (S-05: new messages come from the extension). */
+export const LIBRARY_SENDERS: SenderRule = { pages: [library] };
+
+/** SYNC_KICK: the pages that write local data. */
+export const SYNC_KICK_SENDERS: SenderRule = { pages: [reader, library, options] };
 
 // ---------------------------------------------------------------------------
 // Parsers
@@ -183,6 +217,33 @@ function sidePanelRoute<K extends SidePanelMessage['type']>(
   });
 }
 
+/** A word route (SAVE_WORD, UNSAVE_WORD, GET_WORD_SAVED): validated by `parseWordMessage`. */
+function wordRoute<K extends WordMessage['type']>(
+  type: K,
+  handle: (message: Extract<WordMessage, { type: K }>, context: RouteContext) => unknown,
+): Route {
+  return defineRoute<Extract<WordMessage, { type: K }>>({
+    type,
+    allow: WORD_SENDERS,
+    parse: contract<WordMessage, K>(parseWordMessage, type),
+    handle,
+  });
+}
+
+/** A route of the library family (chat, sync nudge): validated by `parseLibraryMessage`. */
+function libraryRoute<K extends LibraryMessage['type']>(
+  type: K,
+  allow: SenderRule,
+  handle: (message: Extract<LibraryMessage, { type: K }>, context: RouteContext) => unknown,
+): Route {
+  return defineRoute<Extract<LibraryMessage, { type: K }>>({
+    type,
+    allow,
+    parse: contract<LibraryMessage, K>(parseLibraryMessage, type),
+    handle,
+  });
+}
+
 /** The Spike B replies are `{ ok: false, reason }`, not envelopes; keep that shape. */
 const injectRejected = (): unknown => ({ ok: false, reason: 'failed' });
 
@@ -195,6 +256,9 @@ export interface RouteServices {
   settings: SettingsHandlers;
   speech: SpeechHandlers;
   injection: InjectionDeps;
+  words: WordHandlers;
+  chat: ChatHandlers;
+  sync: SyncHandlers;
 }
 
 /**
@@ -202,7 +266,8 @@ export interface RouteServices {
  * Anything not listed is not answered.
  */
 export function buildRoutes(services: RouteServices): Route[] {
-  const { ai, card, navigation, sidePanel, keys, settings, speech, injection } = services;
+  const { ai, card, navigation, sidePanel, keys, settings, speech, injection, words, chat, sync } =
+    services;
 
   return [
     // ---- public ---------------------------------------------------------
@@ -270,6 +335,16 @@ export function buildRoutes(services: RouteServices): Route[] {
         : invalidRequest(message),
     ),
 
+    // ---- saved words (docs/clavis-sync-design.md 7.4) ---------------------------------
+    wordRoute('SAVE_WORD', (message, context) => words.save(message, context)),
+    wordRoute('UNSAVE_WORD', (message, context) => words.unsave(message.wordKey, context)),
+    wordRoute('GET_WORD_SAVED', (message, context) => words.isSaved(message.text, context)),
+
+    // ---- the library: chat about a saved word, and the sync nudge ----------------------
+    libraryRoute('WORD_CHAT_SEND', LIBRARY_SENDERS, (message) => chat.send(message)),
+    libraryRoute('WORD_CHAT_CANCEL', LIBRARY_SENDERS, (message) => chat.cancel(message.requestId)),
+    libraryRoute('SYNC_KICK', SYNC_KICK_SENDERS, (message) => sync.kick(message.pull === true)),
+
     // ---- privileged: the key --------------------------------------------
     privilegedRoute('SET_API_KEY', KEY_SENDERS, (message) =>
       keys.set(message.apiKey, message.storage),
@@ -285,7 +360,9 @@ export function buildRoutes(services: RouteServices): Route[] {
       settings.updatePreferences(message.patch),
     ),
     privilegedRoute('RESET_PREFERENCES', SETTINGS_SENDERS, () => settings.resetPreferences()),
-    privilegedRoute('ACCEPT_DISCLOSURE', SETTINGS_SENDERS, () => settings.acceptDisclosure()),
+    privilegedRoute('ACCEPT_DISCLOSURE', ACCEPT_DISCLOSURE_SENDERS, () =>
+      settings.acceptDisclosure(),
+    ),
     privilegedRoute('UPDATE_ONBOARDING', SETTINGS_SENDERS, (message) =>
       settings.updateOnboarding({
         completed: message.completed,

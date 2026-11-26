@@ -256,9 +256,9 @@ test.describe('journey 1 with the real prompt: Allow, automatic toolbar, keyboar
     await tb(page).waitShown();
     const card = await explainByKeyboard(page);
 
-    // Tab order inside the card: Close, the tab, the answer, Copy, Open in side panel.
+    // Tab order inside the card: Close, the tab, the answer, Copy, Save word, Open in side panel.
     const order: Array<string | null | undefined> = [];
-    for (let i = 0; i < 5; i += 1) {
+    for (let i = 0; i < 6; i += 1) {
       xdotool('key', 'Tab');
       await page.waitForTimeout(80);
       order.push(await card.focused());
@@ -268,14 +268,17 @@ test.describe('journey 1 with the real prompt: Allow, automatic toolbar, keyboar
       'card-tab:core',
       'card-panel:core',
       'card-copy:',
+      'card-save:',
       'card-side-panel:',
     ]);
-    // Shift+Tab goes back to Copy; Enter copies and it is announced (not mouse-only).
+    // Shift+Tab twice goes back to Copy; Enter copies and it is announced (not mouse-only).
+    xdotool('key', 'shift+Tab');
     xdotool('key', 'shift+Tab');
     await page.waitForTimeout(80);
     expect(await card.focused()).toBe('card-copy:');
     xdotool('key', 'Return');
     await expect.poll(() => card.text(CARD.live), { timeout: 5000 }).toBe('Copied');
+    xdotool('key', 'Tab');
     xdotool('key', 'Tab');
     await page.waitForTimeout(80);
     expect(await card.focused()).toBe('card-side-panel:');

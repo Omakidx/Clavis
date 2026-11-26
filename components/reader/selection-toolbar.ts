@@ -4,6 +4,7 @@ import { createSelectionController } from '../../lib/selection/controller';
 import { createListenController } from '../../lib/selection/listen';
 import type { ExplainCardApi, ToolbarHandle, ToolbarOptions } from '../../lib/selection/ui-api';
 import { isOpenSelectionMessage } from '../../lib/site-access/messages';
+import type { PdfRef } from '../explanation/backend';
 
 /**
  * The reader's selection toolbar (FR-053): the SAME controller, toolbar, Listen and explanation
@@ -48,6 +49,7 @@ export interface ReaderSelectionHandle {
 export function mountReaderSelection(
   container: HTMLElement,
   win: Window = window,
+  pdf?: () => PdfRef | null,
 ): ReaderSelectionHandle {
   const speech = createListenController();
   // Filled in below; the message handler needs it when a message arrives, never earlier.
@@ -80,7 +82,8 @@ export function mountReaderSelection(
   let loadingCard: Promise<ExplainCardApi> | null = null;
   const loadCard = (): Promise<ExplainCardApi> => {
     loadingCard ??= import('../explanation').then(({ createExplainCard }) => {
-      card = createExplainCard();
+      // `pdf` is how a saved word learns which PDF it came from (SAVE_WORD from the reader).
+      card = createExplainCard(pdf === undefined ? {} : { pdf });
       return card;
     });
     return loadingCard;

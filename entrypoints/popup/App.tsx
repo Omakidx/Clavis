@@ -21,6 +21,12 @@ function openReader() {
   window.close();
 }
 
+/** The library: saved words by default, the documents tab for "Library". */
+function openLibrary(tab?: 'documents') {
+  openExtensionPage('/library.html', tab);
+  window.close();
+}
+
 function openSettings() {
   openSettingsPage();
   window.close();
@@ -213,6 +219,11 @@ export function App() {
             </div>
           </details>
         ) : null}
+
+        <div className="clavis-actions" data-testid="popup-library">
+          <Button onClick={() => openLibrary()}>{t('popupSavedWords')}</Button>
+          <Button onClick={() => openLibrary('documents')}>{t('popupLibrary')}</Button>
+        </div>
 
         <footer className="clavis-popup__footer">
           <Button variant="link" onClick={openSettings}>

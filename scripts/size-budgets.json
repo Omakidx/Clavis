@@ -20,9 +20,9 @@
     },
     {
       "id": "explain-card",
-      "description": "Explanation card, injected on the first Explain (Phase 5, D-08); not part of the observer",
+      "description": "Explanation card, injected on the first Explain (Phase 5, D-08); not part of the observer. Raised from 20 KiB to 21 KiB for the Save word toggle (Clavis Sync P1: about 0.7 KB gzip)",
       "files": ["explain-card.js"],
-      "maxGzipBytes": 20480,
+      "maxGzipBytes": 21504,
       "required": true
     },
     {
@@ -44,6 +44,15 @@
       "required": true
     },
     {
+      "id": "library-page-js",
+      "description": "Library page JavaScript (Clavis Sync P1): entry chunk and every static import, loaded when the user opens the library",
+      "files": ["chunks/library-*.js"],
+      "includeStaticImports": true,
+      "aggregate": true,
+      "maxGzipBytes": 114688,
+      "required": true
+    },
+    {
       "id": "reader-lazy-ui",
       "description": "Toolbar (Preact) and explanation card static import closure, excluding chunks already loaded at reader startup; the baseline build measured 29,832 gzip bytes",
       "files": ["chunks/toolbar-*.js", "chunks/explanation-*.js", "chunks/preact-renderer-*.js"],
@@ -51,6 +60,16 @@
       "excludeStaticImportsOf": ["chunks/reader-*.js"],
       "aggregate": true,
       "maxGzipBytes": 30720,
+      "required": true
+    },
+    {
+      "id": "reader-lazy-data",
+      "description": "Reader code that uses the local data layer (IndexedDB): highlights, reading progress and the Continue reading list. Loaded on demand after the reader starts, so it is not part of reader-page-js",
+      "files": ["chunks/ReaderData-*.js", "chunks/ReaderHighlights-*.js"],
+      "includeStaticImports": true,
+      "excludeStaticImportsOf": ["chunks/reader-*.js"],
+      "aggregate": true,
+      "maxGzipBytes": 8192,
       "required": true
     },
     {

@@ -28,7 +28,7 @@ export interface AiProvider extends KeyProvider {
 }
 
 /** Which optional (Should) modes are enabled; `lib/config/constants` FEATURES by default. */
-export type FeatureFlags = Record<keyof typeof FEATURES, boolean>;
+export type FeatureFlags = Record<'grammarTab' | 'translateTab', boolean>;
 
 export interface AiHandlerDeps {
   settings: SettingsStore;
@@ -62,7 +62,10 @@ export function effectiveModel(preferred: string | undefined): string {
   return preferred ?? RECOMMENDED_MODEL;
 }
 
-type Readiness =
+/** What the readiness gate reads (shared with the per-word chat, which has the same gate). */
+export type ReadinessDeps = Pick<AiHandlerDeps, 'settings' | 'keys' | 'lockedDown'>;
+
+export type Readiness =
   | {
       state: 'ready';
       apiKey: string;
@@ -80,7 +83,7 @@ export function modeEnabled(mode: ExplainRequest['mode'], features: FeatureFlags
 }
 
 /** `lockedDown` never rejects in production; a rejecting stand-in still fails closed. */
-async function isLockedDown(deps: AiHandlerDeps): Promise<boolean> {
+async function isLockedDown(deps: ReadinessDeps): Promise<boolean> {
   try {
     return await deps.lockedDown();
   } catch {
@@ -89,7 +92,7 @@ async function isLockedDown(deps: AiHandlerDeps): Promise<boolean> {
 }
 
 /** Whether a key is stored; false (never an error) when storage is unusable. */
-async function hasStoredKey(deps: AiHandlerDeps): Promise<boolean> {
+async function hasStoredKey(deps: ReadinessDeps): Promise<boolean> {
   try {
     return (await isLockedDown(deps)) && (await deps.keys.read()) !== undefined;
   } catch {
@@ -98,12 +101,12 @@ async function hasStoredKey(deps: AiHandlerDeps): Promise<boolean> {
 }
 
 /**
- * Readiness gate shared by GET_AI_STATUS and AI_EXPLAIN. Order matters: storage first
+ * Readiness gate shared by GET_AI_STATUS, AI_EXPLAIN and WORD_CHAT_SEND. Order matters: storage first
  * (fail closed), then key, then disclosure (FR-002), then the last verification (FR-072).
  * A model that is no longer in the account's list does not change the state: the UI
  * learns it from KeyStatus.models and prompts, and the user picks (FR-005).
  */
-async function evaluate(deps: AiHandlerDeps): Promise<Readiness> {
+export async function evaluateReadiness(deps: ReadinessDeps): Promise<Readiness> {
   if (!(await isLockedDown(deps))) return { state: 'storage_unavailable' };
 
   let stored;
@@ -132,7 +135,7 @@ async function evaluate(deps: AiHandlerDeps): Promise<Readiness> {
   };
 }
 
-const NOT_READY_CODE: Record<Exclude<AiStatus['state'], 'ready'>, ErrorCode> = {
+export const NOT_READY_CODE: Record<Exclude<AiStatus['state'], 'ready'>, ErrorCode> = {
   storage_unavailable: 'STORAGE_UNAVAILABLE',
   setup_required: 'SETUP_REQUIRED',
   // Not reached from AI_EXPLAIN: that route answers disclosure_required itself (with
@@ -144,7 +147,7 @@ const NOT_READY_CODE: Record<Exclude<AiStatus['state'], 'ready'>, ErrorCode> = {
 export function createAiHandlers(deps: AiHandlerDeps) {
   return {
     async getAiStatus(): Promise<MessageReply<AiStatus>> {
-      const readiness = await evaluate(deps);
+      const readiness = await evaluateReadiness(deps);
       return success({
         state: readiness.state,
         ...(readiness.model === undefined ? {} : { model: readiness.model }),
@@ -211,7 +214,7 @@ export function createAiHandlers(deps: AiHandlerDeps) {
       const inFlight = deps.guard.inFlight.begin(sender, requestId);
       let apiKey: string | undefined;
       try {
-        let readiness = await evaluate(deps);
+        let readiness = await evaluateReadiness(deps);
         // Aborted while the key was being read (replaced, removed, cleared, superseded)?
         if (inFlight.signal.aborted) return failure('REQUEST_CANCELLED', { requestId });
 
@@ -222,7 +225,7 @@ export function createAiHandlers(deps: AiHandlerDeps) {
             return failure('SETUP_REQUIRED', { requestId, reason: 'disclosure' });
           }
           await deps.settings.acceptDisclosure();
-          readiness = await evaluate(deps);
+          readiness = await evaluateReadiness(deps);
           if (inFlight.signal.aborted) return failure('REQUEST_CANCELLED', { requestId });
         }
         if (readiness.state !== 'ready') {

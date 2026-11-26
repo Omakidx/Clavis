@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState, type RefObject } from 'react';
-import { browser } from 'wxt/browser';
+import { onDataChanged } from '../../lib/data/channel';
+import { createIdbHighlightStore } from '../../lib/data/highlights';
+import { kickSync } from '../../lib/data/kick';
 import type { PdfReaderController } from '../../lib/pdf/controller';
 import {
-  createHighlightStore,
   HIGHLIGHT_COLORS,
-  parseHighlightDocuments,
   type HighlightColor,
   type ReaderHighlight,
 } from '../../lib/pdf/highlights';
@@ -13,7 +13,6 @@ import {
   readerTextRange,
   type ReaderTextSelection,
 } from '../../lib/pdf/reader-text';
-import { STORAGE_KEYS } from '../../lib/storage/keys';
 import { t, type MessageKey } from '../../lib/i18n';
 import './highlights.css';
 import { useReaderTextVersion } from './useReaderTextVersion';
@@ -34,7 +33,7 @@ const colorLabels: Record<HighlightColor, MessageKey> = {
 
 /** Local annotations never modify the PDF or its text layer. Only offsets and colors are saved. */
 export function ReaderHighlights({ controller, containerRef, renderCount, documentKey }: Props) {
-  const [store] = useState(() => createHighlightStore(browser.storage.local));
+  const [store] = useState(() => createIdbHighlightStore());
   const [marks, setMarks] = useState<ReaderHighlight[]>([]);
   const [selection, setSelection] = useState<ReaderTextSelection[]>([]);
   const [error, setError] = useState<MessageKey | null>(null);
@@ -73,21 +72,22 @@ export function ReaderHighlights({ controller, containerRef, renderCount, docume
           if (active) setError('readerHighlightsLoadError');
         });
     }
-    const changed: Parameters<typeof browser.storage.onChanged.addListener>[0] = (
-      changes,
-      area,
-    ) => {
-      if (!active || area !== 'local' || !(STORAGE_KEYS.readerHighlights in changes)) return;
-      const documents = parseHighlightDocuments(changes[STORAGE_KEYS.readerHighlights]?.newValue);
+    // Another reader tab (or this one) changed the marks: read them again (design 7.3).
+    const stopListening = onDataChanged(() => {
+      if (!active || !documentId) return;
       revision++;
-      setMarks(documentId ? (documents[documentId] ?? []) : []);
-    };
-    browser.storage.onChanged.addListener(changed);
+      void store
+        .list(documentId)
+        .then((saved) => {
+          if (active) setMarks(saved);
+        })
+        .catch(() => undefined);
+    }, ['highlights']);
     return () => {
       active = false;
       generation.current = turn + 1;
       pendingNavigation.current = null;
-      browser.storage.onChanged.removeListener(changed);
+      stopListening();
     };
   }, [documentId, documentKey, store]);
 
@@ -169,6 +169,7 @@ export function ReaderHighlights({ controller, containerRef, renderCount, docume
       const next = await task(documentId);
       if (turn !== generation.current) return;
       setMarks(next);
+      void kickSync();
       if (saved) setStatus('readerHighlightsSaved');
     } catch (reason) {
       if (turn === generation.current)

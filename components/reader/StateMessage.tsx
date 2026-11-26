@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { SETTINGS_SECTION_ANCHORS } from '../../lib/config/constants';
 import { t } from '../../lib/i18n';
 import { MAX_PDF_BYTES, MAX_PDF_PAGES } from '../../lib/pdf/limits';
@@ -25,6 +26,8 @@ interface StateMessageProps {
   dragging: boolean;
   /** Opens the file picker (the empty state's and the error states' action). */
   onOpen?: () => void;
+  /** Shown under the open button in the empty state (the "Continue reading" list). */
+  extra?: ReactNode;
 }
 
 /**
@@ -32,7 +35,7 @@ interface StateMessageProps {
  * Every message is Clavis's own localized text chosen by state/code: nothing from the PDF (its
  * file name is the only exception and is rendered as a text node by React) reaches markup.
  */
-export function StateMessage({ state, dragging, onOpen }: StateMessageProps) {
+export function StateMessage({ state, dragging, onOpen, extra }: StateMessageProps) {
   switch (state.phase) {
     case 'empty':
       return (
@@ -50,6 +53,7 @@ export function StateMessage({ state, dragging, onOpen }: StateMessageProps) {
               </button>
             </div>
           ) : null}
+          {extra}
           <p className="reader-empty__drop">
             {dragging ? t('readerDropActive') : t('readerEmptyHint')}
           </p>

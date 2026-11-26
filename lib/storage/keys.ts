@@ -24,6 +24,11 @@ export const STORAGE_KEYS = {
    * and a browser restart clears the key and its metadata together.
    */
   keyMeta: 'clavis.key-meta',
+  /**
+   * Non-secret sync state (`{ accountId, cursor, ... }`), written by the sync engine while signed
+   * in (docs/clavis-sync-design.md 4.1). Local data writers only check that it names an account.
+   */
+  syncState: 'clavis.sync-state',
 } as const;
 
 /** The two records that describe the stored key; always read, written and removed together. */

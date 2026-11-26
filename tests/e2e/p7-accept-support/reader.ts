@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { expect, type BrowserContext, type Locator, type Page } from '@playwright/test';
+import { forgetReadingProgress } from '../p10-support/progress';
 import { accept, acceptPath } from './manifest';
 
 /**
@@ -506,6 +507,8 @@ export async function openReaderPage(
     });
   });
   requests.length = 0;
+  // A fresh open starts on page 1 (the reader now restores the saved place of a file it knows).
+  await forgetReadingProgress(context);
   await page.goto(`chrome-extension://${extensionId}/reader.html`);
   await expect(page.getByTestId(HOOK.stateEmpty)).toBeVisible();
   return new Reader(page, observed);

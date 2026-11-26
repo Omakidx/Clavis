@@ -89,6 +89,8 @@ export const EXTENSION_PAGES = {
   reader: '/reader.html',
   /** The side panel (FR-042). One panel per tab: the tab id is a query parameter of its path. */
   sidepanel: '/sidepanel.html',
+  /** Saved words, per-word chat and the documents read in the reader (Clavis Sync, P1). */
+  library: '/library.html',
 } as const;
 
 /** Network timeouts in milliseconds. Every external call must be bounded. */
@@ -121,6 +123,12 @@ export const AI_RATE_LIMIT = {
 export const FEATURES = {
   grammarTab: false,
   translateTab: true,
+  /**
+   * Optional Google account and sync (docs/clavis-sync-design.md). Stays false until the whole
+   * sync release passes (design phase 4): no account UI is shown and nothing contacts the Clavis API.
+   * The local features (saved words, library, reading progress) do not depend on it.
+   */
+  accountSync: false,
 } as const;
 
 /** Feature flag per explain mode that is not part of the Must set (see `FEATURES`). */

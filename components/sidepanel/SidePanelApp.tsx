@@ -9,6 +9,7 @@ import { createBackend, type ExplainBackend } from '../explanation/backend';
 import { copyPlainText } from '../explanation/copy';
 import { kindLabel, tabLabel, truncateText } from '../explanation/model';
 import { ListenBar, listenMessage } from './ListenBar';
+import { SaveWord } from './SaveWord';
 import { SectionView } from './SectionView';
 import { createPanelClient, isFromBackground, tabFromSearch, type PanelClient } from './client';
 import { allText, sectionText } from './text';
@@ -202,6 +203,9 @@ export function SidePanelApp({ deps: given }: { deps?: PanelDeps }) {
               >
                 {t('panelCopyAll')}
               </Button>
+              {session !== null && deps.backend.words !== undefined ? (
+                <SaveWord session={session} words={deps.backend.words} announce={setNote} />
+              ) : null}
             </div>
             <p className="clavis-hint">{t('panelAiNote')}</p>
           </header>

@@ -3,9 +3,11 @@ import { MESSAGE_VERSION } from '../../lib/config/constants';
 import type { ErrorCode } from '../../lib/contracts/errors';
 import type { ForbiddenReason } from '../../lib/contracts/setup';
 import type { ExplainRequest, ExplainResult } from '../../lib/contracts/explain';
+import type { SelectionSnapshot } from '../../lib/contracts/selection';
 import type { SidePanelHandoff } from '../../lib/contracts/sidepanel';
 import type { ClientErrorCode } from '../../lib/ui-client/errors';
 import { readExplainResult } from './model';
+import type { SavedMeaningInput } from './session';
 
 /**
  * The card's side of the background routes AI_EXPLAIN, AI_CANCEL, OPEN_SETTINGS,
@@ -31,7 +33,29 @@ export type BackendReply =
       forbiddenReason?: ForbiddenReason;
     };
 
+/** Where a word saved from the PDF reader came from (the reader knows; the card does not). */
+export interface PdfRef {
+  fingerprint: string | null;
+  title: string | null;
+}
+
+export type SaveOutcome =
+  { ok: true; wordKey: string } | { ok: false; reason: 'limit' | 'elsewhere' | 'failed' };
+
+/**
+ * The Save button's side of SAVE_WORD, UNSAVE_WORD and GET_WORD_SAVED (docs/clavis-sync-design.md
+ * 7.4). The webpage source is never sent: the background reads it from the browser's sender.
+ */
+export interface WordsBackend {
+  /** Whether this text is saved, and its key. Null when nobody answered. */
+  lookup(text: string): Promise<{ saved: boolean; wordKey: string } | null>;
+  save(snapshot: SelectionSnapshot, meaning: SavedMeaningInput, pdf?: PdfRef): Promise<SaveOutcome>;
+  remove(wordKey: string): Promise<boolean>;
+}
+
 export interface ExplainBackend {
+  /** Saving words; absent where the host has no library to save to. */
+  words?: WordsBackend;
   /**
    * One paid request. Never retried here, not even when nobody answers (a second send could be a
    * second Groq call, requirements §8 abuse case 5). `acknowledge` is true only after the user
@@ -148,7 +172,40 @@ export function createBackend(send: Send = (message) => browser.runtime.sendMess
     }
   };
 
+  const dataOf = (reply: unknown): Record<string, unknown> | undefined => {
+    const data = isRecord(reply) && reply['ok'] === true ? reply['data'] : undefined;
+    return isRecord(data) ? data : undefined;
+  };
+  const words: WordsBackend = {
+    async lookup(text) {
+      const data = dataOf(await call({ type: 'GET_WORD_SAVED', text }));
+      return typeof data?.['wordKey'] === 'string'
+        ? { saved: data['saved'] === true, wordKey: data['wordKey'] }
+        : null;
+    },
+    async save(snapshot, meaning, pdf) {
+      const reply = await call({ type: 'SAVE_WORD', snapshot, meaning, ...(pdf && { pdf }) });
+      const data = dataOf(reply);
+      if (typeof data?.['wordKey'] === 'string') return { ok: true, wordKey: data['wordKey'] };
+      const error = isRecord(reply) ? reply['error'] : undefined;
+      return {
+        ok: false,
+        reason: !isRecord(error)
+          ? 'failed'
+          : error['code'] === 'LIMIT_EXCEEDED'
+            ? 'limit'
+            : error['code'] === 'PERMISSION_DENIED'
+              ? 'elsewhere'
+              : 'failed',
+      };
+    },
+    async remove(wordKey) {
+      return dataOf(await call({ type: 'UNSAVE_WORD', wordKey })) !== undefined;
+    },
+  };
+
   const backend: ExplainBackend = {
+    words,
     async explain(request, acknowledge) {
       return interpretReply(
         await call({

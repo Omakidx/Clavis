@@ -23,6 +23,8 @@ const MESSAGES: Record<ErrorCode, string> = {
   INVALID_REQUEST: 'The request was not valid.',
   STORAGE_UNAVAILABLE: 'Secure storage is unavailable; the API key cannot be used.',
   INTERNAL_ERROR: 'Something went wrong inside Clavis.',
+  NOT_FOUND: 'That saved word no longer exists.',
+  LIMIT_EXCEEDED: 'A limit on saved data has been reached.',
 };
 
 /** Why an `INVALID_RESPONSE` happened. Diagnostic only; carries no model output. */

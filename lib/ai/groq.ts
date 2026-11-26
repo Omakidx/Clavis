@@ -20,7 +20,7 @@ import {
 } from './errors';
 import type { AccessProbe, ForbiddenReason } from '../contracts/setup';
 import { buildResult, schemaNameFor, strictSchemaFor } from './modes';
-import { buildPrompt, type ResponseMode } from './prompts';
+import { buildPrompt, type ChatMessage, type ResponseMode } from './prompts';
 
 export type { ResponseMode } from './prompts';
 
@@ -67,6 +67,29 @@ export interface ExplainOptions {
   /** The user's reading level (FR-006). Defaults to `standard`. */
   readingLevel?: ReadingLevel;
 }
+
+export interface ChatOptions {
+  apiKey: string;
+  model: string;
+  signal?: AbortSignal;
+  /** Overall deadline for the call including its one fallback. */
+  timeoutMs?: number;
+}
+
+/** What a chat call returns: the answer as plain text and the model that wrote it. */
+export interface ChatReply {
+  text: string;
+  model: string;
+}
+
+/** Longest answer the chat keeps (the shared record limit for an assistant message). */
+export const MAX_CHAT_ANSWER_CHARS = 4000;
+/** Sampling temperature for chat answers. */
+const CHAT_TEMPERATURE = 0.3;
+/** Completion budget of a chat answer; reasoning models also spend it on thinking. */
+const CHAT_MAX_TOKENS = { standard: 700, reasoning: 2500 } as const;
+// eslint-disable-next-line no-control-regex -- stripping control characters from model output is the point
+const CONTROL_CHARS = /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f-\u009f]/g;
 
 export interface ExplainDetails {
   result: ExplainResult;
@@ -382,6 +405,76 @@ export class GroqProvider {
     return (await this.explainDetailed(request, opts)).result;
   }
 
+  /**
+   * One chat completion for a per-word question (S-05, design 7.6). Plain text in, plain text out:
+   * no `response_format`, the answer is trimmed, stripped of control characters and cut at
+   * `MAX_CHAT_ANSWER_CHARS`. Same transport, timeouts and error mapping as `explain`; one fallback
+   * when the model rejects `reasoning_effort`. Never retried otherwise.
+   */
+  async chat(messages: readonly ChatMessage[], opts: ChatOptions): Promise<ChatReply> {
+    if (!modelIdSchema.safeParse(opts.model).success) throw new GroqError('MODEL_UNAVAILABLE');
+    assertApiKey(opts.apiKey);
+    const capabilities = getModelCapabilities(opts.model);
+    const observed = await this.cache.get(opts.model);
+    let effort: ModelCapabilities['reasoningEffort'] =
+      observed.reasoningEffort === false ? null : capabilities.reasoningEffort;
+    const deadline = AbortSignal.timeout(opts.timeoutMs ?? REQUEST_TIMEOUT_MS.default);
+    const signals = { caller: opts.signal, deadline };
+    const started = this.now();
+    const meta = (extra: LogMetadata = {}): LogMetadata => ({
+      mode: 'chat',
+      durationMs: Math.round(this.now() - started),
+      ...extra,
+    });
+    try {
+      for (let attempt = 1; ; attempt++) {
+        const outcome = await this.send(
+          GROQ.chatCompletionsUrl,
+          {
+            method: 'POST',
+            apiKey: opts.apiKey,
+            body: JSON.stringify({
+              model: opts.model,
+              messages,
+              temperature: CHAT_TEMPERATURE,
+              max_completion_tokens: capabilities.reasoning
+                ? CHAT_MAX_TOKENS.reasoning
+                : CHAT_MAX_TOKENS.standard,
+              ...(effort ? { reasoning_effort: effort } : {}),
+            }),
+          },
+          signals,
+        );
+        if (outcome.ok) {
+          const text = mapChatCompletion(outcome.text);
+          this.log.debug('groq_chat_ok', meta({ status: outcome.status }));
+          return { text, model: opts.model };
+        }
+        if (
+          attempt === 1 &&
+          effort !== null &&
+          outcome.status === 400 &&
+          UNSUPPORTED_EFFORT_PATTERN.test(readProviderError(outcome.text).message)
+        ) {
+          effort = null;
+          await this.cache.record(opts.model, { reasoningEffort: false });
+          continue;
+        }
+        throw this.failure(outcome);
+      }
+    } catch (error) {
+      const groqError = error instanceof GroqError ? error : new GroqError('NETWORK_ERROR');
+      this.log.warn(
+        'groq_chat_failed',
+        meta({
+          errorCode: groqError.code,
+          ...(groqError.status !== undefined ? { status: groqError.status } : {}),
+        }),
+      );
+      throw groqError;
+    }
+  }
+
   /** Like `explain`, plus response mode, fallback flags and token usage for measurement. */
   async explainDetailed(request: ExplainRequest, opts: ExplainOptions): Promise<ExplainDetails> {
     const parsedRequest = explainRequestSchema.safeParse(request);
@@ -552,6 +645,29 @@ function buildBody(input: BodyInput): Record<string, unknown> {
     response_format: responseFormat,
     ...(reasoningEffort ? { reasoning_effort: reasoningEffort } : {}),
   };
+}
+
+/** The text of a chat completion: `choices[0].message.content`, cleaned and bounded. */
+function mapChatCompletion(text: string): string {
+  let body: z.infer<typeof completionSchema>;
+  try {
+    body = completionSchema.parse(JSON.parse(text));
+  } catch {
+    throw new GroqError('INVALID_RESPONSE', { stage: 'body' });
+  }
+  const content = body.choices[0]?.message.content;
+  if (typeof content !== 'string') throw new GroqError('INVALID_RESPONSE', { stage: 'empty' });
+  const answer = Array.from(content.replace(THINK_BLOCK, '').replace(CONTROL_CHARS, ''))
+    .slice(0, MAX_CHAT_ANSWER_CHARS)
+    .join('')
+    .trim();
+  // Nothing left (an answer spent entirely on thinking, or cut off at once) is not an answer.
+  if (answer === '') {
+    throw new GroqError('INVALID_RESPONSE', {
+      stage: body.choices[0]?.finish_reason === 'length' ? 'truncated' : 'empty',
+    });
+  }
+  return answer;
 }
 
 /** Take only `choices[0].message.content`; ignore reasoning fields entirely. */

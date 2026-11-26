@@ -1,21 +1,40 @@
 import 'pdfjs-dist/web/pdf_viewer.css';
 import '../common/page.css';
 import './reader.css';
-import { useCallback, useEffect, useRef, useState, type ChangeEvent, type DragEvent } from 'react';
+import {
+  lazy,
+  Suspense,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type ChangeEvent,
+  type DragEvent,
+} from 'react';
 import { t } from '../../lib/i18n';
+import { titleFromFileName } from '../../lib/pdf/state';
 import { Announcer } from './Announcer';
 import { FindBar } from './FindBar';
 import { LinkConfirm } from './LinkConfirm';
 import { PasswordPrompt } from './PasswordPrompt';
 import { ReaderToolbar } from './ReaderToolbar';
 import { ReaderPlayback } from './ReaderPlayback';
-import { ReaderHighlights } from './ReaderHighlights';
 import { StateMessage } from './StateMessage';
 import { useFindBar } from './useFindBar';
 import { useReaderController } from './useReaderController';
 import { useReaderSelection } from './useReaderSelection';
 import { useReaderShortcuts } from './useReaderShortcuts';
 import { useReaderNarration } from './useReaderNarration';
+
+// Highlights, reading progress and the "Continue reading" list use the local data layer
+// (IndexedDB). They load on demand so opening the reader does not pay for them up front.
+const ReaderHighlights = lazy(() =>
+  import('./ReaderHighlights').then((m) => ({ default: m.ReaderHighlights })),
+);
+const ReaderResume = lazy(() => import('./ReaderData').then((m) => ({ default: m.ReaderResume })));
+const ContinueReading = lazy(() =>
+  import('./ReaderData').then((m) => ({ default: m.ContinueReading })),
+);
 
 /** Phases in which pages are on screen (the others show a message over the stage instead). */
 const SHOWS_PAGES = new Set(['ready', 'image-only']);
@@ -55,7 +74,15 @@ export function Reader() {
     view?.pageCount ?? 0,
   );
 
-  useReaderSelection(containerRef, renderCount, hasPages ? openCount : null);
+  // The PDF a saved word came from: read when the word is saved, so it is always the open file.
+  const pdfRef = useCallback(
+    () => ({
+      fingerprint: controller.documentId,
+      title: titleFromFileName(controller.getSnapshot().fileName),
+    }),
+    [controller],
+  );
+  useReaderSelection(containerRef, renderCount, hasPages ? openCount : null, pdfRef);
   useReaderShortcuts({
     controller,
     containerRef,
@@ -194,6 +221,16 @@ export function Reader() {
             blocked={pendingLink !== null}
           />
         ) : null}
+        {hasPages ? (
+          <Suspense fallback={null}>
+            <ReaderResume
+              controller={controller}
+              containerRef={containerRef}
+              snapshot={snapshot}
+              documentKey={openCount}
+            />
+          </Suspense>
+        ) : null}
         {state.phase === 'image-only' ? <StateMessage state={state} dragging={false} /> : null}
         {pageErrors > 0 ? (
           <p
@@ -236,7 +273,16 @@ export function Reader() {
                     onCancel={() => controller.cancelPassword()}
                   />
                 ) : (
-                  <StateMessage state={state} dragging={dragging} onOpen={pickFile} />
+                  <StateMessage
+                    state={state}
+                    dragging={dragging}
+                    onOpen={pickFile}
+                    extra={
+                      <Suspense fallback={null}>
+                        <ContinueReading onOpen={pickFile} />
+                      </Suspense>
+                    }
+                  />
                 )}
               </div>
             ) : null}
@@ -255,12 +301,14 @@ export function Reader() {
           </div>
           {hasPages ? (
             <div className="reader__sidebar" inert={pendingLink !== null}>
-              <ReaderHighlights
-                controller={controller}
-                containerRef={containerRef}
-                renderCount={renderCount}
-                documentKey={openCount}
-              />
+              <Suspense fallback={null}>
+                <ReaderHighlights
+                  controller={controller}
+                  containerRef={containerRef}
+                  renderCount={renderCount}
+                  documentKey={openCount}
+                />
+              </Suspense>
             </div>
           ) : null}
         </div>

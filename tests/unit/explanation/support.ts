@@ -1,8 +1,11 @@
 import type {
   BackendReply,
   ExplainBackend,
+  PdfRef,
+  SaveOutcome,
   SettingsSection,
 } from '../../../components/explanation/backend';
+import type { SavedMeaningInput } from '../../../components/explanation/session';
 import type { ExplainRequest, ExplainResult } from '../../../lib/contracts/explain';
 import type { SelectionKind, SelectionSnapshot } from '../../../lib/contracts/selection';
 import type { SidePanelHandoff } from '../../../lib/contracts/sidepanel';
@@ -113,7 +116,28 @@ export function createFakeBackend() {
   const settings: Array<SettingsSection | undefined> = [];
   const handoffs: SidePanelHandoff[] = [];
   const state = { settingsOpens: true, panelOpens: true, language: 'en' as string | undefined };
+  /** Saved words: what the Save button asked for, and what is "in the library". */
+  const saves: Array<{ snapshot: SelectionSnapshot; meaning: SavedMeaningInput; pdf?: PdfRef }> =
+    [];
+  const removed: string[] = [];
+  const library = new Map<string, string>();
+  const saving = { outcome: { ok: true, wordKey: 'k'.repeat(64) } as SaveOutcome, removeOk: true };
   const backend: ExplainBackend = {
+    words: {
+      lookup: (text) =>
+        Promise.resolve({ saved: library.has(text), wordKey: library.get(text) ?? 'k'.repeat(64) }),
+      save(snapshot, meaning, pdf) {
+        saves.push({ snapshot, meaning, ...(pdf === undefined ? {} : { pdf }) });
+        if (saving.outcome.ok) library.set(snapshot.text, saving.outcome.wordKey);
+        return Promise.resolve(saving.outcome);
+      },
+      remove(wordKey) {
+        removed.push(wordKey);
+        if (saving.removeOk)
+          for (const [text, key] of library) if (key === wordKey) library.delete(text);
+        return Promise.resolve(saving.removeOk);
+      },
+    },
     explain(request, acknowledge) {
       return new Promise<BackendReply>((resolve) => {
         calls.push({
@@ -136,7 +160,7 @@ export function createFakeBackend() {
     },
     translationLanguage: () => Promise.resolve(state.language),
   };
-  return { backend, calls, cancelled, settings, handoffs, state };
+  return { backend, calls, cancelled, settings, handoffs, state, saves, removed, library, saving };
 }
 
 export const flush = async (): Promise<void> => {

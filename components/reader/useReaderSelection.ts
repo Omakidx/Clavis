@@ -1,4 +1,5 @@
 import { useEffect, useRef, type RefObject } from 'react';
+import type { PdfRef } from '../explanation/backend';
 import { mountReaderSelection, type ReaderSelectionHandle } from './selection-toolbar';
 
 /**
@@ -10,6 +11,7 @@ export function useReaderSelection(
   containerRef: RefObject<HTMLElement | null>,
   renderCount: number,
   documentKey: number | null,
+  pdf?: () => PdfRef | null,
 ): void {
   const handle = useRef<ReaderSelectionHandle | null>(null);
 
@@ -17,13 +19,13 @@ export function useReaderSelection(
     const container = containerRef.current;
     if (!container) return;
     // The empty reader still needs its background-message listener to answer keyboard commands.
-    const mounted = mountReaderSelection(container);
+    const mounted = mountReaderSelection(container, window, pdf);
     handle.current = mounted;
     return () => {
       mounted.stop();
       handle.current = null;
     };
-  }, [containerRef, documentKey]);
+  }, [containerRef, documentKey, pdf]);
 
   useEffect(() => {
     if (renderCount === 0) return;

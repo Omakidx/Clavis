@@ -1,16 +1,21 @@
 import { browser } from 'wxt/browser';
 import { createCapabilityCache } from '../ai/capability-cache';
 import { GroqProvider } from '../ai/groq';
+import { migrateLegacyHighlights } from '../data/migrate';
+import { logger } from '../security/logger';
 import { whenStorageLockedDown } from '../security/storage-lockdown';
 import { registerSiteAccess } from '../site-access/background';
 import { createSpeech } from '../speech/background';
 import { createApiKeyStore, createSettingsStore } from '../storage';
 import { createAiHandlers } from './handlers/ai';
 import { createCardHandlers } from './handlers/card';
+import { createChatHandlers } from './handlers/chat';
 import { createKeyService } from './handlers/key';
 import { createNavigationHandlers } from './handlers/navigation';
 import { createSidePanelHandlers } from './handlers/sidepanel';
 import { createSettingsHandlers } from './handlers/settings';
+import { createSyncHandlers } from './handlers/sync';
+import { createWordHandlers } from './handlers/words';
 import { abortTabRequests, createAiGuard, panelKey, senderKey } from './limiter';
 import { createMessageListener } from './router';
 import { buildRoutes } from './routes';
@@ -94,6 +99,16 @@ export function registerBackground(): void {
     }),
     speech: createSpeech({ preferences: () => settingsStore.getPreferences() }),
     injection,
+    words: createWordHandlers({ tabs: browser.tabs }),
+    chat: createChatHandlers({
+      settings: settingsStore,
+      keys: keyStore,
+      keyService,
+      provider,
+      guard,
+      lockedDown: whenStorageLockedDown,
+    }),
+    sync: createSyncHandlers(),
   });
 
   const listener = createMessageListener({
@@ -104,6 +119,10 @@ export function registerBackground(): void {
     routes,
   });
   browser.runtime.onMessage.addListener(listener);
+
+  // Highlights used to live in chrome.storage.local; move them into IndexedDB once (design 7.3).
+  // Idempotent and cheap when there is nothing to move, so it simply runs at every worker start.
+  void migrateLegacyHighlights().catch(() => logger.warn('highlight_migration_failed'));
 
   // A closed tab can no longer receive a result: stop paying for its request.
   browser.tabs.onRemoved.addListener((tabId) => {

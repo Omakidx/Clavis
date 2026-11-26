@@ -144,3 +144,23 @@ export function clampPage(page: number, pageCount: number): number {
   if (!Number.isFinite(page)) return 1;
   return Math.min(Math.max(Math.trunc(page), 1), Math.max(pageCount, 1));
 }
+
+/** The file name without `.pdf`, as the title a document or a saved word keeps; null when none is left. */
+export function titleFromFileName(name: string): string | null {
+  const title = clipUnits(name.replace(/\.pdf$/iu, '').trim(), 300);
+  return title === '' ? null : title;
+}
+
+/**
+ * Cut `text` to at most `max` UTF-16 units (the unit the shared record limits count) without
+ * splitting a surrogate pair: whole code points only.
+ */
+export function clipUnits(text: string, max: number): string {
+  if (text.length <= max) return text;
+  let out = '';
+  for (const point of text) {
+    if (out.length + point.length > max) break;
+    out += point;
+  }
+  return out;
+}

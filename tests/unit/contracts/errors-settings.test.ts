@@ -7,7 +7,7 @@ import {
 
 describe('errorCodeSchema / errorEnvelopeSchema', () => {
   it('contains the architecture §4 codes plus the Phase 3 INVALID_REQUEST, STORAGE_UNAVAILABLE and INTERNAL_ERROR', () => {
-    expect(ERROR_CODES).toHaveLength(16);
+    expect(ERROR_CODES).toHaveLength(18);
     for (const code of ERROR_CODES) expect(errorCodeSchema.safeParse(code).success).toBe(true);
     expect(errorCodeSchema.safeParse('SELECTION_TOO_LONG').success).toBe(true);
     expect(errorCodeSchema.safeParse('INVALID_REQUEST').success).toBe(true);

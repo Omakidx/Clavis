@@ -23,6 +23,10 @@ export const ERROR_CODES = [
   'STORAGE_UNAVAILABLE',
   /** Unexpected failure inside the extension; carries no error text. */
   'INTERNAL_ERROR',
+  /** A saved word (or its record) the request names does not exist (any more). */
+  'NOT_FOUND',
+  /** A local data limit is reached (saved words, messages per word). */
+  'LIMIT_EXCEEDED',
 ] as const;
 
 export const errorCodeSchema = z.enum(ERROR_CODES);

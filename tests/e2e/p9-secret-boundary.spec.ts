@@ -306,6 +306,8 @@ test('Explain on a web page, success and every failure: the key appears in no me
     'LOAD_EXPLAIN_CARD',
     'OPEN_SETTINGS',
     'OPEN_SIDE_PANEL',
+    // The card asks whether the selected word is already saved (Clavis Sync P1; no key involved).
+    'GET_WORD_SAVED',
   ]);
   expect([...types].filter((t) => !allowed.has(t))).toEqual([]);
   const toolbarLoads = rec.sent.map((s) => JSON.parse(s)).filter((m) => m.type === 'LOAD_TOOLBAR');
@@ -428,6 +430,16 @@ test('every route, from a content script: only the nine public ones answer, all 
     GET_SITE_ACCESS_STATUS: { v: 1, type: 'GET_SITE_ACCESS_STATUS' },
     GET_VOICES: { v: 1, type: 'GET_VOICES' },
     GET_SIDE_PANEL_STATE: { v: 1, type: 'GET_SIDE_PANEL_STATE', tabId: 1 },
+    // Chat about a saved word uses the key and is the library's alone; the sync nudge is for pages.
+    WORD_CHAT_SEND: {
+      v: 1,
+      type: 'WORD_CHAT_SEND',
+      requestId: id(),
+      wordKey: 'a'.repeat(64),
+      message: 'hello',
+    },
+    WORD_CHAT_CANCEL: { v: 1, type: 'WORD_CHAT_CANCEL', requestId: id() },
+    SYNC_KICK: { v: 1, type: 'SYNC_KICK' },
   };
   for (const [type, message] of Object.entries(refused)) {
     const reply = await content.evaluate<unknown>(
@@ -457,6 +469,7 @@ test('every route, from a content script: only the nine public ones answer, all 
     { v: 1, type: 'TTS_STOP' },
     { v: 1, type: 'OPEN_SIDE_PANEL', handoff: { snapshot, results: [] } },
     { v: 1, type: 'TTS_SPEAK', requestId: id(), text: 'bank', rate: 1 },
+    { v: 1, type: 'GET_WORD_SAVED', text: 'bank' },
   ];
   for (const message of publicMessages) {
     const reply = await content.evaluate<{ ok?: boolean } | undefined>(

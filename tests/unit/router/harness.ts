@@ -8,6 +8,10 @@ import {
   type AiProvider,
 } from '../../../lib/router/handlers/ai';
 import { createCardHandlers } from '../../../lib/router/handlers/card';
+import { createChatHandlers } from '../../../lib/router/handlers/chat';
+import { createSyncHandlers } from '../../../lib/router/handlers/sync';
+import { createWordHandlers } from '../../../lib/router/handlers/words';
+import type { ChatProvider } from '../../../lib/router/handlers/chat';
 import { createKeyService } from '../../../lib/router/handlers/key';
 import { createNavigationHandlers } from '../../../lib/router/handlers/navigation';
 import { createSidePanelHandlers } from '../../../lib/router/handlers/sidepanel';
@@ -242,6 +246,30 @@ export function createHarness(options: HarnessOptions = {}) {
     now,
   });
 
+  const tabsGet = vi.fn((_tabId: number) =>
+    Promise.resolve({ url: 'https://news.example/story?id=7#top', title: 'The story' } as {
+      url?: string;
+      title?: string;
+    }),
+  );
+  const words = createWordHandlers({ tabs: { get: tabsGet }, now });
+  const chatProvider = {
+    chat: vi.fn<ChatProvider['chat']>(() =>
+      Promise.resolve({ text: 'An answer.', model: MODELS[0]!.id }),
+    ),
+  };
+  const chat = createChatHandlers({
+    settings: settingsStore,
+    keys: keyStore,
+    keyService,
+    provider: chatProvider,
+    guard,
+    lockedDown,
+    now,
+    nonce: 'feedface00000000',
+  });
+  const sync = createSyncHandlers();
+
   const routes: Route[] = buildRoutes({
     ai,
     card,
@@ -251,6 +279,9 @@ export function createHarness(options: HarnessOptions = {}) {
     settings,
     speech,
     injection: injection as never,
+    words,
+    chat,
+    sync,
   });
   const listener = createMessageListener({
     identity: { runtimeId: RUNTIME_ID, extensionOrigin: ORIGIN },
@@ -298,6 +329,8 @@ export function createHarness(options: HarnessOptions = {}) {
     routes,
     send,
     call,
+    tabsGet,
+    chatProvider,
   };
 }
 

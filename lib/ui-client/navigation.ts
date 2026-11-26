@@ -1,7 +1,8 @@
 import { browser } from 'wxt/browser';
 import { SETTINGS_SECTION_ANCHORS } from '../config/constants';
 
-type ExtensionPagePath = '/onboarding.html' | '/options.html' | '/practice.html' | '/reader.html';
+type ExtensionPagePath =
+  '/library.html' | '/onboarding.html' | '/options.html' | '/practice.html' | '/reader.html';
 
 /** Open the settings page in a tab (it is declared `open_in_tab`). */
 export function openSettingsPage(): void {
@@ -19,8 +20,10 @@ export function openSettingsAt(section: keyof typeof SETTINGS_SECTION_ANCHORS): 
 }
 
 /** Open one of the extension's own pages in a new tab. */
-export function openExtensionPage(path: ExtensionPagePath): void {
-  void browser.tabs.create({ url: browser.runtime.getURL(path) });
+export function openExtensionPage(path: ExtensionPagePath, hash?: string): void {
+  void browser.tabs.create({
+    url: `${browser.runtime.getURL(path)}${hash === undefined ? '' : `#${hash}`}`,
+  });
 }
 
 /** chrome://extensions details page for Clavis (site access can be switched off there). */

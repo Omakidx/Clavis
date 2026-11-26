@@ -296,14 +296,60 @@ test.describe('title, close and what is forgotten', () => {
     expect(await page.locator('.textLayer').count()).toBe(0);
     expect(await page.evaluate(() => document.getSelection()?.toString() ?? '')).toBe('');
 
-    // Nothing about the file is kept anywhere the page can write.
-    const stored = await page.evaluate(async () => ({
-      local: Object.keys(localStorage),
-      session: Object.keys(sessionStorage),
-      databases: (await indexedDB.databases()).map((d) => d.name),
-      caches: await caches.keys(),
-    }));
-    expect(stored).toEqual({ local: [], session: [], databases: [], caches: [] });
+    // The file itself is kept nowhere the page can write. Since Clavis Sync P1 the reader remembers
+    // WHERE you stopped (docs/clavis-sync-design.md 7.3): one small record per file in IndexedDB,
+    // keyed by the SHA-256 of the bytes, with the title, page count, size and position. No bytes,
+    // no text, no cache, no other storage.
+    const stored = await page.evaluate(async () => {
+      const open = indexedDB.open('clavis-data', 1);
+      const db = await new Promise<IDBDatabase>((resolve, reject) => {
+        open.onsuccess = () => resolve(open.result);
+        open.onerror = () => reject(open.error);
+      });
+      const read = (name: string) =>
+        new Promise<Record<string, unknown>[]>((resolve, reject) => {
+          const request = db.transaction(name).objectStore(name).getAll();
+          request.onsuccess = () => resolve(request.result as Record<string, unknown>[]);
+          request.onerror = () => reject(request.error);
+        });
+      const result = {
+        local: Object.keys(localStorage),
+        session: Object.keys(sessionStorage),
+        databases: (await indexedDB.databases()).map((d) => d.name),
+        caches: await caches.keys(),
+        documents: await read('documents'),
+        highlights: await read('highlights'),
+        fileHandoff: await read('fileHandoff'),
+      };
+      db.close();
+      return result;
+    });
+    expect(stored).toMatchObject({
+      local: [],
+      session: [],
+      databases: ['clavis-data'],
+      caches: [],
+      highlights: [],
+      fileHandoff: [],
+    });
+    expect(stored.documents).toHaveLength(1);
+    expect(Object.keys(stored.documents[0]!).sort()).toEqual(
+      [
+        'clientModifiedAt',
+        'deleted',
+        'dirty',
+        'fileBytes',
+        'fingerprint',
+        'lastPage',
+        'pageCount',
+        'pageOffset',
+        'rev',
+        'seq',
+        'storageState',
+        'title',
+      ].sort(),
+    );
+    expect(stored.documents[0]).toMatchObject({ title: 'text-100pages', pageCount: 100 });
   });
 
   test('opening another file replaces the first one completely, and zoom and page start fresh', async ({

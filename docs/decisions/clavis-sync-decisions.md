@@ -28,4 +28,6 @@ disclosures and [architecture.md](../architecture.md) must be updated before rel
 ## Resolved
 
 - **Stable extension ID.** Unpacked builds carry a development manifest `key` (extension ID `ebfpdncfkebjagolnbmfdhikaipiflbl`), and store ZIPs drop it (see `wxt.config.ts`).
+- **Saved words from web pages (P1 security review, M-1).** A content script (the in-page card) can only see, remove or overwrite saved words whose source is a web page on the same origin as its tab, and these routes are rate-limited per tab. Extension pages (reader, practice page, side panel, library) are not restricted.
+- **Incognito saves (P1 security review, L-2).** A word saved from an incognito tab keeps its text, meaning and context, but its source is stored with no URL and no title.
 - **Dashboard sign-in.** It uses a server-side OAuth redirect and a cookie session, separate from the extension's tokens. See [clavis-sync-design.md §2.5](../clavis-sync-design.md).
