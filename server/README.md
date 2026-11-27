@@ -57,6 +57,19 @@ CORS: `chrome-extension://<id>` for every ID in `ALLOWED_EXTENSION_IDS` may call
 - `node dist/migrate.js` applies them (Railway pre-deploy). It is a no-op until `migrations/meta/_journal.json` exists.
 - DB client: `createDb(url, logger)` in `src/db/client.ts` returns `{ pool, db, ping, close }`.
 - Integration tests read `TEST_DATABASE_URL` and skip when it is unset. They must only touch a throwaway database.
+- PDF storage tests (`test/storage/`) also need an S3 bucket: `TEST_S3_ENDPOINT`, `TEST_S3_BUCKET`, `TEST_S3_ACCESS_KEY_ID`,
+  `TEST_S3_SECRET_ACCESS_KEY` (the dev MinIO: `http://127.0.0.1:9000`, bucket `clavis-dev`, user `clavis-dev`, password
+  `clavis-dev-only`). They skip when unset and only write under random `u/<userId>/` prefixes.
+
+## PDF storage and jobs (design §6)
+
+- `src/storage/` is the S3 adapter (`ObjectStorage` port); `src/documents/file-routes.ts` + `file-service.ts` are the
+  `/v1/documents/:fp/file` endpoints. Without `S3_*` the file routes answer `503 UNAVAILABLE` and the rest works.
+- `src/jobs/` runs in the API process unless `JOBS_ENABLED=0`: expire uploads (5 min), object deletions (1 min),
+  purge (daily), orphan sweep (weekly). Each run holds a Postgres advisory lock; `STORAGE_ALERT_BYTES` makes the sweep log an alert.
+- `MAX_CONCURRENT_UPLOADS` (default 8) caps simultaneous PDF uploads in the process; above it the PUT answers 503 `UNAVAILABLE`.
+- Bucket setup: add a lifecycle rule `AbortIncompleteMultipartUpload` with `DaysAfterInitiation: 1`, so multipart uploads
+  orphaned by a crash do not accrue storage. (The server aborts its own uploads on failure; this is the backstop.)
 
 ## Authentication (design §2)
 

@@ -1,4 +1,4 @@
-import { ENDPOINTS, TokenPair } from '../../shared/api-contract/endpoints';
+import { AccountResponse, ENDPOINTS, TokenPair } from '../../shared/api-contract/endpoints';
 import { SYNC } from '../config/constants';
 import type { AccountStatus } from '../contracts/account';
 import type { ErrorCode } from '../contracts/errors';
@@ -47,8 +47,15 @@ export interface AccountServiceDeps {
   random?: Random;
   onStatusChanged?: () => void;
   newId?: () => string;
+  now?: () => number;
   notify?: (stores: readonly (typeof STORE_NAMES)[number][]) => void;
 }
+
+/** How long the server's storage usage is reused (a refresh is forced after an upload or removal). */
+const USAGE_TTL_MS = 30_000;
+const USAGE_FAILURE_TTL_MS = 10_000;
+const USAGE_TIMEOUT_MS = 5_000;
+type Usage = NonNullable<AccountStatus['usage']>;
 
 const idleSync = { state: 'idle', pending: 0, rejected: 0 } as const;
 
@@ -56,7 +63,9 @@ export function createAccountService(deps: AccountServiceDeps) {
   const newId = deps.newId ?? (() => crypto.randomUUID());
   const notify = deps.notify ?? notifyDataChanged;
   const statusChanged = deps.onStatusChanged ?? notifyAccountStatusChanged;
+  const now = deps.now ?? Date.now;
   let signingIn: Promise<ServiceResult> | null = null;
+  let usageCache: { at: number; ttl: number; value: Usage | null } | null = null;
   /** Bumped by every sign-out and data clear; a sign-in or refresh started earlier is dropped. */
   let generation = 0;
 
@@ -158,6 +167,7 @@ export function createAccountService(deps: AccountServiceDeps) {
   /** Everything after the network part of a sign-out. Never throws. */
   async function detachLocally(keepLocalCopy: boolean): Promise<void> {
     generation += 1;
+    usageCache = null;
     // Unbind first: writers stop marking dirty, the engine finds nobody to work for.
     await deps.store.clear().catch(() => undefined);
     await deps.state.clear().catch(() => undefined);
@@ -167,7 +177,38 @@ export function createAccountService(deps: AccountServiceDeps) {
     statusChanged();
   }
 
+  /** `GET /v1/account` usage, cached briefly; null when the server cannot be asked. Never throws. */
+  async function readUsage(): Promise<Usage | null> {
+    if (usageCache !== null && now() - usageCache.at < usageCache.ttl) return usageCache.value;
+    const started = generation;
+    let value: Usage | null;
+    try {
+      const account = await deps.tokens.request({
+        method: 'GET',
+        path: ENDPOINTS.account.path,
+        response: AccountResponse,
+        timeoutMs: USAGE_TIMEOUT_MS,
+      });
+      value = {
+        storageUsedBytes: account.usage.storageUsedBytes,
+        storageQuotaBytes: account.usage.storageQuotaBytes,
+      };
+    } catch {
+      value = null;
+    }
+    // Signed out (or data cleared) while asking: remember nothing.
+    if (generation === started) {
+      usageCache = { at: now(), ttl: value === null ? USAGE_FAILURE_TTL_MS : USAGE_TTL_MS, value };
+    }
+    return value;
+  }
+
   return {
+    /** The next status asks the server again (after a file was stored or removed). */
+    invalidateUsage(): void {
+      usageCache = null;
+    },
+
     /** ACCOUNT_SIGN_IN. One at a time. */
     signIn(): Promise<ServiceResult> {
       signingIn ??= doSignIn().finally(() => {
@@ -268,6 +309,7 @@ export function createAccountService(deps: AccountServiceDeps) {
         ...(email === undefined ? {} : { email }),
         ...(displayName === undefined ? {} : { displayName }),
         sync: await deps.engine.status(),
+        usage: await readUsage(),
       };
     },
   };

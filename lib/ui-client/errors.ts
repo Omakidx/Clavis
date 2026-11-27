@@ -55,6 +55,11 @@ const MAPPING = {
   NOT_CONFIGURED: { key: 'errSignInNotConfigured', action: 'none' },
   EMAIL_NOT_VERIFIED: { key: 'errEmailNotVerified', action: 'none' },
   NOT_SIGNED_IN: { key: 'errNotSignedIn', action: 'none' },
+  QUOTA_EXCEEDED: { key: 'errQuotaExceeded', action: 'none' },
+  FILE_TOO_LARGE: { key: 'errFileTooLarge', action: 'none' },
+  NOT_A_PDF: { key: 'errNotAPdf', action: 'none' },
+  FINGERPRINT_MISMATCH: { key: 'errFingerprintMismatch', action: 'none' },
+  UPLOAD_IN_PROGRESS: { key: 'errUploadInProgress', action: 'retry' },
   NO_RESPONSE: { key: 'errNoResponse', action: 'retry' },
   BAD_REPLY: { key: 'errInvalidResponse', action: 'retry' },
 } as const satisfies Record<ClientErrorCode, Mapping>;

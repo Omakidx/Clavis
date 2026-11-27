@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
-import { onDataCleared } from '../../lib/data/channel';
+import { onAccountStatusChanged, onDataChanged, onDataCleared } from '../../lib/data/channel';
+import { FEATURES } from '../../lib/config/constants';
+import { isSignedIn } from '../../lib/data/sync-flag';
 import { getDocument, listDocuments, saveProgress } from '../../lib/data/documents';
 import { kickSync } from '../../lib/data/kick';
 import type { LocalDocument } from '../../lib/data/db';
@@ -163,25 +165,46 @@ export function ReaderResume({ controller, containerRef, snapshot, documentKey }
 }
 
 /**
- * Recently read PDFs, in the reader's empty state. Clavis keeps no copy of a file, so each item
- * opens the file picker; choosing the same file (same fingerprint) returns to the saved place.
+ * Recently read PDFs, in the reader's empty state, as cards with a progress bar. A PDF stored in
+ * the account (signed in, accounts on) opens straight from `?doc=<fingerprint>`; the others ask
+ * for the file again and return to the saved place when its fingerprint matches (design 7.7).
  */
 export function ContinueReading({ onOpen }: { onOpen(): void }) {
   const [documents, setDocuments] = useState<LocalDocument[]>([]);
+  const [account, setAccount] = useState(false);
   useEffect(() => {
     let active = true;
-    void listDocuments(CONTINUE_LIST_SIZE * 3)
-      .then((all) => {
-        if (active) {
-          setDocuments(all.filter((doc) => doc.lastPage !== null).slice(0, CONTINUE_LIST_SIZE));
-        }
-      })
-      .catch(() => undefined);
+    const read = (): void => {
+      void listDocuments(CONTINUE_LIST_SIZE * 3)
+        .then((all) => {
+          if (active) {
+            setDocuments(all.filter((doc) => doc.lastPage !== null).slice(0, CONTINUE_LIST_SIZE));
+          }
+        })
+        .catch(() => undefined);
+    };
+    read();
+    // Signed in, a pull can bring cards that other devices read, and their stored state.
+    const stop = FEATURES.accountSync ? onDataChanged(read, ['documents']) : () => undefined;
+    // Signing in or out changes which cards may open from the account.
+    const readAccount = (): void => {
+      void isSignedIn().then((value) => {
+        if (active) setAccount(value);
+      });
+    };
+    let stopAccount = (): void => undefined;
+    if (FEATURES.accountSync) {
+      readAccount();
+      stopAccount = onAccountStatusChanged(readAccount);
+    }
     return () => {
       active = false;
+      stop();
+      stopAccount();
     };
   }, []);
   if (documents.length === 0) return null;
+  const fromAccount = (doc: LocalDocument): boolean => account && doc.storageState === 'stored';
   return (
     <section
       className="reader-continue"
@@ -189,28 +212,56 @@ export function ContinueReading({ onOpen }: { onOpen(): void }) {
       data-testid="reader-continue"
     >
       <h3 id="reader-continue-title">{t('readerContinueTitle')}</h3>
-      <p className="clavis-muted">{t('readerContinueHint')}</p>
-      <ul>
+      {documents.every(fromAccount) ? null : (
+        <p className="clavis-muted">{t('readerContinueHint')}</p>
+      )}
+      <ul className="reader-continue__list">
         {documents.map((doc) => {
           const title = doc.title ?? t('libraryDocUntitled');
+          const page = doc.lastPage ?? 1;
+          const progress =
+            doc.pageCount === null
+              ? t('readerContinuePage', String(page))
+              : t('readerContinueItem', [String(page), String(doc.pageCount)]);
           return (
-            <li key={doc.fingerprint}>
-              <span className="reader-continue__title" dir="auto">
+            <li key={doc.fingerprint} className="reader-card" data-testid="reader-continue-item">
+              <span className="reader-card__title" dir="auto" title={title}>
                 {title}
               </span>
-              <span className="clavis-muted">
-                {doc.pageCount === null
-                  ? t('readerContinuePage', String(doc.lastPage))
-                  : t('readerContinueItem', [String(doc.lastPage), String(doc.pageCount)])}
+              <span className="reader-card__meta">
+                {progress}
+                {fromAccount(doc) ? (
+                  <span className="reader-card__badge">{t('readerContinueStored')}</span>
+                ) : null}
               </span>
-              <button
-                type="button"
-                className="clavis-button"
-                aria-label={t('readerContinueOpenLabel', title)}
-                onClick={onOpen}
-              >
-                {t('readerContinueOpen')}
-              </button>
+              {doc.pageCount === null ? null : (
+                <progress
+                  className="reader-card__bar"
+                  max={doc.pageCount}
+                  value={Math.min(page, doc.pageCount)}
+                  aria-label={t('readerContinueProgressLabel', title)}
+                  aria-valuetext={progress}
+                />
+              )}
+              {fromAccount(doc) ? (
+                <a
+                  className="clavis-button clavis-button--primary reader-card__action"
+                  href={`?doc=${doc.fingerprint}`}
+                  aria-label={t('readerContinueFromAccountLabel', title)}
+                  data-testid="reader-continue-cloud"
+                >
+                  {t('readerContinueFromAccount')}
+                </a>
+              ) : (
+                <button
+                  type="button"
+                  className="clavis-button reader-card__action"
+                  aria-label={t('readerContinueOpenLabel', title)}
+                  onClick={onOpen}
+                >
+                  {t('readerContinueOpen')}
+                </button>
+              )}
             </li>
           );
         })}

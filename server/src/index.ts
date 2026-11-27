@@ -3,7 +3,9 @@ import { createApp } from './app';
 import { ConfigError, loadConfig } from './config';
 import { createDb, type DbHandle } from './db/client';
 import { createLogger } from './logger';
+import { startJobs } from './jobs';
 import { findDashboardDir } from './paths';
+import { createStorage } from './storage';
 
 let config;
 try {
@@ -25,7 +27,16 @@ if (!dbHandle) logger.warn('DATABASE_URL is not set: /readyz will report 503');
 const dashboardDir = findDashboardDir();
 if (!dashboardDir) logger.warn('dashboard build not found: static files are not served');
 
-const app = createApp({ config, logger, db: dbHandle, dashboardDir });
+const storage = createStorage(config.s3, {
+  onStreamError: (name) => logger.warn({ name }, 'download stream failed'),
+});
+if (!storage) logger.warn('S3 is not configured: PDF file routes answer 503');
+
+const app = createApp({ config, logger, db: dbHandle, dashboardDir, storage });
+const jobs =
+  config.jobsEnabled && dbHandle
+    ? startJobs({ handle: dbHandle, storage, logger, alertBytes: config.storageAlertBytes })
+    : undefined;
 const server = serve({ fetch: app.fetch, port: config.port }, (info) => {
   logger.info({ port: info.port, env: config.nodeEnv }, 'clavis-api listening');
 });
@@ -38,6 +49,7 @@ async function shutdown(signal: string) {
   const force = setTimeout(() => process.exit(1), 10_000);
   force.unref();
   server.close(async () => {
+    await jobs?.stop();
     await dbHandle?.close().catch(() => undefined);
     process.exit(0);
   });

@@ -30,6 +30,11 @@ const MESSAGES: Record<ErrorCode, string> = {
   NOT_CONFIGURED: 'Sign-in is not set up in this build.',
   EMAIL_NOT_VERIFIED: 'Google has not verified this email address.',
   NOT_SIGNED_IN: 'Sign in to sync.',
+  QUOTA_EXCEEDED: 'Your account has no room for this file.',
+  FILE_TOO_LARGE: 'The file is too large to store.',
+  NOT_A_PDF: 'The file is not a PDF.',
+  FINGERPRINT_MISMATCH: 'The file does not match this document.',
+  UPLOAD_IN_PROGRESS: 'This file is already being uploaded.',
 };
 
 /** Why an `INVALID_RESPONSE` happened. Diagnostic only; carries no model output. */

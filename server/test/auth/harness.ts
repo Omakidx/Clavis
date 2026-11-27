@@ -7,6 +7,7 @@ import { loadConfig, type Config } from '../../src/config';
 import type { DbHandle } from '../../src/db/client';
 import { RateLimiter } from '../../src/http/rate-limit';
 import { createLogger } from '../../src/logger';
+import type { ObjectStorage } from '../../src/storage/types';
 
 export const ORIGIN = 'https://clavis-api-production.up.railway.app';
 export const DEV_EXT_ID = 'ebfpdncfkebjagolnbmfdhikaipiflbl';
@@ -169,7 +170,11 @@ export interface Harness {
 }
 
 export async function createHarness(
-  opts: { db?: DbHandle | undefined; env?: Record<string, string> | undefined } = {},
+  opts: {
+    db?: DbHandle | undefined;
+    env?: Record<string, string> | undefined;
+    storage?: ObjectStorage | undefined;
+  } = {},
 ): Promise<Harness> {
   const clock = makeClock();
   const google = await createMockGoogle(clock.now);
@@ -186,6 +191,7 @@ export async function createHarness(
     config,
     logger: createLogger('info', sink),
     db: opts.db,
+    storage: opts.storage,
     now: clock.now,
     google: google.client,
     limiter,

@@ -8,6 +8,8 @@ import { createSyncEngine } from '../sync/engine';
 import { createSyncStateStore } from '../sync/state';
 import { createCapabilityCache } from '../ai/capability-cache';
 import { GroqProvider } from '../ai/groq';
+import { notifyAccountStatusChanged } from '../data/channel';
+import { sweepStaleHandoffs } from '../data/handoff';
 import { migrateLegacyHighlights } from '../data/migrate';
 import { logger } from '../security/logger';
 import { whenStorageLockedDown } from '../security/storage-lockdown';
@@ -18,6 +20,7 @@ import { createAccountHandlers } from './handlers/account';
 import { createAiHandlers } from './handlers/ai';
 import { createCardHandlers } from './handlers/card';
 import { createChatHandlers } from './handlers/chat';
+import { createDocumentHandlers } from './handlers/documents';
 import { createKeyService } from './handlers/key';
 import { createNavigationHandlers } from './handlers/navigation';
 import { createSidePanelHandlers } from './handlers/sidepanel';
@@ -161,6 +164,15 @@ export function registerBackground(): void {
     }),
     sync: createSyncHandlers({ onKick: kickEngine }),
     account: createAccountHandlers({ account, engine, enabled: accountEnabled }),
+    documents: createDocumentHandlers({
+      tokens: tokenClient,
+      enabled: accountEnabled,
+      onLocalChange: () => kickEngine(true),
+      onStorageChanged: () => {
+        account.invalidateUsage();
+        notifyAccountStatusChanged();
+      },
+    }),
   });
 
   const listener = createMessageListener({
@@ -180,6 +192,9 @@ export function registerBackground(): void {
     },
     () => logger.warn('highlight_migration_failed'),
   );
+
+  // A PDF left in the handoff store by a page that died mid-transfer must not stay (design 6.6).
+  void sweepStaleHandoffs().catch(() => logger.warn('handoff_sweep_failed'));
 
   if (accountEnabled) {
     // Listeners are registered synchronously (MV3). The engine only acts while signed in.

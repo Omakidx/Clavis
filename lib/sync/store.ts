@@ -392,6 +392,15 @@ export async function sweepUnseen(ctx: PullContext): Promise<void> {
 // Sign-in and sign-out conversions (design 4.7)
 // ---------------------------------------------------------------------------
 
+/**
+ * Which files an account holds is that account's business: a record that leaves one (sign-out) or
+ * joins another (first sign-in) must not claim a stored file. The server is the source of truth,
+ * and the next pull sets the state again.
+ */
+function forgetStored<T extends object>(store: string, record: T): T {
+  return store === STORE.documents ? { ...record, storageState: 'none' } : record;
+}
+
 /** First sign-in: every record is new to the account. Keeps `clientModifiedAt`. */
 export async function markAllDirty(): Promise<void> {
   await transact(SYNCED_STORES, 'readwrite', async (tx) => {
@@ -399,7 +408,9 @@ export async function markAllDirty(): Promise<void> {
       const store = tx.objectStore(name);
       for (const record of await getAll<AnyRecord>(store)) {
         if (record.deleted === 1) continue;
-        await request(store.put({ ...record, dirty: 1, seq: null, rev: record.rev + 1 }));
+        await request(
+          store.put({ ...forgetStored(name, record), dirty: 1, seq: null, rev: record.rev + 1 }),
+        );
       }
     }
   });
@@ -413,7 +424,7 @@ export async function detachForKeep(): Promise<void> {
       for (const record of await getAll<AnyRecord>(store)) {
         const key = store.keyPath as string;
         if (record.deleted === 1) await request(store.delete(record[key] as string));
-        else await request(store.put({ ...record, dirty: 0, seq: null }));
+        else await request(store.put({ ...forgetStored(name, record), dirty: 0, seq: null }));
       }
     }
   });

@@ -73,6 +73,16 @@
       "required": true
     },
     {
+      "id": "reader-lazy-cloud",
+      "description": "Reader code for Clavis Sync PDFs (open from account, Save to account). Loaded on demand only when FEATURES.accountSync is on, so it is not part of reader-page-js. The closure includes small helpers it shares with the other lazy reader chunks",
+      "files": ["chunks/ReaderCloud-*.js"],
+      "includeStaticImports": true,
+      "excludeStaticImportsOf": ["chunks/reader-*.js"],
+      "aggregate": true,
+      "maxGzipBytes": 6144,
+      "required": false
+    },
+    {
       "id": "pdfjs-js",
       "description": "PDF.js core, viewer components and worker, loaded when the first PDF is opened",
       "files": ["chunks/pdf-*.js", "chunks/pdf_viewer-*.js", "assets/pdf.worker.min-*.mjs"],

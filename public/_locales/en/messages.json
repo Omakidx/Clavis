@@ -2921,5 +2921,150 @@
   "onbSyncLink": {
     "message": "Set up sync in Settings",
     "description": "Link text of the optional onboarding sync line."
+  },
+  "errQuotaExceeded": {
+    "message": "Your account is out of storage. Remove a stored PDF in the library, then try again.",
+    "description": "Error shown when saving a PDF to the account fails because the 100 MB account storage is full."
+  },
+  "errFileTooLarge": {
+    "message": "This file is larger than 15 MB, the most Clavis can store in an account.",
+    "description": "Error shown when a PDF is too large to store in the account."
+  },
+  "errNotAPdf": {
+    "message": "This file is not a PDF, so it cannot be stored.",
+    "description": "Error shown when the server says the uploaded bytes are not a PDF."
+  },
+  "errFingerprintMismatch": {
+    "message": "This file does not match the saved document. Open the PDF from your computer instead.",
+    "description": "Error shown when a file stored in the account does not match the document it belongs to."
+  },
+  "errUploadInProgress": {
+    "message": "This file is already being saved. Try again in a moment.",
+    "description": "Error shown when the same PDF is already being uploaded."
+  },
+  "readerCloudSave": {
+    "message": "Save to account",
+    "description": "Toolbar button in the PDF reader: uploads the open PDF to the user's Clavis account so it opens on other devices."
+  },
+  "readerCloudSaveTitle": {
+    "message": "Keep a copy of this PDF in your account to open it on your other devices.",
+    "description": "Tooltip of the Save to account button."
+  },
+  "readerCloudSaving": {
+    "message": "Saving to account...",
+    "description": "Label of the toolbar button while the PDF is being uploaded to the account."
+  },
+  "readerCloudStored": {
+    "message": "Stored in account",
+    "description": "Toolbar label in the PDF reader shown when the open PDF is stored in the user's account."
+  },
+  "readerCloudSavedLive": {
+    "message": "Saved to your account.",
+    "description": "Screen reader announcement after a PDF was uploaded to the account."
+  },
+  "readerCloudFetching": {
+    "message": "Opening your PDF from your account...",
+    "description": "Message shown in the reader while a PDF stored in the account is downloaded."
+  },
+  "readerCloudSignInNeeded": {
+    "message": "Sign in to Clavis, then open this file from your account again.",
+    "description": "Message shown in the reader when a link opens an account PDF but the user is not signed in."
+  },
+  "readerCloudOpenFailed": {
+    "message": "Could not open this file from your account.",
+    "description": "Heading of the error shown when a PDF stored in the account cannot be opened."
+  },
+  "readerContinueStored": {
+    "message": "In your account",
+    "description": "Small label on a Continue reading card whose PDF is stored in the account."
+  },
+  "readerContinueFromAccount": {
+    "message": "Open from account",
+    "description": "Button on a Continue reading card: opens the PDF stored in the account."
+  },
+  "readerContinueFromAccountLabel": {
+    "message": "Open $ARG1$ from your account",
+    "description": "Accessible name of the button that opens a stored PDF. {1} is the title.",
+    "placeholders": {
+      "ARG1": {
+        "content": "$1"
+      }
+    }
+  },
+  "readerContinueProgressLabel": {
+    "message": "Reading progress of $ARG1$",
+    "description": "Accessible name of the progress bar on a Continue reading card. {1} is the title.",
+    "placeholders": {
+      "ARG1": {
+        "content": "$1"
+      }
+    }
+  },
+  "readerHighlightsToggle": {
+    "message": "Highlights",
+    "description": "Toolbar toggle that shows or hides the highlights panel of the PDF reader."
+  },
+  "libraryDocCloudStored": {
+    "message": "Stored in account",
+    "description": "Cloud state of a document in the library whose PDF is stored in the account."
+  },
+  "libraryDocCloudNone": {
+    "message": "Only on this device",
+    "description": "Cloud state of a document in the library whose PDF is not stored in the account."
+  },
+  "libraryDocOpenCloud": {
+    "message": "Open from account",
+    "description": "Button in the library that opens the PDF stored in the account in the reader."
+  },
+  "libraryDocRemoveFile": {
+    "message": "Remove stored file",
+    "description": "Button in the library that deletes the PDF from the account but keeps progress and highlights."
+  },
+  "libraryDocRemoveFileLabel": {
+    "message": "Remove the stored file of $ARG1$ from your account",
+    "description": "Accessible name of the remove stored file button. {1} is the title.",
+    "placeholders": {
+      "ARG1": {
+        "content": "$1"
+      }
+    }
+  },
+  "libraryDocRemoveFileTitle": {
+    "message": "Remove the stored file of $ARG1$?",
+    "description": "Title of the dialog that confirms removing a stored PDF. {1} is the title.",
+    "placeholders": {
+      "ARG1": {
+        "content": "$1"
+      }
+    }
+  },
+  "libraryDocRemoveFileBody": {
+    "message": "The PDF is deleted from your account. Your reading progress and highlights stay. You can store the file again from the reader.",
+    "description": "Body of the dialog that confirms removing a stored PDF."
+  },
+  "libraryDocFileRemoved": {
+    "message": "Removed the stored file of $ARG1$.",
+    "description": "Screen reader announcement after a stored PDF was removed. {1} is the title.",
+    "placeholders": {
+      "ARG1": {
+        "content": "$1"
+      }
+    }
+  },
+  "libraryQuotaLabel": {
+    "message": "PDF storage",
+    "description": "Label of the account storage bar in the library's Documents tab."
+  },
+  "libraryQuotaUsed": {
+    "message": "$ARG1$ of $ARG2$ used",
+    "description": "Text of the account storage bar. {1} is the used size and {2} the total, for example 12.3 MB of 100 MB.",
+    "placeholders": {
+      "ARG1": {
+        "content": "$1"
+      },
+      "ARG2": {
+        "content": "$2"
+      }
+    }
   }
 }

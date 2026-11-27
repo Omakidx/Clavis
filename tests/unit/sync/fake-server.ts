@@ -123,6 +123,10 @@ export class FakeServer {
     };
   }
 
+  /** What `GET /v1/account` reports, and how often it was asked. */
+  usage = { storageUsedBytes: 5_242_880, storageQuotaBytes: 104_857_600 };
+  accountReads = 0;
+
   readonly fetch: typeof fetch = async (input, init) => {
     const url = new URL(String(input));
     const headers: Record<string, string> = {};
@@ -183,6 +187,13 @@ export class FakeServer {
       for (const t of this.refresh.values())
         if (t.userId === user.id) this.revokedFamilies.add(t.family);
       return new Response(null, { status: 204 });
+    }
+    if (method === 'GET' && path === '/v1/account') {
+      this.accountReads += 1;
+      return json(200, {
+        user: { id: user.id, email: user.email, displayName: null, createdAt: 1_700_000_000_000 },
+        usage: { ...this.usage, words: 0, documents: 0 },
+      });
     }
     if (method === 'POST' && path === '/v1/sync/push') return this.push(user, request);
     if (method === 'GET' && path === '/v1/sync/pull') return this.pull(user, request);

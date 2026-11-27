@@ -63,8 +63,10 @@ export function wordRoutes(rt: AuthRuntime, db: Database): Hono<AppEnv> {
     const rows = await db
       .select({
         row: savedWords,
+        // Qualified outer columns: Drizzle renders them bare, which would correlate the subquery with itself.
         messageCount: sql<number>`(SELECT count(*)::int FROM word_chat_messages m
-          WHERE m.user_id = ${savedWords.userId} AND m.word_key = ${savedWords.wordKey})`,
+          WHERE m.user_id = ${sql.raw('"saved_words"."user_id"')}
+            AND m.word_key = ${sql.raw('"saved_words"."word_key"')})`,
       })
       .from(savedWords)
       .where(and(...conds))

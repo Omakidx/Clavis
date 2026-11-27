@@ -69,6 +69,8 @@ export interface ApplyCtx {
   seq: ResettableSeq;
   nowMs: number;
   warn?: ((msg: string) => void) | undefined;
+  /** Receives the object key of every stored file a tombstone removed (for the inline delete after commit). */
+  removedKeys?: string[] | undefined;
 }
 
 export type Outcome =
@@ -361,6 +363,7 @@ export async function writeDocumentTombstone(
       ctx.warn?.('quota refund skipped: storage_used_bytes below stored file size');
     }
     await enqueueObjectDeletion(ctx.tx, { key: row.objectKey });
+    ctx.removedKeys?.push(row.objectKey);
   }
   const seq = ctx.seq.next();
   const nulled = {

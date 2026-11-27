@@ -30,3 +30,10 @@ export function openExtensionPage(path: ExtensionPagePath, hash?: string): void 
 export function openChromeExtensionDetails(): void {
   void browser.tabs.create({ url: `chrome://extensions/?id=${browser.runtime.id}` });
 }
+
+/** Open a PDF stored in the account in the reader (`reader.html?doc=<fingerprint>`, design 6.6). */
+export function openReaderDocument(fingerprint: string): void {
+  void browser.tabs.create({
+    url: `${browser.runtime.getURL('/reader.html')}?doc=${encodeURIComponent(fingerprint)}`,
+  });
+}

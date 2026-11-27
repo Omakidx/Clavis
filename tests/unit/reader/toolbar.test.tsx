@@ -31,12 +31,18 @@ function setup(v: ViewStatus | null, findOpen = false) {
     setZoom: vi.fn(),
     fitWidth: vi.fn(),
   };
-  const props = { onToggleFind: vi.fn(), onOpen: vi.fn(), onClose: vi.fn() };
+  const props = {
+    onToggleFind: vi.fn(),
+    onToggleHighlights: vi.fn(),
+    onOpen: vi.fn(),
+    onClose: vi.fn(),
+  };
   render(
     <ReaderToolbar
       controller={controller as unknown as PdfReaderController}
       view={v}
       findOpen={findOpen}
+      highlightsOpen
       {...props}
     />,
   );

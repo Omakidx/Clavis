@@ -38,6 +38,17 @@ export const ERROR_CODES = [
   'EMAIL_NOT_VERIFIED',
   /** A sync route that needs an account was called signed out. */
   'NOT_SIGNED_IN',
+  // PDF files in the account (docs/clavis-sync-design.md 6.6, 7.4). The server's codes of the same names.
+  /** The account's 100 MiB of stored PDFs is full. */
+  'QUOTA_EXCEEDED',
+  /** The file is over 15 MiB. */
+  'FILE_TOO_LARGE',
+  /** The bytes are not a PDF. */
+  'NOT_A_PDF',
+  /** The file's content does not match the fingerprint of the document. */
+  'FINGERPRINT_MISMATCH',
+  /** This document is already being uploaded. */
+  'UPLOAD_IN_PROGRESS',
 ] as const;
 
 export const errorCodeSchema = z.enum(ERROR_CODES);

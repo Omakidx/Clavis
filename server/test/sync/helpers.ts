@@ -9,6 +9,7 @@ import {
   type WordData,
 } from '../../../shared/api-contract';
 import type { DbHandle } from '../../src/db/client';
+import type { ObjectStorage } from '../../src/storage/types';
 import { bearer, createHarness, extSignIn, type Harness, type Pair } from '../auth/harness';
 
 let userN = 0;
@@ -177,8 +178,15 @@ export interface World {
 }
 
 /** Harness without per-user rate limits (the limiter itself is covered by its own test). */
-export async function makeWorld(db: DbHandle, opts: { limited?: boolean } = {}): Promise<World> {
-  const h = await createHarness({ db });
+export async function makeWorld(
+  db: DbHandle,
+  opts: {
+    limited?: boolean;
+    storage?: ObjectStorage | undefined;
+    env?: Record<string, string> | undefined;
+  } = {},
+): Promise<World> {
+  const h = await createHarness({ db, storage: opts.storage, env: opts.env });
   if (!opts.limited) h.limiter.take = () => 0;
   return {
     h,

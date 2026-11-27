@@ -40,25 +40,47 @@ export function StateMessage({ state, dragging, onOpen, extra }: StateMessagePro
     case 'empty':
       return (
         <section className="reader-empty" data-testid="state-empty" data-dragging={dragging}>
-          <h2 className="reader-empty__title">{t('readerEmptyTitle')}</h2>
-          <p>{t('readerEmptyBody')}</p>
-          {onOpen ? (
-            <div className="clavis-actions reader-empty__actions">
-              <button
-                type="button"
-                className="clavis-button clavis-button--primary"
-                onClick={onOpen}
-              >
-                {t('readerEmptyChoose')}
-              </button>
-            </div>
-          ) : null}
+          <div className="reader-empty__zone">
+            <svg
+              className="reader-empty__icon"
+              viewBox="0 0 48 48"
+              width="44"
+              height="44"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              aria-hidden="true"
+            >
+              <path
+                d="M12 5h17l9 9v27a2 2 0 0 1-2 2H12a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2Z"
+                strokeLinejoin="round"
+              />
+              <path
+                d="M29 5v9h9M24 36V23m-5 5 5-5 5 5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+            <h2 className="reader-empty__title">{t('readerEmptyTitle')}</h2>
+            <p className="reader-empty__body">{t('readerEmptyBody')}</p>
+            {onOpen ? (
+              <div className="clavis-actions reader-empty__actions">
+                <button
+                  type="button"
+                  className="clavis-button clavis-button--primary"
+                  onClick={onOpen}
+                >
+                  {t('readerEmptyChoose')}
+                </button>
+              </div>
+            ) : null}
+            <p className="reader-empty__drop">
+              {dragging ? t('readerDropActive') : t('readerEmptyHint')}
+            </p>
+          </div>
           {extra}
-          <p className="reader-empty__drop">
-            {dragging ? t('readerDropActive') : t('readerEmptyHint')}
-          </p>
-          <p className="clavis-muted">{t('readerEmptyChrome')}</p>
-          <p>
+          <p className="clavis-muted reader-empty__note">{t('readerEmptyChrome')}</p>
+          <p className="reader-empty__note">
             {/* A plain link: the reader's first-load chunks must not pull in the shared UI module. */}
             <a
               href={`/options.html#${SETTINGS_SECTION_ANCHORS.pdfHelp}`}
@@ -69,7 +91,7 @@ export function StateMessage({ state, dragging, onOpen, extra }: StateMessagePro
               <span className="clavis-sr-only"> {t('uiOpensInNewTab')}</span>
             </a>
           </p>
-          <p className="clavis-muted">{t('readerShortcutsHint')}</p>
+          <p className="clavis-muted reader-empty__note">{t('readerShortcutsHint')}</p>
         </section>
       );
     case 'loading':

@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { ENDPOINTS, TokenPair } from '../../shared/api-contract/endpoints';
 import type { StorageAreaLike } from '../storage/area';
 import { STORAGE_KEYS, unwrapRecord, wrapRecord } from '../storage/keys';
-import { ApiRequestError, type ApiClient, type RequestSpec } from './api';
+import { ApiRequestError, type ApiClient, type BlobRequestSpec, type RequestSpec } from './api';
 
 /**
  * Token storage and refresh (docs/clavis-sync-design.md 2.3, 2.4). Background only. These are the
@@ -134,6 +134,8 @@ export interface TokenClient {
   request<S extends z.ZodType | undefined = undefined>(
     spec: Omit<RequestSpec<S>, 'token'>,
   ): Promise<S extends z.ZodType ? z.infer<S> : undefined>;
+  /** An authenticated file download (a 401 refreshes once and repeats), bounded by `maxBytes`. */
+  requestBlob(spec: Omit<BlobRequestSpec, 'token'>): Promise<Blob>;
   /** Store the pair of a fresh sign-in. */
   adopt(pair: TokenPair): Promise<void>;
 }
@@ -207,27 +209,37 @@ export function createTokenClient(deps: TokenClientDeps): TokenClient {
     return refresh(signal);
   }
 
+  /** Run `call` with an access token; a 401 refreshes once and repeats (the shared auth loop). */
+  async function authorized<T>(
+    signal: AbortSignal | undefined,
+    call: (token: string) => Promise<T>,
+  ): Promise<T> {
+    let token = await accessToken(signal);
+    for (let attempt = 0; ; attempt += 1) {
+      try {
+        return await call(token);
+      } catch (error) {
+        if (!(error instanceof ApiRequestError)) throw error;
+        if (error.code === 'SESSION_REVOKED') return sessionLost();
+        if (attempt === 0 && (error.code === 'UNAUTHENTICATED' || error.code === 'TOKEN_EXPIRED')) {
+          token = await refresh(signal);
+          continue;
+        }
+        throw error;
+      }
+    }
+  }
+
   return {
     accessToken,
     adopt: (pair) => deps.store.writePair(pair),
-    async request(spec) {
-      let token = await accessToken(spec.signal);
-      for (let attempt = 0; ; attempt += 1) {
-        try {
-          return (await deps.api.request({ ...spec, token } as RequestSpec<never>)) as never;
-        } catch (error) {
-          if (!(error instanceof ApiRequestError)) throw error;
-          if (error.code === 'SESSION_REVOKED') return sessionLost();
-          if (
-            attempt === 0 &&
-            (error.code === 'UNAUTHENTICATED' || error.code === 'TOKEN_EXPIRED')
-          ) {
-            token = await refresh(spec.signal);
-            continue;
-          }
-          throw error;
-        }
-      }
+    request(spec) {
+      return authorized(spec.signal, (token) =>
+        deps.api.request({ ...spec, token } as RequestSpec<never>),
+      ) as never;
+    },
+    requestBlob(spec) {
+      return authorized(spec.signal, (token) => deps.api.requestBlob({ ...spec, token }));
     },
   };
 }

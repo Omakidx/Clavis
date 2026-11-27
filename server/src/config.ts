@@ -64,6 +64,7 @@ const EnvSchema = z
     TRUSTED_PROXY_HOPS: z.coerce.number().int().min(1).max(5).default(1),
     JOBS_ENABLED: flag('1'),
     STORAGE_ALERT_BYTES: z.coerce.number().int().positive().optional(),
+    MAX_CONCURRENT_UPLOADS: z.coerce.number().int().min(1).max(100).default(8),
   })
   .superRefine((env, ctx) => {
     if (env.NODE_ENV === 'production') {
@@ -203,6 +204,8 @@ export interface Config {
   trustedProxyHops: number;
   jobsEnabled: boolean;
   storageAlertBytes: number | undefined;
+  /** Process-wide cap on simultaneous PDF uploads (each buffers up to two 5 MiB parts). */
+  maxConcurrentUploads: number;
 }
 
 export class ConfigError extends Error {
@@ -281,5 +284,6 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
     trustedProxyHops: e.TRUSTED_PROXY_HOPS,
     jobsEnabled: e.JOBS_ENABLED,
     storageAlertBytes: e.STORAGE_ALERT_BYTES,
+    maxConcurrentUploads: e.MAX_CONCURRENT_UPLOADS,
   };
 }

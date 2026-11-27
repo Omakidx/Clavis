@@ -49,7 +49,9 @@ describe('token boundary (R1)', () => {
       expect(
         file.startsWith('lib/account/') ||
           file.startsWith('lib/sync/') ||
-          file === 'lib/router/register.ts',
+          file === 'lib/router/register.ts' ||
+          // Only the ApiRequestError class, to map the server's codes to replies; no client, no token.
+          file === 'lib/router/handlers/documents.ts',
         file,
       ).toBe(true);
     }

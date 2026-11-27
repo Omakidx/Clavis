@@ -9,12 +9,14 @@ export class ApiException extends Error {
     public readonly code: ErrorCode,
     message: string,
     public readonly extra: Partial<Omit<ApiError['error'], 'code' | 'message'>> = {},
+    /** Rare: an HTTP status other than the code's default (for example 411 with VALIDATION_FAILED). */
+    private readonly statusOverride?: number,
   ) {
     super(message);
     this.name = 'ApiException';
   }
   get status(): number {
-    return ERROR_STATUS[this.code];
+    return this.statusOverride ?? ERROR_STATUS[this.code];
   }
 }
 

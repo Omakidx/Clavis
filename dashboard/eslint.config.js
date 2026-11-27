@@ -24,5 +24,10 @@ export default tseslint.config(
       'no-console': ['error', { allow: ['warn', 'error'] }],
     },
   },
-  { files: ['*.config.{js,ts}'], languageOptions: { globals: { ...globals.node } } },
+  {
+    // Playwright fixtures use a `use` callback and empty destructuring; neither is a React hook.
+    files: ['e2e/**/*.ts'],
+    rules: { 'react-hooks/rules-of-hooks': 'off', 'no-empty-pattern': 'off' },
+  },
+  { files: ['*.config.{js,ts}', 'e2e/**/*.ts'], languageOptions: { globals: { ...globals.node } } },
 );

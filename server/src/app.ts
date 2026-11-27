@@ -15,7 +15,9 @@ import { ApiException, errorBody, sendError } from './http/errors';
 import { RateLimiter } from './http/rate-limit';
 import type { AppEnv } from './http/types';
 import type { Logger } from './logger';
+import { fileRoutes } from './documents/file-routes';
 import { documentRoutes } from './documents/routes';
+import type { ObjectStorage } from './storage/types';
 import { dashboardStatic, isApiPath } from './static';
 import { syncRoutes } from './sync/routes';
 import { wordRoutes } from './words/routes';
@@ -33,12 +35,23 @@ export interface AppDeps {
   now?: (() => number) | undefined;
   google?: GoogleClient | undefined;
   limiter?: RateLimiter | undefined;
+  /** PDF object storage. Absent when S3 is not configured: file routes then answer 503 UNAVAILABLE. */
+  storage?: ObjectStorage | undefined;
 }
 
 /** Routes that never get CORS headers: cookie-only dashboard routes (design §2.6). */
 const NO_CORS = new Set(['/v1/session', '/v1/account/export']);
 
-export function createApp({ config, logger, db, dashboardDir, now, google, limiter }: AppDeps) {
+export function createApp({
+  config,
+  logger,
+  db,
+  dashboardDir,
+  now,
+  google,
+  limiter,
+  storage,
+}: AppDeps) {
   const app = new Hono<AppEnv>();
   const clock = now ?? Date.now;
   const rateLimiter = limiter ?? new RateLimiter(clock);
@@ -70,7 +83,10 @@ export function createApp({ config, logger, db, dashboardDir, now, google, limit
   // The API is JSON and must never be cached (design §5.4). Static files set their own headers.
   app.use(async (c, next) => {
     await next();
-    if (isApiPath(c.req.path)) c.header('Cache-Control', 'no-store');
+    // A route may set a stricter value itself (the PDF download: `private, no-store`).
+    if (isApiPath(c.req.path) && !c.res.headers.has('Cache-Control')) {
+      c.header('Cache-Control', 'no-store');
+    }
   });
 
   // Baseline hardening on every response (API, errors and static). HSTS only where the origin is https.
@@ -89,7 +105,12 @@ export function createApp({ config, logger, db, dashboardDir, now, google, limit
       return c.json(errorBody('PAYLOAD_TOO_LARGE', 'Request body is too large'), 413);
     },
   });
-  for (const p of ['/v1/*', '/auth/*']) app.use(p, limitJson);
+  // The 512 KiB JSON limit does not apply to the PDF upload: its own limit is 15 MiB, enforced in the route.
+  const isFilePut = (method: string, path: string) =>
+    method === 'PUT' && /^\/v1\/documents\/[^/]+\/file$/.test(path);
+  for (const p of ['/v1/*', '/auth/*']) {
+    app.use(p, (c, next) => (isFilePut(c.req.method, c.req.path) ? next() : limitJson(c, next)));
+  }
 
   app.get('/healthz', (c) => c.json({ status: 'ok' as const }));
 
@@ -114,9 +135,15 @@ export function createApp({ config, logger, db, dashboardDir, now, google, limit
     app.route('/v1/auth/extension', extensionRoutes(runtime));
     app.route('/', webRoutes(runtime));
     app.route('/', accountRoutes(runtime));
-    app.route('/', syncRoutes(runtime, db.db, logger));
+    app.route('/', syncRoutes(runtime, db.db, logger, storage));
     app.route('/', wordRoutes(runtime, db.db));
-    app.route('/', documentRoutes(runtime, db.db, logger));
+    app.route('/', documentRoutes(runtime, db.db, logger, storage));
+    app.route(
+      '/',
+      fileRoutes(runtime, db.db, logger, storage, {
+        maxConcurrentUploads: config.maxConcurrentUploads,
+      }),
+    );
   } else {
     // Development without Google credentials or a database: say so instead of a misleading 404.
     for (const p of [

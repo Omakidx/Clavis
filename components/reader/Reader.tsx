@@ -11,6 +11,7 @@ import {
   type ChangeEvent,
   type DragEvent,
 } from 'react';
+import { FEATURES } from '../../lib/config/constants';
 import { t } from '../../lib/i18n';
 import { titleFromFileName } from '../../lib/pdf/state';
 import { Announcer } from './Announcer';
@@ -35,6 +36,20 @@ const ReaderResume = lazy(() => import('./ReaderData').then((m) => ({ default: m
 const ContinueReading = lazy(() =>
   import('./ReaderData').then((m) => ({ default: m.ContinueReading })),
 );
+// Account features (design 6.6, 7.7): fetched only when the build has accounts switched on.
+const CloudSave = lazy(() => import('./ReaderCloud').then((m) => ({ default: m.CloudSave })));
+
+/** The `?doc=<fingerprint>` parameter that opens a PDF stored in the account (64 lowercase hex chars). */
+export type DocParam = { kind: 'none' } | { kind: 'invalid' } | { kind: 'ok'; fingerprint: string };
+
+export function readDocParam(search: string = window.location.search): DocParam {
+  const raw = new URLSearchParams(search).get('doc');
+  if (raw === null) return { kind: 'none' };
+  return /^[0-9a-f]{64}$/.test(raw) ? { kind: 'ok', fingerprint: raw } : { kind: 'invalid' };
+}
+
+/** What the empty stage says while a PDF is fetched from the account, or why that did not work. */
+type CloudNotice = { kind: 'fetching' } | { kind: 'signin' | 'error'; message: string };
 
 /** Phases in which pages are on screen (the others show a message over the stage instead). */
 const SHOWS_PAGES = new Set(['ready', 'image-only']);
@@ -64,6 +79,18 @@ export function Reader() {
   const openButton = useRef<HTMLButtonElement>(null);
   const [openCount, setOpenCount] = useState(0);
   const [dragging, setDragging] = useState(false);
+  // The file the user opened: the controller hashes the bytes before PDF.js takes the buffer, so
+  // the reader keeps the File for "Save to account" (design 6.6).
+  const [openedFile, setOpenedFile] = useState<File | null>(null);
+  const [highlightsOpen, setHighlightsOpen] = useState(true);
+  const [docParam] = useState(() => readDocParam());
+  const [cloud, setCloud] = useState<CloudNotice | null>(
+    FEATURES.accountSync && docParam.kind === 'ok' ? { kind: 'fetching' } : null,
+  );
+  /** The fingerprint a document opened from the account must have once the controller has hashed it. */
+  const expected = useRef<string | null>(null);
+  /** Counts opened files, to tell a download that finished late from one that is still current. */
+  const openCountRef = useRef(0);
   const findBar = useFindBar(controller, containerRef);
   const hasPages = SHOWS_PAGES.has(state.phase);
   const narration = useReaderNarration(
@@ -107,14 +134,62 @@ export function Reader() {
 
   const { reset: resetFind } = findBar;
   const openFile = useCallback(
-    (file: File) => {
+    (file: File, fromAccount?: string) => {
       narration.stop();
+      // A file the user opens replaces any download still being checked; only a file that came from
+      // the account is verified against its link (design 6.6).
+      expected.current = fromAccount ?? null;
+      openCountRef.current += 1;
       setOpenCount((n) => n + 1);
+      setOpenedFile(file);
+      setCloud(null);
       resetFind();
       void controller.openFile(file);
     },
     [controller, resetFind, narration],
   );
+
+  // `?doc=<fingerprint>`: open a PDF stored in the account (design 6.6). Ignored when the build has
+  // no accounts. The background downloads it into the handoff store; nothing here calls the API.
+  const openRef = useRef(openFile);
+  useEffect(() => {
+    openRef.current = openFile;
+  }, [openFile]);
+  useEffect(() => {
+    if (!FEATURES.accountSync || docParam.kind !== 'ok') return;
+    let active = true;
+    const startedAt = openCountRef.current;
+    void import('./ReaderCloud')
+      .then((m) => m.openFromAccount(docParam.fingerprint))
+      .then((result) => {
+        // The user opened a file meanwhile: it stays, and the late download is dropped.
+        if (!active || openCountRef.current !== startedAt) return;
+        if (!result.ok) return setCloud({ kind: result.kind, message: result.message });
+        openRef.current(result.file, docParam.fingerprint);
+      })
+      .catch(
+        () =>
+          active &&
+          openCountRef.current === startedAt &&
+          setCloud({ kind: 'error', message: t('errGeneric') }),
+      );
+    return () => {
+      active = false;
+    };
+  }, [docParam]);
+
+  // The file from the account must be the document the link named: check once it is hashed.
+  useEffect(() => {
+    const want = expected.current;
+    if (want === null) return;
+    if (phase === 'error') expected.current = null;
+    if (phase !== 'ready' && phase !== 'image-only') return;
+    expected.current = null;
+    if (controller.documentId !== want) {
+      void controller.close();
+      setCloud({ kind: 'error', message: t('errFingerprintMismatch') });
+    }
+  }, [phase, controller]);
 
   const pickFile = useCallback(() => fileInput.current?.click(), []);
 
@@ -151,6 +226,7 @@ export function Reader() {
   const closeFile = () => {
     narration.stop();
     resetFind();
+    setOpenedFile(null);
     void controller.close();
     // The Close button is about to be disabled: keep keyboard focus somewhere useful.
     openButton.current?.focus();
@@ -178,6 +254,17 @@ export function Reader() {
               {name}
             </span>
           )}
+          {FEATURES.accountSync ? (
+            <Suspense fallback={null}>
+              <CloudSave
+                key={openCount}
+                controller={controller}
+                file={openedFile}
+                fileName={name}
+                showing={hasPages}
+              />
+            </Suspense>
+          ) : null}
         </div>
         <ReaderToolbar
           key={openCount}
@@ -185,6 +272,8 @@ export function Reader() {
           view={view}
           findOpen={findBar.open}
           onToggleFind={() => (findBar.open ? findBar.hide() : findBar.show())}
+          highlightsOpen={highlightsOpen}
+          onToggleHighlights={() => setHighlightsOpen((open) => !open)}
           onOpen={pickFile}
           openRef={openButton}
           onClose={closeFile}
@@ -272,6 +361,8 @@ export function Reader() {
                     onSubmit={(password) => controller.submitPassword(password)}
                     onCancel={() => controller.cancelPassword()}
                   />
+                ) : cloud !== null && state.phase === 'empty' ? (
+                  <CloudMessage notice={cloud} onOpen={pickFile} />
                 ) : (
                   <StateMessage
                     state={state}
@@ -300,7 +391,12 @@ export function Reader() {
             ) : null}
           </div>
           {hasPages ? (
-            <div className="reader__sidebar" inert={pendingLink !== null}>
+            <div
+              id="reader-sidebar"
+              className="reader__sidebar"
+              hidden={!highlightsOpen}
+              inert={pendingLink !== null || !highlightsOpen}
+            >
               <Suspense fallback={null}>
                 <ReaderHighlights
                   controller={controller}
@@ -315,6 +411,34 @@ export function Reader() {
 
         <Announcer snapshot={snapshot} />
       </main>
+    </div>
+  );
+}
+
+/** The empty stage while a PDF is fetched from the account, or when that failed. */
+function CloudMessage({ notice, onOpen }: { notice: CloudNotice; onOpen: () => void }) {
+  if (notice.kind === 'fetching') {
+    return (
+      <div className="reader-message" role="status" data-testid="state-cloud">
+        <p>{t('readerCloudFetching')}</p>
+        <progress className="reader-progress" aria-label={t('readerCloudFetching')} />
+      </div>
+    );
+  }
+  return (
+    <div
+      className="reader-message reader-message--error"
+      role="alert"
+      data-testid="state-cloud"
+      data-kind={notice.kind}
+    >
+      <p>{t('readerCloudOpenFailed')}</p>
+      <p>{notice.message}</p>
+      <div className="clavis-actions reader-empty__actions">
+        <button type="button" className="clavis-button" onClick={onOpen}>
+          {t('readerEmptyChoose')}
+        </button>
+      </div>
     </div>
   );
 }

@@ -76,6 +76,11 @@ export interface PushArgs {
   nowMs: number;
   /** Operational warnings (never user content). */
   warn?: (msg: string) => void;
+  /**
+   * Filled with the object keys of stored files whose documents this push tombstoned (§6.4). Candidates only:
+   * the caller must go through deleteQueuedKeys, which touches keys that have a committed object_deletions row.
+   */
+  removedKeys?: string[];
 }
 
 export async function pushChanges(db: Database, a: PushArgs): Promise<PushResponse> {
@@ -110,7 +115,17 @@ export async function pushChanges(db: Database, a: PushArgs): Promise<PushRespon
       try {
         // A savepoint per item: a database-level rejection of one item rolls back only that item.
         const outcome = await tx.transaction((sp) =>
-          applyChange({ tx: sp, userId: a.userId, seq, nowMs: a.nowMs, warn: a.warn }, parsed.data),
+          applyChange(
+            {
+              tx: sp,
+              userId: a.userId,
+              seq,
+              nowMs: a.nowMs,
+              warn: a.warn,
+              removedKeys: a.removedKeys,
+            },
+            parsed.data,
+          ),
         );
         results.push(toResult(index, outcome));
         if (outcome.status !== 'applied') seq.reset(mark);

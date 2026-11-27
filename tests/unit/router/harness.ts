@@ -10,6 +10,7 @@ import {
 import { createCardHandlers } from '../../../lib/router/handlers/card';
 import { createChatHandlers } from '../../../lib/router/handlers/chat';
 import { createAccountHandlers } from '../../../lib/router/handlers/account';
+import { createDocumentHandlers } from '../../../lib/router/handlers/documents';
 import { createSyncHandlers } from '../../../lib/router/handlers/sync';
 import { createWordHandlers } from '../../../lib/router/handlers/words';
 import type { ChatProvider } from '../../../lib/router/handlers/chat';
@@ -145,6 +146,15 @@ export const ACCOUNT_MESSAGES: Record<string, unknown> = {
   ACCOUNT_SIGN_OUT: { v: 1, type: 'ACCOUNT_SIGN_OUT', keepLocalCopy: false },
   ACCOUNT_SIGN_OUT_EVERYWHERE: { v: 1, type: 'ACCOUNT_SIGN_OUT_EVERYWHERE' },
   SYNC_NOW: { v: 1, type: 'SYNC_NOW' },
+};
+
+export const FP = 'a'.repeat(64);
+
+/** PDF file routes (design 6.6, 7.4). */
+export const DOCUMENT_MESSAGES: Record<string, unknown> = {
+  DOCUMENT_UPLOAD: { v: 1, type: 'DOCUMENT_UPLOAD', fingerprint: FP, title: 'Paper' },
+  DOCUMENT_FETCH: { v: 1, type: 'DOCUMENT_FETCH', fingerprint: FP },
+  DOCUMENT_REMOVE_FILE: { v: 1, type: 'DOCUMENT_REMOVE_FILE', fingerprint: FP },
 };
 
 export const PRIVILEGED_MESSAGES = { ...KEY_MESSAGES, ...SETTINGS_MESSAGES };
@@ -316,6 +326,31 @@ export function createHarness(options: HarnessOptions = {}) {
     enabled: true,
   });
 
+  // PDF files: the token client and the handoff store are scripted, no network, no IndexedDB.
+  const documentTokens = {
+    request: vi.fn((_spec: unknown) => Promise.resolve(undefined as never)),
+    requestBlob: vi.fn((_spec: unknown) => Promise.resolve(new Blob(['%PDF-1.7']))),
+  };
+  const handoff = {
+    take: vi.fn((_fingerprint: string, _direction: string) =>
+      Promise.resolve(new Blob(['%PDF-1.7']) as Blob | null),
+    ),
+    put: vi.fn((_fingerprint: string, _blob: Blob, _direction: string) => Promise.resolve(true)),
+    drop: vi.fn((_fingerprint: string, _direction: string) => Promise.resolve()),
+    sweep: vi.fn(() => Promise.resolve(0)),
+    markStorage: vi.fn((_fingerprint: string, _state: string) => Promise.resolve(true)),
+  };
+  const documents = createDocumentHandlers({
+    tokens: documentTokens as never,
+    enabled: true,
+    signedIn: () => Promise.resolve(true),
+    take: handoff.take as never,
+    put: handoff.put as never,
+    drop: handoff.drop as never,
+    sweep: handoff.sweep as never,
+    markStorage: handoff.markStorage as never,
+  });
+
   const routes: Route[] = buildRoutes({
     ai,
     card,
@@ -329,6 +364,7 @@ export function createHarness(options: HarnessOptions = {}) {
     chat,
     sync,
     account,
+    documents,
   });
   const listener = createMessageListener({
     identity: { runtimeId: RUNTIME_ID, extensionOrigin: ORIGIN },
@@ -380,6 +416,8 @@ export function createHarness(options: HarnessOptions = {}) {
     call,
     tabsGet,
     chatProvider,
+    documentTokens,
+    handoff,
   };
 }
 

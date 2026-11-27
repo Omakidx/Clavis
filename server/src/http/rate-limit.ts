@@ -27,8 +27,11 @@ export class RateLimiter {
     private readonly maxKeys = 50_000,
   ) {}
 
-  /** Consume one token. Returns 0 when allowed, otherwise the milliseconds until a token is available. */
-  take(key: string, rule: RateLimitRule): number {
+  /**
+   * Consume `cost` tokens (default 1; byte budgets pass a byte count). Returns 0 when allowed, otherwise the
+   * milliseconds until enough tokens are available. A cost above the rule's limit can never be allowed.
+   */
+  take(key: string, rule: RateLimitRule, cost = 1): number {
     const t = this.now();
     let group = this.groups.get(rule.windowMs);
     if (!group) this.groups.set(rule.windowMs, (group = new Map()));
@@ -37,8 +40,8 @@ export class RateLimiter {
     b.tokens = Math.min(rule.limit, b.tokens + (t - b.updatedAt) * refillPerMs);
     b.updatedAt = t;
     let wait = 0;
-    if (b.tokens >= 1) b.tokens -= 1;
-    else wait = Math.max(1, Math.ceil((1 - b.tokens) / refillPerMs));
+    if (cost <= rule.limit && b.tokens >= cost) b.tokens -= cost;
+    else wait = Math.max(1, Math.ceil((Math.min(cost, rule.limit) - b.tokens) / refillPerMs));
     group.delete(key); // re-insert to keep Map order = recency
     group.set(key, b);
     if (group.size > this.maxKeys) this.evict(group, t, rule.windowMs);
@@ -61,13 +64,14 @@ export class RateLimiter {
 }
 
 /** Throw RATE_LIMITED with `retryAfterMs` when `key` is over `rule`. */
-export function enforce(limiter: RateLimiter, key: string, rule: RateLimitRule): void {
-  const wait = limiter.take(key, rule);
+export function enforce(limiter: RateLimiter, key: string, rule: RateLimitRule, cost = 1): void {
+  const wait = cost === 1 ? limiter.take(key, rule) : limiter.take(key, rule, cost);
   if (wait > 0) throw new ApiException('RATE_LIMITED', 'Too many requests', { retryAfterMs: wait });
 }
 
 export const perMinute = (limit: number): RateLimitRule => ({ limit, windowMs: 60_000 });
 export const perHour = (limit: number): RateLimitRule => ({ limit, windowMs: 3_600_000 });
+export const perDay = (limit: number): RateLimitRule => ({ limit, windowMs: 86_400_000 });
 
 export interface ClientIpSource {
   trustProxy: boolean;

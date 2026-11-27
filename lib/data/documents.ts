@@ -142,3 +142,25 @@ export async function deleteDocument(fingerprint: string, deps: WriteDeps = {}):
   if (existed) notifyDataChanged(['documents', 'highlights']);
   return existed;
 }
+
+/**
+ * Record whether the account holds the document's file (the server's answer to an upload or a
+ * removal). `storageState` is server-owned: no dirty flag, no rev bump, so it is never pushed. A
+ * document that is not recorded here yet gets nothing: the next pull brings it. True if written.
+ */
+export async function setStorageState(
+  fingerprint: string,
+  state: LocalDocument['storageState'],
+): Promise<boolean> {
+  const wrote = await transact([STORE.documents], 'readwrite', async (tx) => {
+    const documents = tx.objectStore(STORE.documents);
+    const previous = await request<LocalDocument | undefined>(documents.get(fingerprint));
+    if (previous === undefined || !isLive(previous) || previous.storageState === state) {
+      return false;
+    }
+    await request(documents.put({ ...previous, storageState: state }));
+    return true;
+  });
+  if (wrote) notifyDataChanged(['documents']);
+  return wrote;
+}

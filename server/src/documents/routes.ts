@@ -1,13 +1,8 @@
 // Document REST (docs/clavis-sync-design.md §5.4): list, detail, delete. `B|C`; scoped to the authenticated user.
-// File upload/download/delete are separate routes (P3).
+// File upload/download/delete live in ./file-routes.ts. Deleting a document also removes its stored file (§6.4).
 import { and, asc, desc, eq, gt, isNull, lt, or, sql } from 'drizzle-orm';
 import { Hono } from 'hono';
-import {
-  Hex64,
-  PageQuery,
-  type DocumentView,
-  type HighlightView,
-} from '../../../shared/api-contract';
+import { Hex64, PageQuery, type HighlightView } from '../../../shared/api-contract';
 import { requireBearerOrCookie } from '../auth/middleware';
 import type { AuthRuntime } from '../auth/runtime';
 import type { Database } from '../db/client';
@@ -19,23 +14,17 @@ import { enforce, perMinute } from '../http/rate-limit';
 import type { AppEnv } from '../http/types';
 import type { Logger } from '../logger';
 import { createResettableSeq, getDocument, writeDocumentTombstone } from '../sync/apply';
-import { documentData, highlightData, type DocumentRow } from '../sync/records';
+import { highlightData } from '../sync/records';
+import { deleteQueuedKeys } from '../storage/deletions';
+import type { ObjectStorage } from '../storage/types';
+import { OUTER_FP, OUTER_USER, documentView } from './view';
 
-function documentView(row: DocumentRow, highlightCount: number): DocumentView {
-  return {
-    ...documentData(row),
-    fingerprint: row.fingerprint,
-    clientModifiedAt: row.clientModifiedAt.getTime(),
-    highlightCount,
-    storage: {
-      state: row.storageState === 'stored' ? 'stored' : 'none',
-      bytes: row.storedBytes === null ? null : Number(row.storedBytes),
-      storedAt: row.storedAt === null ? null : row.storedAt.getTime(),
-    },
-  };
-}
-
-export function documentRoutes(rt: AuthRuntime, db: Database, logger: Logger): Hono<AppEnv> {
+export function documentRoutes(
+  rt: AuthRuntime,
+  db: Database,
+  logger: Logger,
+  storage?: ObjectStorage | undefined,
+): Hono<AppEnv> {
   const app = new Hono<AppEnv>();
   const auth = requireBearerOrCookie(rt);
   const prelude = (c: { get(k: 'auth'): { userId: string } | undefined }): string => {
@@ -66,7 +55,7 @@ export function documentRoutes(rt: AuthRuntime, db: Database, logger: Logger): H
       .select({
         row: documents,
         highlightCount: sql<number>`(SELECT count(*)::int FROM highlights h
-          WHERE h.user_id = ${documents.userId} AND h.fingerprint = ${documents.fingerprint}
+          WHERE h.user_id = ${OUTER_USER} AND h.fingerprint = ${OUTER_FP}
             AND h.deleted_at IS NULL)`,
       })
       .from(documents)
@@ -125,6 +114,7 @@ export function documentRoutes(rt: AuthRuntime, db: Database, logger: Logger): H
     const uid = prelude(c);
     const fp = fpParam(c.req.param('fp'));
     const nowMs = rt.now();
+    let objectKey: string | null = null;
     const deleted = await db.transaction(async (tx) => {
       const current = await lockUserForSeq(tx, uid);
       if (current === null) throw new ApiException('UNAUTHENTICATED', 'Account no longer exists');
@@ -138,6 +128,7 @@ export function documentRoutes(rt: AuthRuntime, db: Database, logger: Logger): H
       };
       const row = await getDocument(ctx, fp);
       if (!row || row.deletedAt) return false;
+      objectKey = row.objectKey;
       await writeDocumentTombstone(
         ctx,
         fp,
@@ -148,6 +139,8 @@ export function documentRoutes(rt: AuthRuntime, db: Database, logger: Logger): H
       return true;
     });
     if (!deleted) throw new ApiException('NOT_FOUND', 'Not found');
+    // §6.4: the file's deletion is already queued in the transaction; try it inline now.
+    if (objectKey !== null) await deleteQueuedKeys(db, storage, logger, [objectKey]);
     return c.body(null, 204);
   });
 

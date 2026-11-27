@@ -289,6 +289,7 @@ describe('ACCOUNT_GET_STATUS', () => {
       'enabled',
       'signedIn',
       'sync',
+      'usage', // the server's stored-PDF usage: numbers only
     ]);
   });
 });

@@ -12,6 +12,8 @@ import type { Database } from '../db/client';
 import { readJsonBody } from '../http/body';
 import { ApiException, parseOrThrow } from '../http/errors';
 import { enforce, perMinute } from '../http/rate-limit';
+import { deleteQueuedKeys } from '../storage/deletions';
+import type { ObjectStorage } from '../storage/types';
 import type { AppEnv } from '../http/types';
 import type { Logger } from '../logger';
 import { pullChanges } from './pull';
@@ -23,7 +25,12 @@ const Envelope = z.strictObject({
 });
 
 /** POST /v1/sync/push and GET /v1/sync/pull (`B`: Bearer only; no cookie route, hence no CSRF surface). */
-export function syncRoutes(rt: AuthRuntime, db: Database, logger: Logger): Hono<AppEnv> {
+export function syncRoutes(
+  rt: AuthRuntime,
+  db: Database,
+  logger: Logger,
+  storage?: ObjectStorage | undefined,
+): Hono<AppEnv> {
   const app = new Hono<AppEnv>();
   const auth = requireBearer(rt);
   const userId = (c: { get(k: 'auth'): { userId: string } | undefined }): string => {
@@ -50,6 +57,7 @@ export function syncRoutes(rt: AuthRuntime, db: Database, logger: Logger): Hono<
       if (!(err instanceof RangeError)) throw err;
       throw new ApiException('VALIDATION_FAILED', 'Request body is nested too deeply');
     }
+    const removedKeys: string[] = [];
     const response = await pushChanges(db, {
       userId: uid,
       idempotencyKey: key.data,
@@ -57,7 +65,9 @@ export function syncRoutes(rt: AuthRuntime, db: Database, logger: Logger): Hono<
       items: body.changes,
       nowMs: rt.now(),
       warn: (msg) => logger.warn({ route: 'sync/push' }, msg),
+      removedKeys,
     });
+    await deleteQueuedKeys(db, storage, logger, removedKeys);
     return c.json(response);
   });
 

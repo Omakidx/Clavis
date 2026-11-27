@@ -102,7 +102,7 @@ test.describe('keyboard and focus', () => {
     // Tab order from the first control; the pages and their text come after the toolbar.
     await page.getByRole('button', { name: 'Open PDF' }).focus();
     const stops: string[] = [];
-    for (let i = 0; i < 14; i++) {
+    for (let i = 0; i < 15; i++) {
       await page.keyboard.press('Tab');
       const stop = await page.evaluate(() => {
         const el = document.activeElement as HTMLElement | null;
@@ -133,7 +133,7 @@ test.describe('keyboard and focus', () => {
       expect(stop.cue, `${stop.name} shows a focus surface`).toBe(true);
       stops.push(stop.name);
     }
-    expect(stops.slice(0, 9)).toEqual([
+    expect(stops.slice(0, 10)).toEqual([
       'Close PDF',
       'Previous page',
       'Page',
@@ -143,9 +143,11 @@ test.describe('keyboard and focus', () => {
       'Zoom in',
       'Fit width',
       'Find',
+      // S-08: the toolbar gained a Highlights toggle after Find.
+      'Highlights',
     ]);
-    expect(stops.slice(9, 13)).toEqual(['Listen to document', 'Play', 'Speed', 'Follow along']);
-    expect(stops[13]).toBe('PDF pages');
+    expect(stops.slice(10, 14)).toEqual(['Listen to document', 'Play', 'Speed', 'Follow along']);
+    expect(stops[14]).toBe('PDF pages');
   });
 
   test('page changes and the open/close of a document reach a polite live region', async ({

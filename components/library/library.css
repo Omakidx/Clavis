@@ -248,3 +248,19 @@
 .library-dialog p {
   overflow-wrap: anywhere;
 }
+
+/* Account storage used by stored PDFs (design 7.7), Documents tab. */
+.library-quota {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  margin: 0 0 var(--space-3);
+}
+
+.library-quota progress {
+  flex: 1 1 10rem;
+  max-width: 20rem;
+  height: 8px;
+  accent-color: var(--accent);
+}

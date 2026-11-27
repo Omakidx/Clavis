@@ -59,6 +59,17 @@ export const accountStatusSchema = z.strictObject({
   /** The device was signed out by the server (session ended); shown until the next sign-in. */
   notice: z.literal('session-ended').optional(),
   sync: syncStatusSchema,
+  /**
+   * Stored-PDF usage as the server counts it (reservations and the per-user quota included).
+   * Null when signed in but the server could not be asked; absent when signed out.
+   */
+  usage: z
+    .strictObject({
+      storageUsedBytes: z.number().int().nonnegative(),
+      storageQuotaBytes: z.number().int().nonnegative(),
+    })
+    .nullable()
+    .optional(),
 });
 export type AccountStatus = z.infer<typeof accountStatusSchema>;
 

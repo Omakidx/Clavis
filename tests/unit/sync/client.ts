@@ -145,6 +145,7 @@ export function createClient(
       },
     },
     enabled: options.enabled ?? true,
+    now: clock.now,
     notify: () => undefined,
   });
 

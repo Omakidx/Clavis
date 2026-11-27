@@ -9,6 +9,8 @@ interface ReaderToolbarProps {
   view: ViewStatus | null;
   findOpen: boolean;
   onToggleFind: () => void;
+  highlightsOpen: boolean;
+  onToggleHighlights: () => void;
   onOpen: () => void;
   /** Ref of the Open PDF button, so the shell can return focus to it. */
   openRef?: Ref<HTMLButtonElement>;
@@ -35,6 +37,8 @@ export function ReaderToolbar({
   view,
   findOpen,
   onToggleFind,
+  highlightsOpen,
+  onToggleHighlights,
   onOpen,
   openRef,
   onClose,
@@ -222,6 +226,31 @@ export function ReaderToolbar({
             <path d="m12.5 12.5 4 4" strokeLinecap="round" />
           </svg>
           <span className="reader-toolbar__action-text">{t('readerFindToggle')}</span>
+        </button>
+        <button
+          type="button"
+          className="clavis-button reader-toggle reader-toolbar__compact-action"
+          disabled={disabled}
+          aria-pressed={highlightsOpen}
+          aria-controls={disabled ? undefined : 'reader-sidebar'}
+          title={t('readerHighlightsToggle')}
+          onClick={onToggleHighlights}
+          data-testid="highlights-toggle"
+        >
+          <svg
+            className="reader-toolbar__small-icon"
+            viewBox="0 0 20 20"
+            width="18"
+            height="18"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            aria-hidden="true"
+          >
+            <path d="m11.5 3.5 5 5-7 7H4.5v-5l7-7Z" strokeLinejoin="round" />
+            <path d="M3 17.5h14" strokeLinecap="round" />
+          </svg>
+          <span className="reader-toolbar__action-text">{t('readerHighlightsToggle')}</span>
         </button>
       </div>
     </div>

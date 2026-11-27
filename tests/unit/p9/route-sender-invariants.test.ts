@@ -68,6 +68,13 @@ const ACCOUNT_SENDERS: Record<string, readonly string[]> = {
   SYNC_NOW: ['options', 'popup', 'library'],
 };
 const ACCOUNT_ROUTES = Object.keys(ACCOUNT_SENDERS);
+/** PDF files in the account (design 7.4): upload and fetch are the reader's, removing also the library's. */
+const DOCUMENT_SENDERS: Record<string, readonly string[]> = {
+  DOCUMENT_UPLOAD: ['reader'],
+  DOCUMENT_FETCH: ['reader'],
+  DOCUMENT_REMOVE_FILE: ['reader', 'library'],
+};
+const DOCUMENT_ROUTES = Object.keys(DOCUMENT_SENDERS);
 const PANEL_ROUTES = ['GET_SIDE_PANEL_STATE'] as const;
 
 const CLASSIFIED = new Set<string>([
@@ -78,6 +85,7 @@ const CLASSIFIED = new Set<string>([
   ...LIBRARY_ROUTES,
   ...SYNC_ROUTES,
   ...ACCOUNT_ROUTES,
+  ...DOCUMENT_ROUTES,
   ...PANEL_ROUTES,
 ]);
 
@@ -152,6 +160,7 @@ describe('the route table, against the policy', () => {
         ...LIBRARY_ROUTES,
         ...SYNC_ROUTES,
         ...ACCOUNT_ROUTES,
+        ...DOCUMENT_ROUTES,
       ]) {
         expect(allowed, `${name} must not reach ${privileged}`).not.toContain(privileged);
       }
@@ -261,6 +270,16 @@ describe('the route table, against the policy', () => {
 
   it('each account route is for exactly its declared extension pages: never a content script, the side panel, the practice page or the removed offscreen page', () => {
     for (const [route, pages] of Object.entries(ACCOUNT_SENDERS)) {
+      for (const [name, sender] of Object.entries(SENDERS)) {
+        expect(allowedFor(sender).includes(route), `${route} for ${name}`).toBe(
+          pages.includes(name),
+        );
+      }
+    }
+  });
+
+  it('each PDF file route is for exactly its declared pages: never a content script, the popup, the panel or the options page', () => {
+    for (const [route, pages] of Object.entries(DOCUMENT_SENDERS)) {
       for (const [name, sender] of Object.entries(SENDERS)) {
         expect(allowedFor(sender).includes(route), `${route} for ${name}`).toBe(
           pages.includes(name),
