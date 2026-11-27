@@ -37,6 +37,8 @@ export interface WordHandlerDeps {
     }>;
   };
   now?: () => number;
+  /** A word was saved or removed: wake the sync engine (it does nothing when signed out). */
+  onLocalChange?: () => void;
 }
 
 /** A page address reduced to origin + path: no query, fragment or credentials (design 7.4). */
@@ -172,8 +174,8 @@ export function createWordHandlers(deps: WordHandlerDeps) {
         return failure('PERMISSION_DENIED');
       }
       try {
-        // P2: trigger sync from here (the background) after the write; card saves send no SYNC_KICK.
         await putWord(key, parsed.data, { now });
+        deps.onLocalChange?.();
       } catch (error) {
         if (error instanceof Error && error.message === 'word-limit') {
           return failure('LIMIT_EXCEEDED');
@@ -200,8 +202,9 @@ export function createWordHandlers(deps: WordHandlerDeps) {
         if (word !== undefined && !mayTouch(word, context.sender))
           return failure('INVALID_REQUEST');
       }
-      // P2: trigger sync from here (the background) after the delete; card unsaves send no SYNC_KICK.
-      return success({ removed: await deleteWord(wordKey, { now }) });
+      const removed = await deleteWord(wordKey, { now });
+      if (removed) deps.onLocalChange?.();
+      return success({ removed });
     },
 
     async isSaved(

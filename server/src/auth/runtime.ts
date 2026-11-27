@@ -57,6 +57,7 @@ export function createAuthRuntime(opts: {
       clientId: config.googleClientId,
       clientSecret: config.googleClientSecret,
       now: opts.now,
+      endpoints: c.googleEndpoints,
     });
   const store = new AuthStore(opts.db);
   const tokens = new AccessTokens({

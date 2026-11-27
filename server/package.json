@@ -9,6 +9,8 @@
   },
   "scripts": {
     "dev": "tsx watch --env-file-if-exists=.env src/index.ts",
+    "fake-google": "node scripts/fake-google.mjs",
+    "e2e:up": "node scripts/e2e-up.mjs",
     "build": "node scripts/build.mjs",
     "start": "node dist/index.js",
     "typecheck": "tsc --noEmit",

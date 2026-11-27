@@ -96,6 +96,8 @@ export function ReaderResume({ controller, containerRef, snapshot, documentKey }
     save.current = flush;
     schedule.current = later;
 
+    // Opening a document pulls other devices' progress (design 4.7); a no-op signed out.
+    void kickSync(true);
     void getDocument(fingerprint)
       .catch(() => undefined)
       .then((known) => {

@@ -89,7 +89,7 @@ describe('CORS on Bearer routes', () => {
       expect(res.status).toBe(204);
       expect(res.headers.get('access-control-allow-origin')).toBe(`chrome-extension://${id}`);
       expect(res.headers.get('access-control-allow-headers')).toBe(
-        'Authorization, Content-Type, Idempotency-Key',
+        'Authorization, Content-Type, Idempotency-Key, X-Clavis-Title',
       );
       expect(res.headers.get('access-control-max-age')).toBe('600');
       expect(res.headers.get('access-control-allow-credentials')).toBeNull();

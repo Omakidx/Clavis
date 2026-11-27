@@ -32,6 +32,12 @@ export interface SettingsHandlerDeps {
   onModelContextChanged?: () => void;
   /** CLEAR_ALL_DATA finished: memory that holds the user's selections (side panel hand-offs) goes too. */
   onDataCleared?: () => void;
+  /** R5 (design 2.4): sign out first, best effort, without keeping a copy. Failures never block the clear. */
+  signOutFirst?: () => Promise<void>;
+  /** Stop waiting for the sign-out after this long and clear anyway (default 15 s). */
+  signOutTimeoutMs?: number;
+  /** Called just before the clear: an in-flight sign-in or token refresh must not write anything back. */
+  invalidateAccount?: () => void;
 }
 
 /** Preference fields that change what the observer registration should look like. */
@@ -104,6 +110,19 @@ export function createSettingsHandlers(deps: SettingsHandlerDeps) {
      * with the preferences.
      */
     async clearAllData(): Promise<MessageReply<ClearAllDataResult>> {
+      // Sign out first, but never let the network hold the clear: after the cap the clear goes
+      // ahead and deletes the tokens and sync state with everything else.
+      if (deps.signOutFirst !== undefined) {
+        let timer: ReturnType<typeof setTimeout> | undefined;
+        await Promise.race([
+          deps.signOutFirst().catch(() => undefined),
+          new Promise<void>((resolve) => {
+            timer = setTimeout(resolve, deps.signOutTimeoutMs ?? 15_000);
+          }),
+        ]);
+        clearTimeout(timer);
+      }
+      deps.invalidateAccount?.();
       // Queue behind (and ahead of) key and settings writes, so a concurrent SET_API_KEY or
       // preference update cannot interleave with the sweep and leave a record behind.
       await deps.keys.exclusive(() => settings.exclusive(() => clearClavisStorage(deps.areas)));

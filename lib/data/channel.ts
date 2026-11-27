@@ -55,3 +55,27 @@ export function onDataChanged(
   };
   return () => channel.close();
 }
+
+/**
+ * The account or sync state changed (a sync started or ended, sign-in, sign-out): pages re-read
+ * ACCOUNT_GET_STATUS. A bare signal: it carries no email, no token and no counts. Never throws.
+ */
+export function notifyAccountStatusChanged(): void {
+  try {
+    const channel = new BroadcastChannel(DATA_CHANNEL);
+    channel.postMessage({ accountStatus: true });
+    channel.close();
+  } catch {
+    // No BroadcastChannel: pages fall back to polling.
+  }
+}
+
+/** Call `listener` on every account-status-changed signal. Returns the unsubscribe. */
+export function onAccountStatusChanged(listener: () => void): () => void {
+  if (typeof BroadcastChannel === 'undefined') return () => undefined;
+  const channel = new BroadcastChannel(DATA_CHANNEL);
+  channel.onmessage = (event: MessageEvent<unknown>) => {
+    if ((event.data as { accountStatus?: unknown } | null)?.accountStatus === true) listener();
+  };
+  return () => channel.close();
+}

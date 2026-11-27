@@ -183,3 +183,60 @@ describe('loadConfig', () => {
     expect(() => loadConfig({ PORT: '70000' })).toThrow(/PORT/);
   });
 });
+
+describe('Google endpoint overrides (dev/e2e only)', () => {
+  const OVERRIDES = {
+    GOOGLE_AUTH_URL: 'http://127.0.0.1:8788/authorize',
+    GOOGLE_TOKEN_URL: 'http://127.0.0.1:8788/token',
+    GOOGLE_JWKS_URL: 'http://127.0.0.1:8788/jwks',
+    GOOGLE_ISSUER: 'http://127.0.0.1:8788',
+  };
+
+  it('defaults to undefined (real Google) and parses overrides outside production', () => {
+    expect(loadConfig({}).googleEndpoints).toBeUndefined();
+    expect(loadConfig({ NODE_ENV: 'development', ...OVERRIDES }).googleEndpoints).toEqual({
+      authUrl: OVERRIDES.GOOGLE_AUTH_URL,
+      tokenUrl: OVERRIDES.GOOGLE_TOKEN_URL,
+      jwksUrl: OVERRIDES.GOOGLE_JWKS_URL,
+      issuer: OVERRIDES.GOOGLE_ISSUER,
+    });
+    expect(loadConfig({ GOOGLE_TOKEN_URL: OVERRIDES.GOOGLE_TOKEN_URL }).googleEndpoints).toEqual({
+      tokenUrl: OVERRIDES.GOOGLE_TOKEN_URL,
+    });
+  });
+
+  it('refuses every override in production, naming the variable', () => {
+    expect(() => loadConfig(PROD_ENV)).not.toThrow();
+    for (const [name, value] of Object.entries(OVERRIDES)) {
+      expect(() => loadConfig({ ...PROD_ENV, [name]: value }), name).toThrow(
+        new RegExp(`${name}: .*refused in production`),
+      );
+    }
+  });
+
+  it('refuses overrides for a non-local https PUBLIC_ORIGIN whatever NODE_ENV is', () => {
+    const origin = 'https://clavis-api-production.up.railway.app';
+    for (const nodeEnv of [undefined, 'development']) {
+      const env: Record<string, string> = { PUBLIC_ORIGIN: origin, ...OVERRIDES };
+      if (nodeEnv) env['NODE_ENV'] = nodeEnv;
+      expect(() => loadConfig(env), String(nodeEnv)).toThrow(/GOOGLE_AUTH_URL: .*refused/);
+    }
+    expect(() => loadConfig({ PUBLIC_ORIGIN: origin })).not.toThrow();
+  });
+
+  it('accepts overrides with a localhost origin (e2e stack)', () => {
+    for (const PUBLIC_ORIGIN of [
+      'http://localhost:8787',
+      'https://localhost:8787',
+      'http://127.0.0.1:8787',
+    ]) {
+      expect(loadConfig({ PUBLIC_ORIGIN, ...OVERRIDES }).googleEndpoints?.tokenUrl).toBe(
+        OVERRIDES.GOOGLE_TOKEN_URL,
+      );
+    }
+  });
+
+  it('rejects a malformed override URL', () => {
+    expect(() => loadConfig({ GOOGLE_TOKEN_URL: 'not a url' })).toThrow(/GOOGLE_TOKEN_URL/);
+  });
+});

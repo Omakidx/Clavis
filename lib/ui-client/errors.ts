@@ -50,6 +50,11 @@ const MAPPING = {
   INTERNAL_ERROR: { key: 'errGeneric', action: 'retry' },
   NOT_FOUND: { key: 'errNotFound', action: 'none' },
   LIMIT_EXCEEDED: { key: 'errLimitExceeded', action: 'none' },
+  CANCELLED: { key: 'errSignInCancelled', action: 'none' },
+  OAUTH_FAILED: { key: 'errSignInFailed', action: 'retry' },
+  NOT_CONFIGURED: { key: 'errSignInNotConfigured', action: 'none' },
+  EMAIL_NOT_VERIFIED: { key: 'errEmailNotVerified', action: 'none' },
+  NOT_SIGNED_IN: { key: 'errNotSignedIn', action: 'none' },
   NO_RESPONSE: { key: 'errNoResponse', action: 'retry' },
   BAD_REPLY: { key: 'errInvalidResponse', action: 'retry' },
 } as const satisfies Record<ClientErrorCode, Mapping>;

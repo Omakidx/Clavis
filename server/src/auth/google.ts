@@ -5,7 +5,7 @@ import { pkceChallenge } from './crypto';
 export const GOOGLE_AUTH_URL = 'https://accounts.google.com/o/oauth2/v2/auth';
 export const GOOGLE_TOKEN_URL = 'https://oauth2.googleapis.com/token';
 export const GOOGLE_JWKS_URL = 'https://www.googleapis.com/oauth2/v3/certs';
-const ISSUERS = ['https://accounts.google.com', 'accounts.google.com'];
+export const GOOGLE_ISSUERS = ['https://accounts.google.com', 'accounts.google.com'];
 const CLOCK_SKEW_S = 300;
 
 /** Sign-in failed because of the code, token or claims (client error). */
@@ -43,6 +43,9 @@ export interface GoogleClientOptions {
   jwks?: JWTVerifyGetKey;
   now?: () => number;
   timeoutMs?: number;
+  /** Dev/e2e only (config refuses these in production): point at a fake Google. Default: the real endpoints. */
+  endpoints?:
+    Partial<{ authUrl: string; tokenUrl: string; jwksUrl: string; issuer: string }> | undefined;
 }
 
 export interface AuthUrlParams {
@@ -69,12 +72,19 @@ export class GoogleClient {
   private readonly jwks: JWTVerifyGetKey;
   private readonly now: () => number;
   private readonly timeoutMs: number;
+  private readonly authEndpoint: string;
+  private readonly tokenEndpoint: string;
+  private readonly issuers: string[];
 
   constructor(private readonly opts: GoogleClientOptions) {
+    const ep = opts.endpoints ?? {};
+    this.authEndpoint = ep.authUrl ?? GOOGLE_AUTH_URL;
+    this.tokenEndpoint = ep.tokenUrl ?? GOOGLE_TOKEN_URL;
+    this.issuers = ep.issuer ? [ep.issuer] : GOOGLE_ISSUERS;
     this.fetchFn = opts.fetch ?? fetch;
     this.jwks =
       opts.jwks ??
-      createRemoteJWKSet(new URL(GOOGLE_JWKS_URL), {
+      createRemoteJWKSet(new URL(ep.jwksUrl ?? GOOGLE_JWKS_URL), {
         timeoutDuration: 5000,
         cooldownDuration: 30_000,
         cacheMaxAge: 3_600_000,
@@ -85,7 +95,7 @@ export class GoogleClient {
 
   /** Authorization URL (scopes `openid email profile`, no offline access, PKCE S256). */
   authUrl(p: AuthUrlParams): string {
-    const u = new URL(GOOGLE_AUTH_URL);
+    const u = new URL(this.authEndpoint);
     const q = u.searchParams;
     q.set('client_id', this.opts.clientId);
     q.set('redirect_uri', p.redirectUri);
@@ -108,7 +118,7 @@ export class GoogleClient {
   async exchangeCode(code: string, codeVerifier: string, redirectUri: string): Promise<string> {
     let res: Response;
     try {
-      res = await this.fetchFn(GOOGLE_TOKEN_URL, {
+      res = await this.fetchFn(this.tokenEndpoint, {
         method: 'POST',
         headers: {
           'content-type': 'application/x-www-form-urlencoded',
@@ -153,7 +163,7 @@ export class GoogleClient {
     try {
       ({ payload } = await jwtVerify(idToken, this.jwks, {
         algorithms: ['RS256'],
-        issuer: ISSUERS,
+        issuer: this.issuers,
         audience: this.opts.clientId,
         currentDate: new Date(this.now()),
         clockTolerance: CLOCK_SKEW_S,

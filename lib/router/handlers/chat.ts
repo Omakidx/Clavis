@@ -34,6 +34,8 @@ export interface ChatHandlerDeps extends ReadinessDeps {
   newId?: () => string;
   /** Fixed delimiter suffix, for tests. */
   nonce?: string;
+  /** A chat pair was written: wake the sync engine (it does nothing when signed out). */
+  onLocalChange?: () => void;
 }
 
 /**
@@ -119,6 +121,7 @@ export function createChatHandlers(deps: ChatHandlerDeps) {
         }
         try {
           await appendChatPair(wordKey, [user, assistant], { now });
+          deps.onLocalChange?.();
         } catch (error) {
           if (error instanceof Error && error.message === 'word-missing') {
             return failure('NOT_FOUND', { requestId });

@@ -2753,5 +2753,173 @@
   "cardSaveElsewhere": {
     "message": "Saved from another page. Manage it in the Library.",
     "description": "Message when saving a word from a web page was refused because the same word is already saved from another page or a PDF; that copy is managed in the Library."
+  },
+  "errSignInCancelled": {
+    "message": "Sign-in was cancelled. Nothing changed.",
+    "description": "Error shown when the user closed the Google sign-in window or refused."
+  },
+  "errSignInFailed": {
+    "message": "Google sign-in did not complete. Try again.",
+    "description": "Error shown when the Google sign-in exchange failed (bad answer, refused code)."
+  },
+  "errSignInNotConfigured": {
+    "message": "Sign-in is not set up in this version of Clavis.",
+    "description": "Error shown when this build has no Google client id, so sign-in cannot start."
+  },
+  "errEmailNotVerified": {
+    "message": "Google has not verified this email address, so it can't be used to sign in.",
+    "description": "Error shown when Google reports the account's email as unverified."
+  },
+  "errNotSignedIn": {
+    "message": "You are not signed in.",
+    "description": "Error shown when an account action needs a signed-in account and there is none."
+  },
+  "accountErrNetwork": {
+    "message": "Clavis can't reach the sync service. Check your internet connection and try again.",
+    "description": "Error shown in the Account and sync section when the Clavis sync service could not be reached."
+  },
+  "accountTitle": {
+    "message": "Account & sync",
+    "description": "Heading and navigation label of the Account and sync section in Settings."
+  },
+  "accountIntro": {
+    "message": "Sign in with Google to keep your saved words, highlights and reading progress in step on every device where you use Clavis. This is optional: Clavis works the same without an account.",
+    "description": "Intro of the Account and sync section when signed out."
+  },
+  "accountMergeNotice": {
+    "message": "Signing in adds this device's saved words, highlights and reading progress to your account. Your Groq API key is never synced or sent to Clavis.",
+    "description": "Consent notice shown next to the Sign in button (Settings and popup)."
+  },
+  "accountSignIn": {
+    "message": "Sign in with Google",
+    "description": "Button that starts Google sign-in."
+  },
+  "accountSigningIn": {
+    "message": "Waiting for Google...",
+    "description": "Button label and status while the Google sign-in window is open."
+  },
+  "accountSignedInAs": {
+    "message": "Signed in as $EMAIL$",
+    "description": "Line showing the signed-in account. $EMAIL$ is the email address.",
+    "placeholders": { "EMAIL": { "content": "$1" } }
+  },
+  "accountSyncNever": {
+    "message": "Not synced yet.",
+    "description": "Sync status before the first sync finished."
+  },
+  "accountSyncDone": {
+    "message": "Synced $TIME$.",
+    "description": "Sync status after a successful sync. $TIME$ is a localized date and time.",
+    "placeholders": { "TIME": { "content": "$1" } }
+  },
+  "accountSyncing": {
+    "message": "Syncing...",
+    "description": "Sync status while a sync is running."
+  },
+  "accountSyncError": {
+    "message": "Sync failed. Clavis will try again automatically.",
+    "description": "Sync status after a failed sync other than losing the connection."
+  },
+  "accountSyncOffline": {
+    "message": "Offline. Clavis will sync when the connection is back.",
+    "description": "Sync status when the sync service can't be reached."
+  },
+  "accountPending": {
+    "message": "$COUNT$ changes are not synced yet.",
+    "description": "Number of local changes waiting to be synced. $COUNT$ is a whole number.",
+    "placeholders": { "COUNT": { "content": "$1" } }
+  },
+  "accountRejected": {
+    "message": "$COUNT$ changes were refused by the server and stay on this device only.",
+    "description": "Number of changes the sync service refused. $COUNT$ is a whole number.",
+    "placeholders": { "COUNT": { "content": "$1" } }
+  },
+  "accountSyncNow": {
+    "message": "Sync now",
+    "description": "Button that starts a sync immediately."
+  },
+  "accountManageWeb": {
+    "message": "Manage account on the web",
+    "description": "Link to the web dashboard."
+  },
+  "accountSignOut": {
+    "message": "Sign out",
+    "description": "Button that opens the sign-out confirmation."
+  },
+  "accountSignOutEverywhere": {
+    "message": "Sign out everywhere",
+    "description": "Button that ends every session of the account on every device."
+  },
+  "accountSignOutTitle": {
+    "message": "Sign out of Clavis?",
+    "description": "Heading of the sign-out dialog."
+  },
+  "accountSignOutBody": {
+    "message": "Your account and its cloud copy stay as they are. By default the saved words, highlights and reading progress on this device are removed.",
+    "description": "Body of the sign-out dialog."
+  },
+  "accountKeepCopy": {
+    "message": "Keep a copy on this device",
+    "description": "Checkbox in the sign-out dialog; unchecked by default."
+  },
+  "accountKeepCopyHint": {
+    "message": "The copy stays on this device and is added to whichever account you sign in to next.",
+    "description": "Help text of the keep-a-copy checkbox."
+  },
+  "accountSignOutConfirm": {
+    "message": "Sign out",
+    "description": "Confirm button of the sign-out dialog."
+  },
+  "accountEverywhereTitle": {
+    "message": "Sign out everywhere?",
+    "description": "Heading of the dialog for signing out on all devices."
+  },
+  "accountEverywhereBody": {
+    "message": "This ends the Clavis session on every device, including this one. The data on this device is kept.",
+    "description": "Body of the dialog for signing out on all devices."
+  },
+  "accountEverywhereConfirm": {
+    "message": "Sign out everywhere",
+    "description": "Confirm button of the dialog for signing out on all devices."
+  },
+  "accountCancel": {
+    "message": "Cancel",
+    "description": "Cancel button of the account dialogs."
+  },
+  "accountSessionEnded": {
+    "message": "You were signed out because the account session ended. The data on this device was kept. Sign in again to resume syncing.",
+    "description": "Notice shown after the server ended the session."
+  },
+  "accountSignedOutDone": {
+    "message": "Signed out.",
+    "description": "Confirmation after signing out."
+  },
+  "accountDismiss": {
+    "message": "Dismiss",
+    "description": "Button that dismisses the session-ended notice."
+  },
+  "accountPrivacyLine": {
+    "message": "When you are signed in, your saved words with their chats, highlights, reading progress and PDF titles are sent to the Clavis sync service. Your Groq API key never is.",
+    "description": "Privacy section statement of what syncs, shown only when accounts are available."
+  },
+  "popupAccountLabel": {
+    "message": "Account",
+    "description": "Popup label of the account row."
+  },
+  "popupAccountSignIn": {
+    "message": "Sign in to sync",
+    "description": "Popup button that starts sign-in when signed out."
+  },
+  "popupAccountSyncNow": {
+    "message": "Sync now",
+    "description": "Popup button that starts a sync when signed in."
+  },
+  "onbSyncLine": {
+    "message": "Sync across devices (optional)",
+    "description": "Optional line in the last onboarding step that links to Settings, Account and sync."
+  },
+  "onbSyncLink": {
+    "message": "Set up sync in Settings",
+    "description": "Link text of the optional onboarding sync line."
   }
 }

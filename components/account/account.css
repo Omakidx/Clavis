@@ -1,0 +1,40 @@
+.clavis-account__row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+.clavis-account__check {
+  display: flex;
+  gap: var(--space-2);
+  align-items: flex-start;
+  margin: var(--space-3) 0;
+}
+
+.account-modal {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: var(--space-4);
+  background: rgb(0 0 0 / 0.45);
+  z-index: 10;
+}
+
+.account-dialog {
+  max-width: 32rem;
+  padding: var(--space-5);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--bg);
+  color: var(--fg);
+}
+
+.account-dialog h2 {
+  margin-top: 0;
+}
+
+.account-dialog p {
+  overflow-wrap: anywhere;
+}

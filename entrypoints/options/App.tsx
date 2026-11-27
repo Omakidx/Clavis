@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { AccountSection } from '../../components/account/AccountSection';
 import { Page } from '../../components/common/Page';
 import { ToastProvider } from '../../components/common/Toast';
 import { ApiKeySection } from '../../components/settings/ApiKeySection';
@@ -8,20 +9,26 @@ import { PreferencesSection } from '../../components/settings/PreferencesSection
 import { PrivacySection } from '../../components/settings/PrivacySection';
 import { VoiceSection } from '../../components/settings/VoiceSection';
 import { SiteAccessSection } from '../../components/settings/SiteAccessSection';
+import { buildAccountConfig } from '../../lib/account/config';
+import { FEATURES } from '../../lib/config/constants';
 import { t } from '../../lib/i18n';
 import { useKeyStatus } from '../../lib/ui-client/use-key-status';
 import { useSettings } from '../../lib/ui-client/use-settings';
 import { SettingsIcon } from '../../components/settings/SettingsIcon';
 import './options.css';
 
-const GROUPS = [
+const ALL_GROUPS = [
   { id: 'connection', anchor: 'section-key', label: 'optionsGroupConnection' },
   { id: 'preferences', anchor: 'section-preferences', label: 'prefsTitle' },
   { id: 'website', anchor: 'section-site-access', label: 'siteTitle' },
+  { id: 'account', anchor: 'section-account', label: 'accountTitle' },
   { id: 'privacy', anchor: 'section-privacy', label: 'optionsGroupPrivacyHelp' },
 ] as const;
 
-type Group = (typeof GROUPS)[number]['id'];
+/** The Account & sync group exists only where accounts are switched on (FEATURES.accountSync). */
+const GROUPS = ALL_GROUPS.filter((group) => group.id !== 'account' || FEATURES.accountSync);
+
+type Group = (typeof ALL_GROUPS)[number]['id'];
 
 const ANCHOR_GROUP: Record<string, Group> = {
   'section-key': 'connection',
@@ -29,6 +36,7 @@ const ANCHOR_GROUP: Record<string, Group> = {
   'section-preferences': 'preferences',
   'section-voice': 'preferences',
   'section-site-access': 'website',
+  ...(FEATURES.accountSync ? { 'section-account': 'account' as const } : {}),
   'section-privacy': 'privacy',
   'section-help': 'privacy',
   'section-help-pdf': 'privacy',
@@ -137,6 +145,11 @@ function SettingsPage() {
           <div hidden={group !== 'website'}>
             <SiteAccessSection settings={settings} />
           </div>
+          {FEATURES.accountSync ? (
+            <div hidden={group !== 'account'}>
+              <AccountSection dashboardUrl={buildAccountConfig().apiOrigin} />
+            </div>
+          ) : null}
           <div hidden={group !== 'privacy'}>
             <PrivacySection onCleared={afterClear} />
             <HelpSection />

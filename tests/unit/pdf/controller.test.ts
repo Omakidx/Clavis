@@ -195,8 +195,6 @@ function setup(
 const pdfFile = (name = 'doc.pdf', body = '%PDF-1.7\n%%EOF') =>
   new File([body], name, { type: 'application/pdf' });
 
-const settle = () => new Promise((r) => setTimeout(r, 0));
-
 describe('PdfReaderController.openFile', () => {
   it('rejects an oversize file as TOO_LARGE without loading PDF.js', async () => {
     const { controller, loadPdfJs } = setup({}, 10);
@@ -337,14 +335,12 @@ describe('PdfReaderController.openFile', () => {
   it('a newer open supersedes a slow earlier load and destroys the stale document', async () => {
     const slow = setup({ holdLoad: true });
     const first = slow.controller.openFile(pdfFile('first.pdf'));
-    await settle();
-    await settle();
-    expect(slow.releaseLoad).toHaveLength(1);
+    // Wait for the condition itself (the first load is held), not for a fixed number of ticks:
+    // how many macrotasks the open needs depends on module loading and varies under load.
+    await vi.waitFor(() => expect(slow.releaseLoad).toHaveLength(1));
     // Second open (new file) while the first load is still pending.
     const second = slow.controller.openFile(pdfFile('second.pdf'));
-    await settle();
-    await settle();
-    expect(slow.releaseLoad).toHaveLength(2);
+    await vi.waitFor(() => expect(slow.releaseLoad).toHaveLength(2));
     slow.releaseLoad[0]!(); // the stale load finishes late
     slow.releaseLoad[1]!();
     await Promise.all([first, second]);

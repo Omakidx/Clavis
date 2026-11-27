@@ -93,10 +93,13 @@ This table is the single source of truth for permissions; the privacy policy, st
 | `activeTab` | `permissions` | Must | Current-tab injection from the context menu or toolbar icon when site access is declined |
 | `contextMenus` | `permissions` | Must | **Explain with Clavis** entry; the fallback path for users without site access (FR-018) |
 | `sidePanel` | `permissions` | Should → **shipped** (D-24, Phase 8) | The side panel for long explanations (FR-042): `sidePanel.setOptions({ tabId, path })` + `open()`, one panel per tab. Shows no install warning. The manifest has **no** `side_panel.default_path` (a shared default panel would keep one tab's explanation across tab switches); a build hook removes the key WXT derives from the entrypoint |
+| `identity` | `permissions` | Should (Clavis Sync, behind `FEATURES.accountSync`) | `chrome.identity.launchWebAuthFlow` and `getRedirectURL` for the optional Google sign-in (docs/clavis-sync-design.md 2.2). Shows no install warning (no `email` scope, no `oauth2` manifest key) |
+| `alarms` | `permissions` | Should (Clavis Sync) | The 30-minute pull and the one-shot retry backoff while the service worker sleeps (design 4.7). Shows no install warning |
 | `content_security_policy.extension_pages` | manifest | Must | Exactly `script-src 'self' 'wasm-unsafe-eval'; object-src 'self'; media-src 'none'; frame-src 'none'; form-action 'none'; base-uri 'none'` (D-17; the `none` directives added in Phase 7) |
 | `commands.explain-selection` (Alt+Shift+E) | manifest | Must | Keyboard path to the toolbar (FR-016); not a permission |
 | `minimum_chrome_version` 147 | manifest | Must | D-18 (set by PDF.js 6's use of `Math.sumPrecise`) |
 | `https://api.groq.com/*` | `host_permissions` | Must | Background Groq API calls; narrowly scoped endpoint |
+| (none) `https://clavis-api-production.up.railway.app` | not a permission | Should (Clavis Sync) | The background calls the Clavis sync API under the server's CORS allowlist (exact `chrome-extension://<id>` origins), so **no new `host_permissions` entry** is added: a required host permission would disable the extension for every existing user until they accept it. The ZIP audit lists the host as `allowedUrlHosts.corsNetwork` |
 | `http://*/*`, `https://*/*` | `optional_host_permissions` | Must | Requested at onboarding with a user gesture; enables the automatic toolbar on all websites |
 
 **Site-access flow (D-02):**

@@ -59,6 +59,15 @@ const CONTENT_ROUTES = [
 /** Chat about a saved word (S-05: library only) and the sync nudge (pages that write local data). */
 const LIBRARY_ROUTES = ['WORD_CHAT_SEND', 'WORD_CHAT_CANCEL'] as const;
 const SYNC_ROUTES = ['SYNC_KICK'] as const;
+/** Account and sync routes (design 7.4): extension pages only, each with its own sender set. */
+const ACCOUNT_SENDERS: Record<string, readonly string[]> = {
+  ACCOUNT_GET_STATUS: ['options', 'onboarding', 'popup', 'reader', 'library'],
+  ACCOUNT_SIGN_IN: ['options', 'popup'],
+  ACCOUNT_SIGN_OUT: ['options'],
+  ACCOUNT_SIGN_OUT_EVERYWHERE: ['options'],
+  SYNC_NOW: ['options', 'popup', 'library'],
+};
+const ACCOUNT_ROUTES = Object.keys(ACCOUNT_SENDERS);
 const PANEL_ROUTES = ['GET_SIDE_PANEL_STATE'] as const;
 
 const CLASSIFIED = new Set<string>([
@@ -68,6 +77,7 @@ const CLASSIFIED = new Set<string>([
   ...CONTENT_ROUTES,
   ...LIBRARY_ROUTES,
   ...SYNC_ROUTES,
+  ...ACCOUNT_ROUTES,
   ...PANEL_ROUTES,
 ]);
 
@@ -141,6 +151,7 @@ describe('the route table, against the policy', () => {
         ...PANEL_ROUTES,
         ...LIBRARY_ROUTES,
         ...SYNC_ROUTES,
+        ...ACCOUNT_ROUTES,
       ]) {
         expect(allowed, `${name} must not reach ${privileged}`).not.toContain(privileged);
       }
@@ -245,6 +256,29 @@ describe('the route table, against the policy', () => {
       expect(allowedFor(sender).includes('SYNC_KICK'), `SYNC_KICK for ${name}`).toBe(
         ['reader', 'library', 'options'].includes(name),
       );
+    }
+  });
+
+  it('each account route is for exactly its declared extension pages: never a content script, the side panel, the practice page or the removed offscreen page', () => {
+    for (const [route, pages] of Object.entries(ACCOUNT_SENDERS)) {
+      for (const [name, sender] of Object.entries(SENDERS)) {
+        expect(allowedFor(sender).includes(route), `${route} for ${name}`).toBe(
+          pages.includes(name),
+        );
+      }
+    }
+  });
+
+  it('the reader may read the account status but cannot sign in, out or sync now', () => {
+    const allowed = allowedFor(SENDERS['reader']!);
+    expect(allowed).toContain('ACCOUNT_GET_STATUS');
+    for (const route of [
+      'ACCOUNT_SIGN_IN',
+      'ACCOUNT_SIGN_OUT',
+      'ACCOUNT_SIGN_OUT_EVERYWHERE',
+      'SYNC_NOW',
+    ]) {
+      expect(allowed).not.toContain(route);
     }
   });
 

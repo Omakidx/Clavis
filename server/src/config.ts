@@ -21,6 +21,13 @@ const secret = z
     'looks low-entropy: use at least 32 random bytes',
   );
 
+const GOOGLE_OVERRIDES = [
+  'GOOGLE_AUTH_URL',
+  'GOOGLE_TOKEN_URL',
+  'GOOGLE_JWKS_URL',
+  'GOOGLE_ISSUER',
+] as const;
+
 const extensionId = z.string().regex(/^[a-p]{32}$/, 'extension IDs are 32 characters a-p');
 
 const EnvSchema = z
@@ -37,6 +44,11 @@ const EnvSchema = z
     PUBLIC_ORIGIN: z.url().optional(),
     GOOGLE_CLIENT_ID: optionalString,
     GOOGLE_CLIENT_SECRET: optionalString,
+    // Dev/e2e only: point sign-in at a fake Google. Refused when NODE_ENV=production.
+    GOOGLE_AUTH_URL: z.url().optional(),
+    GOOGLE_TOKEN_URL: z.url().optional(),
+    GOOGLE_JWKS_URL: z.url().optional(),
+    GOOGLE_ISSUER: optionalString,
     ALLOWED_EXTENSION_IDS: z.string().optional(),
     TOKEN_SIGNING_SECRET: secret.optional(),
     TOKEN_SIGNING_SECRET_PREVIOUS: secret.optional(),
@@ -82,6 +94,25 @@ const EnvSchema = z
       for (const [name, value] of required) {
         if (!value)
           ctx.addIssue({ code: 'custom', path: [name], message: 'is required in production' });
+      }
+    }
+    // NODE_ENV defaults to development, so a deploy that forgets it must still be caught: an https
+    // PUBLIC_ORIGIN on a non-local host is treated as production-like.
+    const prodLike =
+      env.NODE_ENV === 'production' ||
+      (env.PUBLIC_ORIGIN !== undefined &&
+        env.PUBLIC_ORIGIN.startsWith('https://') &&
+        !['localhost', '127.0.0.1'].includes(new URL(env.PUBLIC_ORIGIN).hostname));
+    if (prodLike) {
+      for (const name of GOOGLE_OVERRIDES) {
+        if (env[name] !== undefined) {
+          ctx.addIssue({
+            code: 'custom',
+            path: [name],
+            message:
+              'is a dev/test-only Google override and is refused in production (NODE_ENV=production or a non-local https PUBLIC_ORIGIN)',
+          });
+        }
       }
     }
     if (env.NODE_ENV === 'production' && !env.TRUST_PROXY) {
@@ -146,6 +177,9 @@ export interface Config {
   publicOrigin: string | undefined;
   googleClientId: string | undefined;
   googleClientSecret: string | undefined;
+  /** Present only when an override is set (never in production). Unset fields use Google's real values. */
+  googleEndpoints:
+    Partial<{ authUrl: string; tokenUrl: string; jwksUrl: string; issuer: string }> | undefined;
   allowedExtensionIds: string[];
   /** `chrome-extension://<id>` */
   allowedExtensionOrigins: string[];
@@ -216,6 +250,15 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
     publicOrigin: e.PUBLIC_ORIGIN ? new URL(e.PUBLIC_ORIGIN).origin : undefined,
     googleClientId: e.GOOGLE_CLIENT_ID,
     googleClientSecret: e.GOOGLE_CLIENT_SECRET,
+    googleEndpoints:
+      e.GOOGLE_AUTH_URL || e.GOOGLE_TOKEN_URL || e.GOOGLE_JWKS_URL || e.GOOGLE_ISSUER
+        ? {
+            ...(e.GOOGLE_AUTH_URL ? { authUrl: e.GOOGLE_AUTH_URL } : {}),
+            ...(e.GOOGLE_TOKEN_URL ? { tokenUrl: e.GOOGLE_TOKEN_URL } : {}),
+            ...(e.GOOGLE_JWKS_URL ? { jwksUrl: e.GOOGLE_JWKS_URL } : {}),
+            ...(e.GOOGLE_ISSUER ? { issuer: e.GOOGLE_ISSUER } : {}),
+          }
+        : undefined,
     allowedExtensionIds: uniqueIds,
     allowedExtensionOrigins: uniqueIds.map((id) => `chrome-extension://${id}`),
     allowedExtensionRedirects: uniqueIds.map((id) => `https://${id}.chromiumapp.org/`),

@@ -27,6 +27,17 @@ export const ERROR_CODES = [
   'NOT_FOUND',
   /** A local data limit is reached (saved words, messages per word). */
   'LIMIT_EXCEEDED',
+  // Clavis Sync account routes (docs/clavis-sync-design.md 7.4).
+  /** The user closed the Google window or refused (access_denied). */
+  'CANCELLED',
+  /** The sign-in exchange failed (bad state, no code, the server refused the code). */
+  'OAUTH_FAILED',
+  /** No Google client id in this build: sign-in cannot start. */
+  'NOT_CONFIGURED',
+  /** Google reported the address as unverified. */
+  'EMAIL_NOT_VERIFIED',
+  /** A sync route that needs an account was called signed out. */
+  'NOT_SIGNED_IN',
 ] as const;
 
 export const errorCodeSchema = z.enum(ERROR_CODES);

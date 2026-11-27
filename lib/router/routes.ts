@@ -14,6 +14,7 @@ import {
   type LibraryMessage,
   type WordMessage,
 } from '../contracts/words';
+import { parseAccountMessage, type AccountMessage } from '../contracts/account';
 import { injectTabForPopup, type InjectionDeps } from '../site-access/injection';
 import { isInjectTabMessage, type InjectTabMessage } from '../site-access/messages';
 import { rejectedSpeakReply, type SpeechHandlers } from '../speech/background';
@@ -22,6 +23,7 @@ import type { CardHandlers } from './handlers/card';
 import type { NavigationHandlers } from './handlers/navigation';
 import type { ChatHandlers } from './handlers/chat';
 import type { SidePanelHandlers } from './handlers/sidepanel';
+import type { AccountHandlers } from './handlers/account';
 import type { SyncHandlers } from './handlers/sync';
 import type { WordHandlers } from './handlers/words';
 import type { KeyService } from './handlers/key';
@@ -141,6 +143,15 @@ export const LIBRARY_SENDERS: SenderRule = { pages: [library] };
 /** SYNC_KICK: the pages that write local data. */
 export const SYNC_KICK_SENDERS: SenderRule = { pages: [reader, library, options] };
 
+/** Account routes (docs/clavis-sync-design.md 7.4). Extension pages only, never a content script. */
+export const ACCOUNT_STATUS_SENDERS: SenderRule = {
+  pages: [options, onboarding, popup, reader, library],
+};
+export const ACCOUNT_SIGN_IN_SENDERS: SenderRule = { pages: [options, popup] };
+export const ACCOUNT_SIGN_OUT_SENDERS: SenderRule = { pages: [options] };
+export const ACCOUNT_SIGN_OUT_EVERYWHERE_SENDERS: SenderRule = { pages: [options] };
+export const SYNC_NOW_SENDERS: SenderRule = { pages: [options, popup, library] };
+
 // ---------------------------------------------------------------------------
 // Parsers
 // ---------------------------------------------------------------------------
@@ -244,6 +255,20 @@ function libraryRoute<K extends LibraryMessage['type']>(
   });
 }
 
+/** A route of the account family (ACCOUNT_*, SYNC_NOW): validated by `parseAccountMessage`. */
+function accountRoute<K extends AccountMessage['type']>(
+  type: K,
+  allow: SenderRule,
+  handle: (message: Extract<AccountMessage, { type: K }>, context: RouteContext) => unknown,
+): Route {
+  return defineRoute<Extract<AccountMessage, { type: K }>>({
+    type,
+    allow,
+    parse: contract<AccountMessage, K>(parseAccountMessage, type),
+    handle,
+  });
+}
+
 /** The Spike B replies are `{ ok: false, reason }`, not envelopes; keep that shape. */
 const injectRejected = (): unknown => ({ ok: false, reason: 'failed' });
 
@@ -259,6 +284,7 @@ export interface RouteServices {
   words: WordHandlers;
   chat: ChatHandlers;
   sync: SyncHandlers;
+  account: AccountHandlers;
 }
 
 /**
@@ -266,8 +292,20 @@ export interface RouteServices {
  * Anything not listed is not answered.
  */
 export function buildRoutes(services: RouteServices): Route[] {
-  const { ai, card, navigation, sidePanel, keys, settings, speech, injection, words, chat, sync } =
-    services;
+  const {
+    ai,
+    card,
+    navigation,
+    sidePanel,
+    keys,
+    settings,
+    speech,
+    injection,
+    words,
+    chat,
+    sync,
+    account,
+  } = services;
 
   return [
     // ---- public ---------------------------------------------------------
@@ -344,6 +382,17 @@ export function buildRoutes(services: RouteServices): Route[] {
     libraryRoute('WORD_CHAT_SEND', LIBRARY_SENDERS, (message) => chat.send(message)),
     libraryRoute('WORD_CHAT_CANCEL', LIBRARY_SENDERS, (message) => chat.cancel(message.requestId)),
     libraryRoute('SYNC_KICK', SYNC_KICK_SENDERS, (message) => sync.kick(message.pull === true)),
+
+    // ---- account and sync (docs/clavis-sync-design.md 7.4) ---------------------------
+    accountRoute('ACCOUNT_GET_STATUS', ACCOUNT_STATUS_SENDERS, () => account.getStatus()),
+    accountRoute('ACCOUNT_SIGN_IN', ACCOUNT_SIGN_IN_SENDERS, () => account.signIn()),
+    accountRoute('ACCOUNT_SIGN_OUT', ACCOUNT_SIGN_OUT_SENDERS, (message) =>
+      account.signOut(message.keepLocalCopy),
+    ),
+    accountRoute('ACCOUNT_SIGN_OUT_EVERYWHERE', ACCOUNT_SIGN_OUT_EVERYWHERE_SENDERS, () =>
+      account.signOutEverywhere(),
+    ),
+    accountRoute('SYNC_NOW', SYNC_NOW_SENDERS, () => account.syncNow()),
 
     // ---- privileged: the key --------------------------------------------
     privilegedRoute('SET_API_KEY', KEY_SENDERS, (message) =>

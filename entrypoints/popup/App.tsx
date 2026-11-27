@@ -1,12 +1,16 @@
 import { useEffect, useRef, useState } from 'react';
 import { browser } from 'wxt/browser';
 import { Button, ErrorNotice, LiveStatus, Notice } from '../../components/common/ui';
+import { syncLine } from '../../components/account/sync-line';
 import { Page } from '../../components/common/Page';
 import { SiteAccessHelp } from '../../components/settings/SiteAccessHelp';
+import { FEATURES } from '../../lib/config/constants';
 import { t } from '../../lib/i18n';
 import { injectTabMessage, type InjectResult } from '../../lib/site-access/messages';
 import { useSiteAccess } from '../../lib/site-access/use-site-access';
+import { accountApi } from '../../lib/ui-client/account-api';
 import { api } from '../../lib/ui-client/api';
+import { useAccountStatus } from '../../lib/ui-client/use-account-status';
 import {
   openExtensionPage,
   openSettingsAt,
@@ -41,6 +45,62 @@ function openSection(section: Parameters<typeof openSettingsAt>[0]) {
 function openSetup() {
   openExtensionPage('/onboarding.html');
   window.close();
+}
+
+/** Popup account row (design 7.7): who is signed in, or the way to sign in. Only where accounts are on. */
+function AccountRow() {
+  const status = useAccountStatus();
+  const [busy, setBusy] = useState(false);
+  const [failed, setFailed] = useState(false);
+  const data = status.state.status === 'ready' ? status.state.data : null;
+  if (data === null) return null;
+
+  async function signIn() {
+    setBusy(true);
+    setFailed(false);
+    const result = await accountApi.signIn();
+    setBusy(false);
+    // Cancelling is not a failure.
+    setFailed(!result.ok && result.error.code !== 'CANCELLED');
+    status.refresh();
+  }
+
+  async function syncNow() {
+    setBusy(true);
+    await accountApi.syncNow();
+    setBusy(false);
+    status.refresh();
+  }
+
+  return (
+    <section
+      className="clavis-popup__account"
+      aria-label={t('popupAccountLabel')}
+      data-testid="popup-account"
+    >
+      {data.signedIn ? (
+        <>
+          <p data-testid="popup-account-email">
+            {t('accountSignedInAs', data.email ?? data.displayName ?? '')}
+          </p>
+          <p>{syncLine(data.sync)}</p>
+          <Button disabled={busy || data.sync.state === 'syncing'} onClick={() => void syncNow()}>
+            {t('popupAccountSyncNow')}
+          </Button>
+        </>
+      ) : (
+        <>
+          <Button disabled={busy} onClick={() => void signIn()} data-testid="popup-account-sign-in">
+            {busy ? t('accountSigningIn') : t('popupAccountSignIn')}
+          </Button>
+          <p className="clavis-popup__hint">{t('accountMergeNotice')}</p>
+          {failed ? (
+            <LiveStatus message={t('errSignInFailed')} tone="warning" role="alert" />
+          ) : null}
+        </>
+      )}
+    </section>
+  );
 }
 
 type InjectState = 'idle' | 'busy' | 'no-selection' | 'restricted' | 'no-access' | 'failed';
@@ -219,6 +279,8 @@ export function App() {
             </div>
           </details>
         ) : null}
+
+        {FEATURES.accountSync ? <AccountRow /> : null}
 
         <div className="clavis-actions" data-testid="popup-library">
           <Button onClick={() => openLibrary()}>{t('popupSavedWords')}</Button>

@@ -25,6 +25,11 @@ const MESSAGES: Record<ErrorCode, string> = {
   INTERNAL_ERROR: 'Something went wrong inside Clavis.',
   NOT_FOUND: 'That saved word no longer exists.',
   LIMIT_EXCEEDED: 'A limit on saved data has been reached.',
+  CANCELLED: 'Sign-in was cancelled.',
+  OAUTH_FAILED: 'Google sign-in did not complete.',
+  NOT_CONFIGURED: 'Sign-in is not set up in this build.',
+  EMAIL_NOT_VERIFIED: 'Google has not verified this email address.',
+  NOT_SIGNED_IN: 'Sign in to sync.',
 };
 
 /** Why an `INVALID_RESPONSE` happened. Diagnostic only; carries no model output. */

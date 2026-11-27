@@ -39,7 +39,20 @@ export default defineConfig({
     // 'sidePanel' (FR-042, Phase 8): the side panel for long explanations. It is opened per tab by
     // `chrome.sidePanel.setOptions({ tabId, path }) + open()` after a click on "Open in side
     // panel"; the manifest has no `side_panel.default_path` (see the build:manifestGenerated hook).
-    permissions: ['storage', 'tts', 'scripting', 'activeTab', 'contextMenus', 'sidePanel'],
+    // 'identity' and 'alarms' (Clavis Sync, design 7.1): Google sign-in through
+    // launchWebAuthFlow, and the periodic pull and retry backoff while the worker sleeps. Neither
+    // shows an install warning. No new host_permissions: the background reaches the sync API
+    // through the server's CORS allowlist.
+    permissions: [
+      'storage',
+      'tts',
+      'scripting',
+      'activeTab',
+      'contextMenus',
+      'sidePanel',
+      'identity',
+      'alarms',
+    ],
     host_permissions: ['https://api.groq.com/*'],
     // Requested at onboarding from a user gesture (D-02); never at install.
     optional_host_permissions: ['http://*/*', 'https://*/*'],
@@ -63,7 +76,9 @@ export default defineConfig({
     },
   },
   // Test builds only: CLAVIS_FORCE_FEATURES=1 builds with every Should-priority flag on
-  // (FEATURES.grammarTab, still off in the shipped build, and FEATURES.translateTab, which ships on),
+  // (FEATURES.grammarTab and FEATURES.accountSync, still off in the shipped build, and
+  // FEATURES.translateTab, which ships on), and lets the WXT_CLAVIS_API_ORIGIN / _GOOGLE_AUTH_URL /
+  // _GOOGLE_LOGIN_HINT overrides point at a local API and a fake Google,
   // so the Grammar tab can be exercised end to end WITHOUT editing lib/config/constants.ts. The
   // shipped flags stay the literals in that file (flip them there).
   vite: () => ({
@@ -80,7 +95,14 @@ export default defineConfig({
                 // and scripts/audit-zip.mjs refuses the ZIP of such a build.
                 // Translate ships on, so only Grammar needs forcing; Translate is forced as well so
                 // the build stays "every flag on" if its shipped literal is ever flipped back.
+                const marked = (flag: string, value: string) =>
+                  `${flag}: ((globalThis as Record<string, unknown>)['${FORCED_FEATURES_MARKER}'] = ${value})`;
                 return code
+                  .replace('accountSync: false', marked('accountSync', 'true'))
+                  .replace(
+                    'ENDPOINT_OVERRIDES: boolean = false',
+                    `ENDPOINT_OVERRIDES: boolean = ((globalThis as Record<string, unknown>)['${FORCED_FEATURES_MARKER}'] = true)`,
+                  )
                   .replace(
                     'grammarTab: false',
                     `grammarTab: ((globalThis as Record<string, unknown>)['${FORCED_FEATURES_MARKER}'] = true)`,

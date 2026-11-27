@@ -2,7 +2,7 @@ import type { MiddlewareHandler } from 'hono';
 import { ApiException } from './errors';
 
 const ALLOW_METHODS = 'GET, POST, PUT, DELETE, OPTIONS';
-const ALLOW_HEADERS = 'Authorization, Content-Type, Idempotency-Key';
+const ALLOW_HEADERS = 'Authorization, Content-Type, Idempotency-Key, X-Clavis-Title';
 
 /**
  * CORS for Bearer routes (design §2.6). Allowed origins are exactly `chrome-extension://<allowed id>`.

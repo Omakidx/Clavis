@@ -14,6 +14,38 @@ npm run dev --prefix server                              # tsx watch on :8787
 Postgres is published on host port **5433** because 5432 is commonly occupied by another local Postgres. The compose
 credentials are development-only (see `docker-compose.dev.yml`). MinIO bucket: `clavis-dev`.
 
+## Local end-to-end without Google
+
+`scripts/fake-google.mjs` is a fake Google OAuth/OIDC server (no UI, in-memory RS256 key). The API is pointed at it with
+dev/test-only overrides: `GOOGLE_AUTH_URL`, `GOOGLE_TOKEN_URL`, `GOOGLE_JWKS_URL`, `GOOGLE_ISSUER` (defaults: Google's
+real endpoints). **Config refuses all four when `NODE_ENV=production` or when `PUBLIC_ORIGIN` is https on a host other than localhost/127.0.0.1.**
+
+- `GET /authorize` immediately 302s to `redirect_uri?code=..&state=..`. Pick the test identity with `login_hint=<email>`
+  (or `email=`), optional `name=`; default `e2e-user-a@example.test`. The `sub` is derived from the email, so two emails
+  are two users. The extension adds `login_hint` to the authorize URL it opens; the dashboard flow can be driven by
+  appending it to the URL from `/auth/google/start`.
+- `POST /token` checks grant, single-use code, `redirect_uri`, `client_id` and the PKCE S256 verifier, then returns an ID
+  token (iss/aud/sub/email/email_verified/name/nonce/auth_time). `GET /jwks` serves the public key.
+- Port `FAKE_GOOGLE_PORT` (default 8788), host `FAKE_GOOGLE_HOST` (127.0.0.1).
+
+One command (fresh throwaway database `clavis_e2e_<rand>` on the dev Postgres, migrated; fake Google + API; Ctrl-C stops
+both and drops the database):
+
+```sh
+docker compose -f docker-compose.dev.yml up -d postgres
+npm run e2e:up        # API http://localhost:8787, fake Google http://127.0.0.1:8788
+```
+
+Env for `e2e:up` (all optional): `E2E_ADMIN_DATABASE_URL`, `E2E_API_PORT`, `FAKE_GOOGLE_PORT`, `E2E_EXTENSION_IDS`
+(default the dev extension ID `ebfpdncfkebjagolnbmfdhikaipiflbl`), `E2E_KEEP_DB=1`.
+
+Or run them separately with a persistent database: `cp env.e2e.example .env`, apply migrations
+(`npm run build && DATABASE_URL=... npm run db:migrate`), then `npm run fake-google` and `npm run dev`.
+
+CORS: `chrome-extension://<id>` for every ID in `ALLOWED_EXTENSION_IDS` may call all `/v1/*` Bearer routes
+(methods GET/POST/PUT/DELETE; headers `Authorization`, `Content-Type`, `Idempotency-Key`, `X-Clavis-Title`).
+`/v1/session` and `/v1/account/export` are cookie-only and have no CORS.
+
 ## Scripts
 
 `npm run ci` = typecheck, lint, test, build. `npm run build` bundles `dist/index.js` and `dist/migrate.js` (esbuild).

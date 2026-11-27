@@ -131,6 +131,34 @@ export const FEATURES = {
   accountSync: false,
 } as const;
 
+/**
+ * Clavis Sync endpoints (docs/clavis-sync-design.md 7.1). The store build contains exactly these
+ * two hosts. Overrides (a local API and a fake Google on localhost) exist only where
+ * `ENDPOINT_OVERRIDES` is true (CLAVIS_FORCE_FEATURES test builds, which audit-zip refuses to
+ * package) or in a `wxt` dev-server build (`import.meta.env.DEV`, read in lib/account/config.ts). In every other build the override env vars are ignored.
+ */
+export const CLAVIS_API_ORIGIN_DEFAULT = 'https://clavis-api-production.up.railway.app';
+export const GOOGLE_AUTHORIZE_URL = 'https://accounts.google.com/o/oauth2/v2/auth';
+export const ENDPOINT_OVERRIDES: boolean = false;
+
+/** Sync engine timing (design 4.7). */
+export const SYNC = {
+  /** Push waits this long after the first SYNC_KICK so edits (reading progress) coalesce. */
+  pushDebounceMs: 5_000,
+  /** Periodic pull while signed in. */
+  alarmPeriodMinutes: 30,
+  /** Backoff after a failed run: 1, 2, 4 ... 60 minutes. */
+  backoffBaseMs: 60_000,
+  backoffMaxMs: 3_600_000,
+  /** Final push at sign-out may take this long. */
+  signOutPushBudgetMs: 10_000,
+  /** A page-open pull (SYNC_KICK {pull}) is skipped if the last pull was this recent. */
+  pullKickMinGapMs: 15_000,
+  alarmName: 'clavis-sync',
+  retryAlarmName: 'clavis-sync-retry',
+  lockName: 'clavis-sync',
+} as const;
+
 /** Feature flag per explain mode that is not part of the Must set (see `FEATURES`). */
 export const MODE_FEATURE_FLAGS = {
   grammar: 'grammarTab',

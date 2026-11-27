@@ -9,6 +9,7 @@ import {
 } from '../../../lib/router/handlers/ai';
 import { createCardHandlers } from '../../../lib/router/handlers/card';
 import { createChatHandlers } from '../../../lib/router/handlers/chat';
+import { createAccountHandlers } from '../../../lib/router/handlers/account';
 import { createSyncHandlers } from '../../../lib/router/handlers/sync';
 import { createWordHandlers } from '../../../lib/router/handlers/words';
 import type { ChatProvider } from '../../../lib/router/handlers/chat';
@@ -137,6 +138,15 @@ export const SETTINGS_MESSAGES: Record<string, unknown> = {
   GET_VOICES: { v: 1, type: 'GET_VOICES' },
 };
 
+/** Account and sync routes (design 7.4). */
+export const ACCOUNT_MESSAGES: Record<string, unknown> = {
+  ACCOUNT_GET_STATUS: { v: 1, type: 'ACCOUNT_GET_STATUS' },
+  ACCOUNT_SIGN_IN: { v: 1, type: 'ACCOUNT_SIGN_IN' },
+  ACCOUNT_SIGN_OUT: { v: 1, type: 'ACCOUNT_SIGN_OUT', keepLocalCopy: false },
+  ACCOUNT_SIGN_OUT_EVERYWHERE: { v: 1, type: 'ACCOUNT_SIGN_OUT_EVERYWHERE' },
+  SYNC_NOW: { v: 1, type: 'SYNC_NOW' },
+};
+
 export const PRIVILEGED_MESSAGES = { ...KEY_MESSAGES, ...SETTINGS_MESSAGES };
 
 // ---- the assembled background -----------------------------------------------
@@ -163,6 +173,12 @@ export interface HarnessOptions {
   now?: () => number;
   features?: AiHandlerDeps['features'];
   onModelContextChanged?: () => void;
+  /** Words and chat writers wake the sync engine through this. */
+  onLocalChange?: () => void;
+  /** CLEAR_ALL_DATA signs out first through this. */
+  signOutFirst?: () => Promise<void>;
+  signOutTimeoutMs?: number;
+  invalidateAccount?: () => void;
 }
 
 /** The real router, handlers, stores and guard over in-memory storage and a scripted provider. */
@@ -216,6 +232,13 @@ export function createHarness(options: HarnessOptions = {}) {
     siteAccess,
     guard,
     areas: [local, session],
+    ...(options.signOutFirst === undefined ? {} : { signOutFirst: options.signOutFirst }),
+    ...(options.signOutTimeoutMs === undefined
+      ? {}
+      : { signOutTimeoutMs: options.signOutTimeoutMs }),
+    ...(options.invalidateAccount === undefined
+      ? {}
+      : { invalidateAccount: options.invalidateAccount }),
     ...(options.onModelContextChanged === undefined
       ? {}
       : { onModelContextChanged: options.onModelContextChanged }),
@@ -252,7 +275,11 @@ export function createHarness(options: HarnessOptions = {}) {
       title?: string;
     }),
   );
-  const words = createWordHandlers({ tabs: { get: tabsGet }, now });
+  const words = createWordHandlers({
+    tabs: { get: tabsGet },
+    now,
+    ...(options.onLocalChange === undefined ? {} : { onLocalChange: options.onLocalChange }),
+  });
   const chatProvider = {
     chat: vi.fn<ChatProvider['chat']>(() =>
       Promise.resolve({ text: 'An answer.', model: MODELS[0]!.id }),
@@ -267,8 +294,27 @@ export function createHarness(options: HarnessOptions = {}) {
     lockedDown,
     now,
     nonce: 'feedface00000000',
+    ...(options.onLocalChange === undefined ? {} : { onLocalChange: options.onLocalChange }),
   });
   const sync = createSyncHandlers();
+  const accountService = {
+    signIn: vi.fn(() => Promise.resolve({ ok: true as const })),
+    signOut: vi.fn((_keep: boolean) => Promise.resolve({ ok: true as const, unsyncedDropped: 0 })),
+    signOutEverywhere: vi.fn(() => Promise.resolve({ ok: true as const })),
+    getStatus: vi.fn(() =>
+      Promise.resolve({
+        enabled: true,
+        signedIn: false,
+        sync: { state: 'idle' as const, pending: 0, rejected: 0 },
+      }),
+    ),
+  };
+  const syncEngine = { syncNow: vi.fn(() => Promise.resolve({ status: 'ok' as const })) };
+  const account = createAccountHandlers({
+    account: accountService,
+    engine: syncEngine,
+    enabled: true,
+  });
 
   const routes: Route[] = buildRoutes({
     ai,
@@ -282,6 +328,7 @@ export function createHarness(options: HarnessOptions = {}) {
     words,
     chat,
     sync,
+    account,
   });
   const listener = createMessageListener({
     identity: { runtimeId: RUNTIME_ID, extensionOrigin: ORIGIN },
@@ -312,6 +359,8 @@ export function createHarness(options: HarnessOptions = {}) {
   return {
     local,
     session,
+    accountService,
+    syncEngine,
     state,
     settingsStore,
     keyStore,

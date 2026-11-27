@@ -1,4 +1,5 @@
-import { useRef, useState, type KeyboardEvent } from 'react';
+import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
+import { kickSync } from '../../lib/data/kick';
 import { t } from '../../lib/i18n';
 import { Page } from '../common/Page';
 import { Documents } from './Documents';
@@ -21,6 +22,11 @@ export function tabFromHash(hash: string): Tab {
 export function Library() {
   const [tab, setTab] = useState<Tab>(() => tabFromHash(window.location.hash));
   const buttons = useRef(new Map<Tab, HTMLButtonElement>());
+
+  // Opening the library pulls other devices' changes (design 4.7); a no-op signed out.
+  useEffect(() => {
+    void kickSync(true);
+  }, []);
 
   const onKeyDown = (event: KeyboardEvent): void => {
     const index = TABS.indexOf(tab);
