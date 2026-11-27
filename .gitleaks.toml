@@ -58,3 +58,19 @@ targetRules = ["generic-api-key"]
 condition = "AND"
 paths = ['''(^|/)wxt\.config\.ts$''']
 regexes = ['''MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA[A-Za-z0-9+/=]+''']
+
+# server/env.e2e.example holds the e2e stack's fake signing secrets. Both are base64 of text that
+# says "FAKE … not a real secret"; production secrets live only in Railway variables.
+[[allowlists]]
+description = "Fake e2e signing secrets in the example env file"
+targetRules = ["generic-api-key"]
+condition = "AND"
+paths = ['''(^|/)server/env\.e2e\.example$''']
+regexes = ['''Y2xhdmlzLWUyZS1GQUtFLX[A-Za-z0-9+/=]+''']
+
+# Earlier commits of tests/unit/sync/s09-groq-key.test.ts used this made-up key before it was
+# renamed to the gsk_TEST form; it stays in git history.
+[[allowlists]]
+description = "Made-up Groq key in the S-09 test's history"
+targetRules = ["groq-api-key", "generic-api-key"]
+regexes = ['''gsk_S09abcdefghijklmnopqrstuvwxyz0123456789ABCD''']

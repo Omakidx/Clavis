@@ -8,7 +8,7 @@ import { FP, createClient, createClock } from './client';
 // S-09 (docs/decisions/clavis-sync-decisions.md): the Groq key is never synced or sent to the
 // Clavis server. The serialized push is built only from the shared strict schemas.
 
-const KEY = 'gsk_S09abcdefghijklmnopqrstuvwxyz0123456789ABCD';
+const KEY = 'gsk_TESTs09abcdefghijklmnopqrstuvwxyz0123456789';
 const UUID = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
 
 describe('S-09: the Groq key never reaches the Clavis API', () => {
