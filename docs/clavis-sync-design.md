@@ -115,7 +115,7 @@ New normative rules (add to architecture §9 as rules 10–14):
    - Upsert the user and create a `web_sessions` row.
    - Set `__Host-clavis_session=<32 random bytes>` with `HttpOnly; Secure; SameSite=Lax; Path=/`. The row stores only the SHA-256 hash.
    - Clear the oauth cookie and **302 to the fixed path `/`**. There is no `returnTo` parameter, so there is no open redirect.
-3. Session lifetime: 7 days idle (sliding `last_seen_at`) and 30 days absolute. `authenticated_at` records the time of the last Google login, for re-auth (§8.4).
+3. Session lifetime: 7 days idle (sliding `last_seen_at`) and 30 days absolute. `authenticated_at` records the time of the last forced Google sign-in (`?reauth=1`, bound to Google's `auth_time`; epoch 0 after an ordinary sign-in), for re-auth (§8.4).
 4. CSRF:
    - (a) `SameSite=Lax`.
    - (b) Every cookie-authenticated non-GET request must carry an `Origin` header exactly equal to `PUBLIC_ORIGIN`.
@@ -184,7 +184,7 @@ CREATE TABLE web_sessions (
   csrf_token        text NOT NULL,                          -- random, not a credential on its own
   created_at        timestamptz NOT NULL DEFAULT now(),
   last_seen_at      timestamptz NOT NULL DEFAULT now(),
-  authenticated_at  timestamptz NOT NULL,                   -- last Google login (re-auth window)
+  authenticated_at  timestamptz NOT NULL,                   -- last forced Google sign-in (re-auth window); epoch 0 otherwise
   expires_at        timestamptz NOT NULL,                   -- absolute 30 d
   revoked_at        timestamptz
 );
@@ -627,7 +627,7 @@ Pagination is keyset: `?cursor=<opaque base64url of (sortKey,id)>&limit=1..100 (
 | GET `/v1/account` | B\|C | — | `{ user: User, usage: { storageUsedBytes, storageQuotaBytes, words, documents } }` | 120/min/user |
 | POST `/v1/account/logout-all` | B\|C | — | 204 (revokes all families + web sessions, including the caller) | 5/hour/user |
 | GET `/v1/account/export` | C | — | 200 `application/zip`, `Content-Disposition: attachment; filename="clavis-export-YYYY-MM-DD.zip"` (§8.5) | 3/day/user |
-| DELETE `/v1/account` | C + re-auth ≤ 10 min | `{ confirm: 'DELETE' }` | 204, clears cookie | 3/hour/user |
+| DELETE `/v1/account` | C + forced same-account re-auth ≤ 10 min (§8.4) | `{ confirm: 'DELETE' }` | 204, clears cookie | 3/hour/user |
 | POST `/v1/sync/push` | B | `PushRequest`, header `Idempotency-Key: uuid` (required) | `PushResponse` | 60/min/user |
 | GET `/v1/sync/pull` | B | `?cursor=Seq&limit=1..1000` | `PullResponse` | 120/min/user |
 | GET `/v1/words` | B\|C | `?q=Text(100)&cursor&limit` | `{ items: WordSummary[], nextCursor }`, newest first | 120/min/user |
@@ -757,6 +757,8 @@ There are no network calls in the reader (R2).
 5. After the controller computes `documentId`, the reader checks that it equals `fp` and otherwise shows an error.
 
 Bytes are never persisted beyond the handoff, so architecture §9 "PDF bytes: do not store automatically" still holds. Stale handoff entries older than 10 min are deleted at SW startup.
+
+**Trust model of the `fileHandoff` store** (normative text: [architecture.md §9](architecture.md#filehandoff-trust-model)). Bytes move between the reader page and the background through an extension-origin IndexedDB store, so they never travel in a message and no page ever holds a token. Entries are direction-tagged (`upload` or `download`): a consumer takes only its own direction, and a write never replaces an entry of the other direction. The consumer deletes the entry as it reads it, the background drops an upload entry on every outcome including failure, and entries older than 10 minutes are swept at service-worker start and before each document transfer (`lib/data/handoff.ts`, `lib/router/handlers/documents.ts`). Tokens never leave the background, and the server re-verifies size, magic bytes and SHA-256 whatever the page placed in the store.
 
 ---
 
@@ -895,7 +897,7 @@ All model and user text is rendered as React text nodes. There is no `dangerousl
 
 ### 8.4 Re-authentication
 
-`DELETE /v1/account` (and export, optionally) requires `now - authenticated_at ≤ 10 min`, otherwise `403 REAUTH_REQUIRED`. The dashboard then navigates to `/auth/google/start?reauth=1`, which forces a Google login.
+`DELETE /v1/account` requires a **forced** Google sign-in (`/auth/google/start?reauth=1`) to the **same Google account** within the last 10 minutes: `authenticated_at` is updated only by such a forced sign-in (an ordinary sign-in does not count), and a sign-in to a different Google account is refused. Otherwise the response is `403 REAUTH_REQUIRED` and the dashboard navigates to `/auth/google/start?reauth=1`. Export does not require re-authentication. It is limited to one at a time per user and 3 per day, a request from another site is refused, and only a stalled download is cancelled (no fixed overall time limit). A completed re-authentication redirects to `/?reauth=done`. Starting one without a signed-in session fails with `/?signin=failed&reason=reauth_session`, and a different Google account fails with `reason=reauth_mismatch`; in both cases no session or user changes. Ordinary sign-ins store `authenticated_at` as epoch 0, so `GET /v1/session` reports `authenticatedAt: 0` until a forced sign-in. The export's JSON phase has a 5-minute limit and the whole stream a 60-second stall limit.
 
 ### 8.5 Export (S-10) and retention
 
@@ -1127,5 +1129,5 @@ Owns:
 1. ~~Production domain~~ **Resolved 2026-11-26:** `https://clavis-api-production.up.railway.app` (Railway subdomain). Moving to a custom domain later requires an extension release, an audit allowlist change and a new OAuth redirect URI.
 2. **Sign-out default:** remove synced data from the device (designed), or keep a copy by default?
 3. **Dashboard PDF upload** in v1? Designed: no; uploads happen only from the reader.
-4. **Backup retention** on Railway Postgres, which bounds how long deleted data can persist and must be stated in the privacy policy.
+4. **Backup retention** on Railway Postgres, which bounds how long deleted data can persist and must be stated in the privacy policy. **Researched 2026-11-27, owner confirmation still needed.** Railway's volume backup documentation ([docs.railway.com/volumes/backups](https://docs.railway.com/volumes/backups); the PostgreSQL page, [docs.railway.com/databases/postgresql](https://docs.railway.com/databases/postgresql), points to it) gives three schedules with fixed retention: daily (every 24 hours, kept 6 days), weekly (every 7 days, kept 27 days) and monthly (every 30 days, kept 89 days), so the longest a backup can be kept is 89 days. The documentation does not say that backups are on by default: they are enabled per volume by choosing schedules in the service settings. It also says "Wiping a volume deletes all backups" but does not say what happens to backups when a service is deleted. The owner must confirm which schedules are enabled on the production Postgres volume (none enabled would mean no backups). Railway Bucket (PDF) backup or versioning is not documented on that page. The privacy policy carries the figures as a bound, with the placeholder `[[OWNER: confirm Railway backup retention]]` until confirmed. Log retention, for the same policy: 7 days on Hobby, 30 days on Pro ([docs.railway.com/observability/logs](https://docs.railway.com/observability/logs)); the plan of this project is for the owner to confirm.
 5. **Saved-word scope:** words and phrases only, ≤ 200 characters (designed). Should sentences be savable?

@@ -69,13 +69,24 @@ export async function releaseStoredBytes(
 export async function enqueueObjectDeletion(
   tx: Executor,
   target: { key: string } | { prefix: string },
+  /** Do not attempt before now() + this many minutes (default: immediately). */
+  delayMinutes = 0,
 ): Promise<void> {
   if ('key' in target) {
-    await tx.execute(sql`INSERT INTO object_deletions (object_key) VALUES (${target.key})`);
+    await tx.execute(
+      sql`INSERT INTO object_deletions (object_key, next_attempt_at)
+          VALUES (${target.key}, now() + make_interval(mins => ${delayMinutes}))`,
+    );
   } else {
-    await tx.execute(sql`INSERT INTO object_deletions (object_prefix) VALUES (${target.prefix})`);
+    await tx.execute(
+      sql`INSERT INTO object_deletions (object_prefix, next_attempt_at)
+          VALUES (${target.prefix}, now() + make_interval(mins => ${delayMinutes}))`,
+    );
   }
 }
+
+/** Upload reservations live 15 minutes (§6.2); the second prefix sweep runs after that plus a margin. */
+export const DELAYED_PREFIX_SWEEP_MINUTES = 20;
 
 export async function findUsersWithExpiredUploads(db: Database, limit = 100): Promise<string[]> {
   const r = await db.execute<{ user_id: string }>(sql`
@@ -102,7 +113,12 @@ export async function expireUserUploads(db: Database, userId: string): Promise<n
 
 export async function deleteAccount(db: Database, userId: string): Promise<boolean> {
   return db.transaction(async (tx) => {
+    // Same lock as every other write transaction: an upload commit either finishes first or sees the user gone.
+    if ((await lockUserForSeq(tx, userId)) === null) return false;
     await enqueueObjectDeletion(tx, { prefix: `u/${userId}/` });
+    // A crash-interrupted upload can write its object after the first sweep and never reach commit/fail (which
+    // would queue the key itself): sweep the prefix once more after the upload TTL.
+    await enqueueObjectDeletion(tx, { prefix: `u/${userId}/` }, DELAYED_PREFIX_SWEEP_MINUTES);
     const r = await tx.execute(sql`DELETE FROM users WHERE id = ${userId}`);
     return (r.rowCount ?? 0) === 1;
   });

@@ -22,11 +22,18 @@ const OauthCookie = z.object({
   v: z.string().min(43),
   /** Set by `?reauth=1`: the callback then requires a fresh Google `auth_time`. */
   r: z.boolean().optional(),
+  /** Re-auth only: the user whose session started it. The callback requires the same account. */
+  u: z.string().min(1).optional(),
   /** Expiry, epoch ms: the cookie Max-Age is advisory for a hostile client, this is authoritative. */
   exp: z.number(),
 });
 
 const FAILED = '/?signin=failed';
+/** Fixed failure destinations the dashboard can tell apart (constants: no user input ever reaches a redirect). */
+const REAUTH_MISMATCH = '/?signin=failed&reason=reauth_mismatch';
+const REAUTH_NO_SESSION = '/?signin=failed&reason=reauth_session';
+/** Completed re-auth: the dashboard resumes the interrupted action only on this path. */
+const REAUTH_DONE = '/?reauth=done';
 const REAUTH_MAX_AGE_MS = 10 * 60_000;
 const CLOCK_SKEW_MS = 60_000;
 
@@ -42,42 +49,60 @@ export function webRoutes(rt: AuthRuntime): Hono<AppEnv> {
     sameSite: 'Lax' as const,
   };
 
-  app.get('/auth/google/start', ipRateLimit(rt.limiter, 'web-start', perMinute(20), trust), (c) => {
-    const q = parseOrThrow(AuthStartQuery, c.req.query());
-    const state = randomToken(16);
-    const nonce = randomToken(16);
-    const codeVerifier = randomToken(32);
-    setCookie(
-      c,
-      rt.cookies.oauth,
-      seal(rt.config.stateCookieSecret, {
-        s: state,
-        n: nonce,
-        v: codeVerifier,
-        r: q.reauth === '1',
-        exp: rt.now() + OAUTH_COOKIE_MAX_AGE_S * 1000,
-      }),
-      { ...cookieOpts, maxAge: OAUTH_COOKIE_MAX_AGE_S },
-    );
-    const url = rt.google.authUrl({
-      redirectUri,
-      state,
-      nonce,
-      codeVerifier,
-      reauth: q.reauth === '1',
-    });
-    return c.redirect(url, 302);
-  });
+  app.get(
+    '/auth/google/start',
+    ipRateLimit(rt.limiter, 'web-start', perMinute(20), trust),
+    async (c) => {
+      const q = parseOrThrow(AuthStartQuery, c.req.query());
+      // Re-auth confirms the account that is already signed in, so it needs that session. This is a browser
+      // navigation: without one we redirect (fixed path) instead of answering JSON.
+      let reauthUser: { id: string; email: string } | undefined;
+      if (q.reauth === '1') {
+        const token = getCookie(c, rt.cookies.session);
+        const session = token ? await rt.store.getWebSession(token, new Date(rt.now())) : undefined;
+        if (!session) {
+          c.set('errorCode', 'REAUTH_NO_SESSION');
+          return c.redirect(REAUTH_NO_SESSION, 302);
+        }
+        reauthUser = { id: session.user.id, email: session.user.email };
+      }
+      const state = randomToken(16);
+      const nonce = randomToken(16);
+      const codeVerifier = randomToken(32);
+      setCookie(
+        c,
+        rt.cookies.oauth,
+        seal(rt.config.stateCookieSecret, {
+          s: state,
+          n: nonce,
+          v: codeVerifier,
+          r: q.reauth === '1',
+          ...(reauthUser ? { u: reauthUser.id } : {}),
+          exp: rt.now() + OAUTH_COOKIE_MAX_AGE_S * 1000,
+        }),
+        { ...cookieOpts, maxAge: OAUTH_COOKIE_MAX_AGE_S },
+      );
+      const url = rt.google.authUrl({
+        redirectUri,
+        state,
+        nonce,
+        codeVerifier,
+        reauth: q.reauth === '1',
+        ...(reauthUser ? { loginHint: reauthUser.email } : {}),
+      });
+      return c.redirect(url, 302);
+    },
+  );
 
   app.get(
     '/auth/google/callback',
     ipRateLimit(rt.limiter, 'web-callback', perMinute(20), trust),
     async (c) => {
-      const failed = (reason: string) => {
+      const failed = (reason: string, to = FAILED) => {
         c.set('errorCode', `SIGNIN_${reason.toUpperCase()}`); // access log only; the browser sees a fixed redirect
         deleteCookie(c, rt.cookies.oauth, { path: '/', secure: rt.https });
         // Fixed destination: there is no user-supplied redirect target anywhere (no open redirect).
-        return c.redirect(FAILED, 302);
+        return c.redirect(to, 302);
       };
       const q = AuthCallbackQuery.safeParse(c.req.query());
       if (!q.success || q.data.error || !q.data.code || !q.data.state) return failed('denied');
@@ -95,7 +120,9 @@ export function webRoutes(rt: AuthRuntime): Hono<AppEnv> {
         const idToken = await rt.google.exchangeCode(q.data.code, o.v, redirectUri);
         const identity = await rt.google.verifyIdToken(idToken, o.n);
         const now = new Date(rt.now());
-        let authenticatedAt = now;
+        // Ordinary logins never count as a recent re-authentication (epoch 0); only `?reauth=1` sets it.
+        let authenticatedAt = new Date(0);
+        const old = getCookie(c, rt.cookies.session);
         if (o.r) {
           // Re-auth must be a login Google performed just now (§8.4): bind authenticated_at to its `auth_time`.
           const authMs = identity.authTime === undefined ? NaN : identity.authTime * 1000;
@@ -107,15 +134,19 @@ export function webRoutes(rt: AuthRuntime): Hono<AppEnv> {
             return failed('reauth_stale');
           }
           authenticatedAt = new Date(Math.min(authMs, now.getTime()));
+          // The Google identity must be the account that is signed in (still, and the one that started this).
+          const current = old ? await rt.store.getWebSession(old, now) : undefined;
+          if (!o.u || current?.user.id !== o.u || current.user.googleSub !== identity.sub) {
+            return failed('reauth_mismatch', REAUTH_MISMATCH);
+          }
         }
         const user = await rt.store.upsertGoogleUser(identity, now);
         // Rotate the session on every login: an old cookie must not survive a new Google login.
-        const old = getCookie(c, rt.cookies.session);
         if (old) await rt.store.revokeWebSessionByToken(old, now);
         const session = await rt.store.createWebSession(user.id, now, authenticatedAt);
         deleteCookie(c, rt.cookies.oauth, { path: '/', secure: rt.https });
         setCookie(c, rt.cookies.session, session.token, { ...cookieOpts, maxAge: session.maxAgeS });
-        return c.redirect('/', 302);
+        return c.redirect(o.r ? REAUTH_DONE : '/', 302);
       } catch (err) {
         if (err instanceof GoogleAuthError) return failed(err.kind);
         if (err instanceof GoogleUnavailableError) return failed('unavailable');

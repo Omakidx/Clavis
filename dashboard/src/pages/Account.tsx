@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react';
 import type { AccountResponse } from '@shared/api-contract/endpoints';
 import { describeFailure, isAbort } from '../api/client';
-import { api } from '../api/endpoints';
+import { api, EXPORT_URL } from '../api/endpoints';
+import { clearReauthMarker, needsReauth, type ResumeState } from '../api/reauth';
 import { useSession } from '../api/session';
 import { formatBytes, formatCount } from '../format';
 import { ConfirmDialog } from '../ui/modal';
+import { DeleteAccountDialog } from './DeleteAccountDialog';
 import { ErrorState, Loading, usePage } from '../ui/page';
 
 type Load =
@@ -19,11 +21,23 @@ export function Account() {
 
 function AccountLoaded({ onRetry }: { onRetry(): void }) {
   const heading = usePage('Account');
-  const { clear } = useSession();
+  const { state, clear } = useSession();
+  // Set by the landing page after a Google re-authentication round trip (see api/reauth.ts).
+  const [resume] = useState<ResumeState>(() => (window.history.state ?? {}) as ResumeState);
+  const authenticatedAt = state.status === 'signed-in' ? state.authenticatedAt : 0;
+  const [deleting, setDeleting] = useState(() => resume.reopenDelete === true);
+  const [reauth, setReauth] = useState(false);
   const [load, setLoad] = useState<Load>({ status: 'loading' });
   const [confirmAll, setConfirmAll] = useState(false);
   const [busy, setBusy] = useState<'logout' | 'logout-all' | null>(null);
   const [error, setError] = useState<unknown>(null);
+
+  useEffect(() => {
+    // The resume hint is single-use: a reload or a later visit must not reopen the dialog.
+    if (resume.reopenDelete || resume.reauthFailed) window.history.replaceState(null, '');
+    // Arriving without a resume: a leftover marker must not reopen the dialog later.
+    if (!resume.reopenDelete) clearReauthMarker();
+  }, [resume]);
 
   useEffect(() => {
     const ctl = new AbortController();
@@ -102,6 +116,14 @@ function AccountLoaded({ onRetry }: { onRetry(): void }) {
         </>
       ) : null}
 
+      {resume.reauthFailed ? (
+        <p className="notice notice--danger" role="alert">
+          {resume.reauthMismatch
+            ? `You signed in to Google with a different account. Sign in again with ${state.status === 'signed-in' ? state.user.email : 'the account you are signed in to Clavis with'} to delete this account.`
+            : 'Sign-in did not complete. Try again.'}
+        </p>
+      ) : null}
+
       <h2>Sign out</h2>
       {error && !confirmAll ? (
         <p className="notice notice--danger" role="alert">
@@ -136,16 +158,37 @@ function AccountLoaded({ onRetry }: { onRetry(): void }) {
 
       <h2>Your data</h2>
       <div className="actions">
-        <button type="button" className="btn btn--quiet" disabled aria-describedby="soon-note">
+        <a className="btn btn--quiet" href={EXPORT_URL} download aria-describedby="export-note">
           Export data
-        </button>
-        <button type="button" className="btn btn--quiet" disabled aria-describedby="soon-note">
+        </a>
+        <button
+          type="button"
+          className="btn btn--quiet"
+          onClick={() => {
+            setReauth(needsReauth(authenticatedAt));
+            setDeleting(true);
+          }}
+        >
           Delete account
         </button>
       </div>
-      <p className="muted" id="soon-note">
-        Exporting your data and deleting your account from the web are coming soon.
+      <p className="muted" id="export-note">
+        The export is a ZIP file with your saved words and their chats, your documents with reading
+        progress and highlights, and your stored PDFs. You can export up to 3 times a day. If a
+        download fails, you may have used today's 3 exports or another export may still be running.
+        Try again later.
       </p>
+
+      {deleting ? (
+        <DeleteAccountDialog
+          reauth={reauth}
+          onReauthRequired={() => setReauth(true)}
+          onCancel={() => {
+            clearReauthMarker();
+            setDeleting(false);
+          }}
+        />
+      ) : null}
 
       {confirmAll ? (
         <ConfirmDialog

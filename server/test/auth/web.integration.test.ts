@@ -60,11 +60,16 @@ describe.skipIf(!adminUrl)('dashboard auth (real Postgres, mocked Google)', () =
 
     it('reauth=1 forces a Google login; other values are rejected', async () => {
       const h = await mk();
+      const me = who();
+      const login = await webLogin(h, me);
       const q = new URL(
-        (await h.app.request('/auth/google/start?reauth=1')).headers.get('location') as string,
+        (
+          await h.app.request('/auth/google/start?reauth=1', { headers: { cookie: login.cookie } })
+        ).headers.get('location') as string,
       ).searchParams;
       expect(q.get('prompt')).toBe('login');
       expect(q.get('max_age')).toBe('0');
+      expect(q.get('login_hint')).toBe(me.email);
       for (const bad of ['?reauth=2', '?reauth=', '?returnTo=https://evil.test']) {
         const r = await h.app.request(`/auth/google/start${bad}`);
         expect(r.status, bad).toBe(400);
@@ -110,7 +115,8 @@ describe.skipIf(!adminUrl)('dashboard auth (real Postgres, mocked Google)', () =
       expect(sess.status).toBe(200);
       const body = SessionResponse.parse(await sess.json());
       expect(body.csrfToken).toBe(w.csrf);
-      expect(body.authenticatedAt).toBe(h.clock.now());
+      // An ordinary login is never a recent re-authentication.
+      expect(body.authenticatedAt).toBe(0);
       expect(body.user.email).toMatch(/@example\.test$/);
       expect(sess.headers.get('cache-control')).toBe('no-store');
     });

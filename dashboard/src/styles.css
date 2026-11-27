@@ -268,7 +268,8 @@ label {
   font-weight: 600;
   margin-bottom: var(--space-1);
 }
-input[type='search'] {
+input[type='search'],
+input[type='text'] {
   width: 100%;
   min-height: var(--target);
   padding: 0 var(--space-3);

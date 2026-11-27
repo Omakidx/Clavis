@@ -134,7 +134,7 @@ export function createApp({
   if (runtime && db?.db) {
     app.route('/v1/auth/extension', extensionRoutes(runtime));
     app.route('/', webRoutes(runtime));
-    app.route('/', accountRoutes(runtime));
+    app.route('/', accountRoutes(runtime, db.db, logger, storage));
     app.route('/', syncRoutes(runtime, db.db, logger, storage));
     app.route('/', wordRoutes(runtime, db.db));
     app.route('/', documentRoutes(runtime, db.db, logger, storage));

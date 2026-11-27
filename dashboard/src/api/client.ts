@@ -86,6 +86,8 @@ interface Options<S extends z.ZodType | undefined> {
   /** Zod schema of the 2xx JSON body. Omit for 204 responses. */
   schema?: S;
   query?: Record<string, string | undefined>;
+  /** JSON request body (sent with Content-Type: application/json). */
+  body?: unknown;
   signal?: AbortSignal;
   /** Do not treat 401 as "session gone" (used for the session probe itself). */
   quiet401?: boolean;
@@ -111,8 +113,10 @@ async function send(
   method: Method,
   url: string,
   signal: AbortSignal | undefined,
+  body?: unknown,
 ): Promise<Response> {
   const headers: Record<string, string> = { Accept: 'application/json' };
+  if (body !== undefined) headers['Content-Type'] = 'application/json';
   if (method !== 'GET' && csrfToken) headers['X-CSRF-Token'] = csrfToken;
   try {
     return await fetch(url, {
@@ -121,6 +125,7 @@ async function send(
       credentials: 'same-origin',
       cache: 'no-store',
       referrerPolicy: 'no-referrer',
+      ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
       ...(signal ? { signal } : {}),
     });
   } catch (e) {
@@ -132,7 +137,7 @@ async function send(
 /**
  * Same-origin JSON request. Parses 2xx bodies with the shared zod schema and turns every other outcome
  * into an `ApiFailure`. Non-GET requests carry the CSRF token; a 403 CSRF_FAILED re-reads the session once.
- * These calls never send a body, so no Content-Type is set (the server only requires JSON when there is one).
+ * A Content-Type is set only when a JSON `body` is given (the server only requires JSON when there is one).
  */
 export async function request<S extends z.ZodType | undefined = undefined>(
   path: string,
@@ -144,7 +149,7 @@ export async function request<S extends z.ZodType | undefined = undefined>(
     if (v !== undefined && v !== '') qs.set(k, v);
   const url = qs.size ? `${path}?${qs.toString()}` : path;
 
-  let res = await send(method, url, opts.signal);
+  let res = await send(method, url, opts.signal, opts.body);
   if (res.status === 403 && method !== 'GET' && refreshCsrf) {
     const body: unknown = await res
       .clone()
@@ -153,7 +158,7 @@ export async function request<S extends z.ZodType | undefined = undefined>(
     const parsed = ApiError.safeParse(body);
     if (parsed.success && parsed.data.error.code === 'CSRF_FAILED') {
       csrfToken = await refreshCsrf();
-      if (csrfToken) res = await send(method, url, opts.signal);
+      if (csrfToken) res = await send(method, url, opts.signal, opts.body);
     }
   }
 

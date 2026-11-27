@@ -96,3 +96,34 @@ export async function deleteQueuedKeys(
     clearTimeout(timer);
   }
 }
+
+/** Inline attempt for an account's prefix job, with the same deadline semantics as `deleteQueuedKeys`. */
+export async function deleteQueuedPrefix(
+  db: Database,
+  storage: ObjectStorage | undefined,
+  logger: Logger,
+  prefix: string,
+  deadlineMs = INLINE_DEADLINE_MS,
+): Promise<void> {
+  if (!storage) return;
+  const run = async () => {
+    try {
+      const rows = await db.execute<DeletionRow>(sql`
+        SELECT id::text AS id, object_key, object_prefix, attempts FROM object_deletions
+        WHERE object_prefix = ${prefix} AND next_attempt_at <= now()`);
+      for (const row of rows.rows) await attempt(db, storage, logger, row);
+    } catch (err) {
+      logger.warn({ name: (err as Error).name }, 'inline prefix deletion skipped');
+    }
+  };
+  let timer: NodeJS.Timeout | undefined;
+  const deadline = new Promise<void>((resolve) => {
+    timer = setTimeout(resolve, deadlineMs);
+    timer.unref();
+  });
+  try {
+    await Promise.race([run(), deadline]);
+  } finally {
+    clearTimeout(timer);
+  }
+}

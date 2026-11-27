@@ -40,7 +40,7 @@ describe.skipIf(!adminUrl)('auth hardening (real Postgres, mocked Google)', () =
         cookie: first.cookie,
         authTimeOffsetS: -300,
       });
-      expect(re.res.headers.get('location')).toBe('/');
+      expect(re.res.headers.get('location')).toBe('/?reauth=done');
       expect(await authAt(re.cookie, h)).toBe(h.clock.now() - 300_000);
     });
 
@@ -63,33 +63,52 @@ describe.skipIf(!adminUrl)('auth hardening (real Postgres, mocked Google)', () =
     it('a reauth token without auth_time, or one from the future, is rejected', async () => {
       const h = await mk();
       const w = who();
-      const none = await webLogin(h, w, { reauth: true, authTimeOffsetS: null });
+      const first = await webLogin(h, w);
+      const none = await webLogin(h, w, {
+        reauth: true,
+        cookie: first.cookie,
+        authTimeOffsetS: null,
+      });
       expect(none.res.headers.get('location')).toBe('/?signin=failed');
-      const future = await webLogin(h, w, { reauth: true, authTimeOffsetS: 600 });
+      const future = await webLogin(h, w, {
+        reauth: true,
+        cookie: first.cookie,
+        authTimeOffsetS: 600,
+      });
       expect(future.res.headers.get('location')).toBe('/?signin=failed');
     });
 
     it('auth_time is just inside the 10 minute window at 10m, outside at 12m', async () => {
       const h = await mk();
       const w = who();
-      expect(
-        (await webLogin(h, w, { reauth: true, authTimeOffsetS: -600 })).res.headers.get('location'),
-      ).toBe('/');
-      expect(
-        (await webLogin(h, w, { reauth: true, authTimeOffsetS: -720 })).res.headers.get('location'),
-      ).toBe('/?signin=failed');
+      const first = await webLogin(h, w);
+      const stale = await webLogin(h, w, {
+        reauth: true,
+        cookie: first.cookie,
+        authTimeOffsetS: -720,
+      });
+      expect(stale.res.headers.get('location')).toBe('/?signin=failed');
+      const ok = await webLogin(h, w, {
+        reauth: true,
+        cookie: first.cookie,
+        authTimeOffsetS: -600,
+      });
+      expect(ok.res.headers.get('location')).toBe('/?reauth=done');
     });
 
     it('a normal (non-reauth) login does not require auth_time', async () => {
       const h = await mk();
       const w = await webLogin(h, who());
       expect(w.res.headers.get('location')).toBe('/');
-      expect(await authAt(w.cookie, h)).toBe(h.clock.now());
+      expect(await authAt(w.cookie, h)).toBe(0); // not a re-auth
     });
 
     it('the reauth flag lives in the sealed cookie: a reauth cookie cannot be downgraded by the client', async () => {
       const h = await mk();
-      const start = await h.app.request('/auth/google/start?reauth=1');
+      const first = await webLogin(h, who());
+      const start = await h.app.request('/auth/google/start?reauth=1', {
+        headers: { cookie: first.cookie },
+      });
       const loc = new URL(start.headers.get('location') as string);
       const code = h.google.issueCode({
         nonce: loc.searchParams.get('nonce') as string,
@@ -101,7 +120,7 @@ describe.skipIf(!adminUrl)('auth hardening (real Postgres, mocked Google)', () =
         `/auth/google/callback?code=${code}&state=${loc.searchParams.get('state')}&reauth=0`,
         {
           headers: {
-            cookie: `__Host-clavis_oauth=${cookiesOf(start)['__Host-clavis_oauth']?.value}`,
+            cookie: `__Host-clavis_oauth=${cookiesOf(start)['__Host-clavis_oauth']?.value}; ${first.cookie}`,
           },
         },
       );

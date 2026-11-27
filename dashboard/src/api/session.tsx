@@ -14,15 +14,15 @@ import { api } from './endpoints';
 export type SessionState =
   | { status: 'loading' }
   | { status: 'error'; failure: ApiFailure }
-  | { status: 'signed-out'; ended: boolean }
-  | { status: 'signed-in'; user: User };
+  | { status: 'signed-out'; ended: boolean; deleted: boolean }
+  | { status: 'signed-in'; user: User; authenticatedAt: number };
 
 interface SessionApi {
   state: SessionState;
   /** Re-run the session probe (after a network error). */
   retry(): void;
-  /** Forget the session locally (after Sign out); `ended` shows the "session ended" notice. */
-  clear(ended: boolean): void;
+  /** Forget the session locally (after Sign out); `ended` shows the "session ended" notice, `deleted` the account-deleted one. */
+  clear(ended: boolean, deleted?: boolean): void;
 }
 
 const Ctx = createContext<SessionApi | null>(null);
@@ -31,9 +31,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<SessionState>({ status: 'loading' });
   const [attempt, setAttempt] = useState(0);
 
-  const clear = useCallback((ended: boolean) => {
+  const clear = useCallback((ended: boolean, deleted = false) => {
     setCsrfToken(null);
-    setState({ status: 'signed-out', ended });
+    setState({ status: 'signed-out', ended, deleted });
   }, []);
 
   useEffect(() => {
@@ -57,12 +57,12 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       .session(ctl.signal)
       .then((s) => {
         setCsrfToken(s.csrfToken);
-        setState({ status: 'signed-in', user: s.user });
+        setState({ status: 'signed-in', user: s.user, authenticatedAt: s.authenticatedAt });
       })
       .catch((e: unknown) => {
         if (isAbort(e)) return;
         if (e instanceof ApiFailure && e.kind === 'unauthenticated') {
-          setState({ status: 'signed-out', ended: false });
+          setState({ status: 'signed-out', ended: false, deleted: false });
         } else {
           setState({
             status: 'error',

@@ -40,9 +40,13 @@ export const api = {
     request(`/v1/documents/${encodeURIComponent(fp)}`, { method: 'DELETE' }),
   deleteDocumentFile: (fp: string) =>
     request(`/v1/documents/${encodeURIComponent(fp)}/file`, { method: 'DELETE' }),
+  deleteAccount: () => request('/v1/account', { method: 'DELETE', body: { confirm: 'DELETE' } }),
   logout: () => request('/auth/logout', { method: 'POST' }),
   logoutAll: () => request('/v1/account/logout-all', { method: 'POST' }),
 };
+
+/** Plain download link: the ZIP streams straight to disk (no fetch/blob). */
+export const EXPORT_URL = '/v1/account/export';
 
 export const fileUrl = (fingerprint: string): string =>
   `/v1/documents/${encodeURIComponent(fingerprint)}/file`;

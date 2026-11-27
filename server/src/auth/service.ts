@@ -37,8 +37,14 @@ export function mapGoogleError(err: unknown): never {
   throw err;
 }
 
+/** Access tokens live 15 minutes; remember a deleted account for longer than that. */
+const DELETED_USER_TTL_MS = 20 * 60_000;
+const MAX_DELETED_USERS = 10_000;
+
 export class AuthService {
   private readonly families: FamilyCache;
+  /** Accounts deleted by this process: their access tokens must fail even if a family verdict is cached. */
+  private readonly deletedUsers = new Map<string, number>();
 
   constructor(private readonly d: AuthServiceDeps) {
     this.families = new FamilyCache(d.now);
@@ -98,6 +104,22 @@ export class AuthService {
     for (const f of families) this.families.evict(f);
   }
 
+  /** Family ids of a user, to be passed to `accountDeleted` once the deletion has committed. */
+  familyIdsForUser(userId: string): Promise<string[]> {
+    return this.d.store.familyIdsForUser(userId);
+  }
+
+  /** Call after the account's deletion committed: stop accepting its access tokens immediately (single replica). */
+  accountDeleted(userId: string, familyIds: readonly string[]): void {
+    for (const f of familyIds) this.families.evict(f);
+    const now = this.d.now();
+    if (this.deletedUsers.size >= MAX_DELETED_USERS) {
+      for (const [id, until] of this.deletedUsers) if (until <= now) this.deletedUsers.delete(id);
+      if (this.deletedUsers.size >= MAX_DELETED_USERS) this.deletedUsers.clear();
+    }
+    this.deletedUsers.set(userId, now + DELETED_USER_TTL_MS);
+  }
+
   /** Verify a Bearer access token and that its family is not revoked (cached <= 30 s). */
   async authenticateBearer(token: string): Promise<{ userId: string; familyId: string }> {
     const v = await this.d.tokens.verify(token);
@@ -105,13 +127,25 @@ export class AuthService {
       if (v.reason === 'expired') throw new ApiException('TOKEN_EXPIRED', 'Access token expired');
       throw new ApiException('UNAUTHENTICATED', 'Invalid access token');
     }
+    const deletedUntil = this.deletedUsers.get(v.claims.userId);
+    if (deletedUntil !== undefined) {
+      if (deletedUntil > this.d.now())
+        throw new ApiException('UNAUTHENTICATED', 'Account no longer exists');
+      this.deletedUsers.delete(v.claims.userId);
+    }
     let active = this.families.get(v.claims.familyId);
     if (active === undefined) {
       const gen = this.families.begin();
       active = await this.d.store.isFamilyActive(v.claims.familyId);
       this.families.set(v.claims.familyId, active, gen);
     }
-    if (!active) throw new ApiException('SESSION_REVOKED', 'Session was revoked');
+    if (!active) {
+      // A deleted account has no families left: report it as signed out, not as a revoked session.
+      if (!(await this.d.store.userExists(v.claims.userId))) {
+        throw new ApiException('UNAUTHENTICATED', 'Account no longer exists');
+      }
+      throw new ApiException('SESSION_REVOKED', 'Session was revoked');
+    }
     return v.claims;
   }
 }

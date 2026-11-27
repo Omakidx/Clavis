@@ -54,6 +54,8 @@ export interface AuthUrlParams {
   nonce: string;
   codeVerifier: string;
   reauth?: boolean;
+  /** Pre-selects the account on a re-auth login (a hint only: the callback verifies the identity). */
+  loginHint?: string;
 }
 
 const TokenResponse = z.looseObject({ id_token: z.string().min(1) });
@@ -108,6 +110,7 @@ export class GoogleClient {
     if (p.reauth) {
       q.set('prompt', 'login');
       q.set('max_age', '0');
+      if (p.loginHint) q.set('login_hint', p.loginHint);
     } else {
       q.set('prompt', 'select_account');
     }

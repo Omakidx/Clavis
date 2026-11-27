@@ -1,4 +1,11 @@
+import { useEffect, useState } from 'react';
 import { Redirect } from 'wouter';
+import {
+  clearReauthMarker,
+  hasReauthMarker,
+  readReauthOutcome,
+  type ResumeState,
+} from '../api/reauth';
 import { useSession } from '../api/session';
 import { PRIVACY_URL } from '../config';
 import { ErrorState, Loading, usePage } from '../ui/page';
@@ -8,8 +15,34 @@ export function Landing() {
   const heading = usePage('Clavis', state.status !== 'loading');
   const failed = new URLSearchParams(window.location.search).get('signin') === 'failed';
 
+  // A re-auth for account deletion was started in this tab: the OAuth callback always lands here.
+  // Resume only when the callback says so (`reauth=done`/a failure) AND this tab left the marker: a stale
+  // marker with a plain load of `/` must not reopen anything.
+  const [{ outcome, marker }] = useState(() => ({
+    outcome: readReauthOutcome(window.location.search),
+    marker: hasReauthMarker(),
+  }));
+  const settled = state.status !== 'loading';
+  useEffect(() => {
+    if (!settled) return;
+    clearReauthMarker();
+    if (new URLSearchParams(window.location.search).get('reauth') !== null)
+      window.history.replaceState(window.history.state, '', '/');
+  }, [settled]);
+
   if (state.status === 'loading') return <Loading label="Loading…" />;
-  if (state.status === 'signed-in') return <Redirect to="/words" replace />;
+  if (state.status === 'signed-in') {
+    if (marker && outcome) {
+      const resume: ResumeState =
+        outcome === 'done'
+          ? { reopenDelete: true }
+          : outcome === 'mismatch'
+            ? { reauthFailed: true, reauthMismatch: true }
+            : { reauthFailed: true };
+      return <Redirect to="/account" replace state={resume} />;
+    }
+    return <Redirect to="/words" replace />;
+  }
 
   return (
     <section className="hero" aria-labelledby="hero-title">
@@ -22,12 +55,17 @@ export function Landing() {
         between devices, and shows them here.
       </p>
       {state.status === 'error' ? <ErrorState failure={state.failure} onRetry={retry} /> : null}
-      {state.status === 'signed-out' && state.ended ? (
+      {state.status === 'signed-out' && state.deleted ? (
+        <p className="notice notice--info" role="status">
+          Your Clavis account was deleted.
+        </p>
+      ) : null}
+      {state.status === 'signed-out' && (state.ended || outcome === 'session') ? (
         <p className="notice notice--info" role="status">
           Your session has ended. Sign in again to continue.
         </p>
       ) : null}
-      {failed ? (
+      {failed && outcome !== 'session' ? (
         <p className="notice notice--danger" role="alert">
           Sign-in did not complete. Try again.
         </p>

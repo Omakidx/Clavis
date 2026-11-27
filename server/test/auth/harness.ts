@@ -288,7 +288,10 @@ export async function webLogin(
   who: { sub?: string; email?: string; email_verified?: boolean } = {},
   opts: { reauth?: boolean; cookie?: string; authTimeOffsetS?: number | null } = {},
 ): Promise<WebLogin> {
-  const start = await h.app.request(`/auth/google/start${opts.reauth ? '?reauth=1' : ''}`);
+  // A re-auth start needs the signed-in session's cookie.
+  const start = await h.app.request(`/auth/google/start${opts.reauth ? '?reauth=1' : ''}`, {
+    headers: opts.cookie ? { cookie: opts.cookie } : {},
+  });
   const loc = new URL(start.headers.get('location') as string);
   const oauth = cookiesOf(start)['__Host-clavis_oauth']?.value as string;
   const code = h.google.issueCode({

@@ -94,9 +94,13 @@ The reader also offers:
 - Live word highlighting when the voice provides word timing. Otherwise the active passage stays highlighted. Resuming may replay the current word, or the current passage when word timing is unavailable.
 - **Highlights** to save a selected passage in yellow, green, blue, or pink. Open a saved mark to return to it, remove individual marks, or clear this document's highlights. On small screens, expand Highlights to see these controls.
 
-Highlights are stored only in this Chrome profile and reappear when you reopen the same PDF. They are separate from the original file and are not embedded in an exported PDF. Clavis stores the document's content hash and the marks' page positions and colors, rather than PDF text. **Settings → Privacy and data → Clear all data** removes these marks too. Storage holds up to 200 marks per PDF across 30 PDFs; remove marks from an older document if it is full.
+Highlights are stored only in this Chrome profile and reappear when you reopen the same PDF. They are separate from the original file and are not embedded in an exported PDF. Clavis stores the document's content hash and the marks' page positions and colors, rather than PDF text. **Settings → Privacy and data → Clear all data** removes these marks too. Storage holds up to 200 marks per PDF across 2,000 PDFs; remove marks from an older document if it is full.
 
 PDF reading order comes from the file's text layer. Complex columns or unusual layouts may not read in the intended order. Online voices send the spoken text to their voice service; local voices keep it on your device. Neither PDF narration nor color highlighting requires a Groq key.
+
+## Optional: sign in to sync (not yet available)
+
+Clavis Sync, an optional Google sign-in that keeps saved words, chats, highlights, reading progress and PDFs you choose to save in step across your devices and in a web dashboard, is built but switched off in current builds. When it is switched on you will find it under **Settings → Account & sync**. Clavis works the same without an account, and nothing is sent to the Clavis server unless you sign in. Running your own sync server is a developer task: see [server/README.md](../server/README.md) for the server's environment variables, and [clavis-sync-design.md](clavis-sync-design.md) for the design.
 
 ## Update an unpacked installation
 

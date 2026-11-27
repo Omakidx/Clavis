@@ -83,6 +83,20 @@ export class AuthStore {
     return row;
   }
 
+  async userExists(id: string): Promise<boolean> {
+    const [row] = await this.db.select({ id: users.id }).from(users).where(eq(users.id, id));
+    return row !== undefined;
+  }
+
+  /** Every refresh-token family of a user (for cache eviction before the account is deleted). */
+  async familyIdsForUser(userId: string): Promise<string[]> {
+    const rows = await this.db
+      .selectDistinct({ familyId: refreshTokens.familyId })
+      .from(refreshTokens)
+      .where(eq(refreshTokens.userId, userId));
+    return rows.map((r) => r.familyId);
+  }
+
   /** Start a new refresh-token family (180 d absolute, 30 d sliding). */
   async createFamily(userId: string, now: Date): Promise<IssuedRefresh> {
     const familyId = crypto.randomUUID();
@@ -237,7 +251,8 @@ export class AuthStore {
   async createWebSession(
     userId: string,
     now: Date,
-    authenticatedAt: Date = now,
+    /** Only a forced Google login (`?reauth=1`, bound to auth_time) passes a Date; ordinary logins store epoch 0. */
+    authenticatedAt: Date = new Date(0),
   ): Promise<{ token: string; csrfToken: string; maxAgeS: number }> {
     const token = randomToken(32);
     const csrfToken = randomToken(32);

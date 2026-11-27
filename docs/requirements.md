@@ -3,7 +3,7 @@
 **Status:** Implementation-ready specification (v1 baseline)  
 **Version:** 1.1-draft · **Last reviewed:** 2026-10-22  
 **Platform:** Google Chrome, Manifest V3, desktop first  
-**Product owner decisions:** Groq only for v1; user provides key; no mandatory accounts or first-party backend; custom PDF.js reader; native pronunciation for words **and** sentences. Further resolved decisions D-01 … D-25 are in [§11](#11-product-decisions).
+**Product owner decisions:** Groq only for v1; user provides key; no mandatory accounts (optional Google accounts and sync were added by Clavis Sync decisions S-01 … S-10, see [§11](#11-product-decisions)); custom PDF.js reader; native pronunciation for words **and** sentences. Further resolved decisions D-01 … D-25 are in [§11](#11-product-decisions).
 
 ## 1. Problem, audience and success criteria
 
@@ -47,8 +47,10 @@ A user with a valid Groq key can highlight selectable text in a supported webpag
 | **Must** | Onboarding, Groq BYOK, key validation, permissions disclosures, optional all-sites access with on-demand fallback, model availability handling, webpage selection, reliable popup, Listen for words/sentences where a voice exists, core explanation (context + definition + examples), roots / related words / simplify tabs, local PDF.js reader with virtualized pages, privacy controls, error handling, keyboard support, Chrome packaging |
 | **Should** | Grammar and translation tabs, quick copy, PDF find-in-document, voice/locale selection, accessible side panel for long answers |
 | **Could** | PDF thumbnails, offline lexical cache, dictionary recorded pronunciation and IPA, theme customization, smarter tone/reading-level control, explain-in-chunks for long selections |
-| **Later (post-v1, planned)** | Remote PDF URLs and "Open in Clavis" on PDF links (D-03), saved vocabulary/history with export (D-04), additional UI languages |
-| **Won't (v1)** | Automatic overlay in Chrome's native PDF viewer, globally intercept all PDFs, OCR/scanned-document recognition, authenticated/DRM PDF bypass, first-party accounts, billing, cloud sync, automatic whole-page or whole-PDF analysis, background surveillance, other AI providers |
+| **Later (post-v1, planned)** | Remote PDF URLs and "Open in Clavis" on PDF links (D-03), additional UI languages. *Saved vocabulary (D-04) was reversed and is part of Clavis Sync; see below* |
+| **Won't (v1)** | Automatic overlay in Chrome's native PDF viewer, globally intercept all PDFs, OCR/scanned-document recognition, authenticated/DRM PDF bypass, billing, automatic whole-page or whole-PDF analysis, background surveillance, other AI providers |
+
+**Clavis Sync (post-v1 scope, decisions S-01 … S-10 in [decisions/clavis-sync-decisions.md](decisions/clavis-sync-decisions.md); design in [clavis-sync-design.md](clavis-sync-design.md)).** The v1 "Won't" items **first-party accounts** and **cloud sync** are reversed, and so is the "Later" item saved vocabulary (D-04). Scope: optional Google sign-in (the only method); local saved words and per-word chat that work signed out; sync of saved words, chats, reading progress, highlights and, when the user chooses, PDFs (15 MB each, 100 MB per account) to a first-party server on Railway; a web dashboard (saved chats read-only); account export and deletion. Still excluded: billing, team features, passwords, any AI call from the server, and syncing the Groq key. The feature is implemented but off behind `FEATURES.accountSync` until release gates pass; until then every statement in this document about the shipped extension (including the approved disclosure copy in §4.1, "Clavis has no server of its own") stays true.
 
 ## 3. User journeys
 
@@ -219,7 +221,8 @@ This is the approved user-facing wording. Implementation may adjust layout and f
 | FR-076 | Must | Minimum necessary permissions with justification | Permission matrix matches actual manifest/behavior; removal test for unnecessary grants |
 | FR-077 | Must | All v1 features work in production ZIP, not dev server only | Fresh profile install and end-to-end smoke test successful |
 | FR-078 | Should | Reset preferences, clear all local data, open privacy settings | Data-deletion and reset results can be verified locally |
-| FR-079 | Later | Downloadable local vocabulary export (D-04) | Deferred with saved vocabulary |
+| FR-079 | Should (Clavis Sync) | Downloadable vocabulary export: a local JSON export of saved words and chats in the library for signed-out users, and a ZIP export of the whole account (JSON plus stored PDFs) on the dashboard Account page (S-10; one export at a time, 3 per day, requests from other sites refused, only stalled downloads are cancelled) | Export contains every live saved word with its chat, every document with highlights, and stored PDFs; tombstones are excluded; the ZIP round-trip test passes |
+| FR-080 | Should (Clavis Sync) | Delete the account and all its server data, from the dashboard Account page, after a forced Google sign-in, to the same Google account, within the last 10 minutes (an ordinary sign-in does not count and a different Google account is refused) (S-10) | After deletion every server table and the bucket prefix hold nothing for the account (deletion completeness test); device copies stay until signed out or cleared |
 
 ## 5. Nonfunctional requirements
 
@@ -230,7 +233,8 @@ This is the approved user-facing wording. Implementation may adjust layout and f
 - Avoid `eval`, remote JavaScript, unsafe HTML, unnecessary analytics SDKs and broad dynamic host permissions.
 - Inspect/sanitize content originating on webpages and Groq before display; treat page text as untrusted model context and never execute embedded instructions.
 - Use request IDs, payload size limits, message schema validation, and sender/origin checks where appropriate.
-- No persisted raw page/PDF excerpts without a separate, explicit user choice to save an item.
+- No persisted raw page/PDF excerpts without a separate, explicit user choice to save an item. Saving a word (with its bounded context and page address) is that explicit choice; with an account it is also sent to the Clavis server.
+- Clavis Sync: signed out, nothing is sent to the Clavis server. Signed in, only the data listed in [§6](#6-permission-and-data-inventory) is sent, from the background only; the Groq key is never synced (S-09); the server never calls an AI provider (S-05); server logs contain no PII.
 
 ### Performance, resilience and maintainability
 
@@ -266,6 +270,15 @@ This is the approved user-facing wording. Implementation may adjust layout and f
 | `tts` permission | Native speech output | Trusted extension speech adapter | No AI request |
 | `storage` permission | Settings, key | Trusted extension storage | No by itself |
 | `sidePanel` permission | Optional detailed display | Extension-owned side panel | No by itself |
+| `identity` permission (*Clavis Sync*) | Google sign-in through `chrome.identity.launchWebAuthFlow` | Background only | The Google authorization code goes to the Clavis server; no install warning |
+| `alarms` permission (*Clavis Sync*) | Periodic sync and retry backoff while the service worker sleeps | Background only | No by itself |
+| Clavis API origin `https://clavis-api-production.up.railway.app` (*Clavis Sync*, no host permission; CORS allowlist) | Sync, account, stored PDFs | Background only | **Only when signed in** |
+| Google account email, display name (*Clavis Sync*) | Identify the account, show who is signed in | Server (Postgres); email and name shown in the extension and dashboard | Yes, to the Clavis server, only when signed in |
+| Saved words: text, meaning, bounded context, source page URL (origin and path only) and title, or PDF title and page (*Clavis Sync*) | Saved vocabulary on every device | IndexedDB locally; Clavis server when signed in | Yes when signed in; none when signed out. A word saved from an incognito tab keeps no URL or title |
+| Per-word chat messages (*Clavis Sync*) | Keep follow-up questions with the word | IndexedDB locally; Clavis server when signed in | Yes when signed in. New messages are produced only by the extension, calling Groq with the user's own key |
+| PDF title, page count, reading position, highlight positions (page, text offsets, colour) (*Clavis Sync*) | Resume reading and restore marks | IndexedDB locally; Clavis server when signed in | Yes when signed in, for every PDF opened in the reader, whether or not uploaded |
+| PDF files the user chooses to save (*Clavis Sync*) | Open the same PDF on another device | Reader, then background; Railway Bucket | Yes, only on **Save to account** (15 MiB per file, 100 MiB per account) |
+| Session tokens (*Clavis Sync*) | Authenticate the sync API | Background only (`chrome.storage`, secret boundary rules R1–R5) | Sent only to the Clavis server |
 
 The exact permission list, and why each permission is needed, is maintained in [architecture.md §3](architecture.md#3-extension-entry-points-and-message-routes).
 
@@ -355,7 +368,7 @@ The team can test **Linux only** by hand. Other platforms get automated coverage
 | D-01 | Product name is **Clavis** | Replaces the working name "Context Reader" | All docs, manifest, listing |
 | D-02 | **Site access:** declare `http://*/*` and `https://*/*` as `optional_host_permissions`; request them in one onboarding step; on grant, register the content script at runtime with `chrome.scripting.registerContentScripts`. If declined, use `activeTab` + context menu / toolbar icon to inject into the current tab on demand | Automatic toolbar for users who want it, a clear prompt rather than an install-time warning, lighter store-review profile than mandatory broad access, and a working fallback for privacy-conscious users | FR-009, FR-010, FR-015, FR-018; architecture §3 |
 | D-03 | **Remote PDF URLs deferred** to post-v1 | Host permissions, CORS, redirects and SSRF controls add cost; local files cover the core need | FR-058; Phase 7 |
-| D-04 | **Saved vocabulary/history deferred** to post-v1 | Not needed to prove the core value; avoids storage, export and deletion UI in v1 | FR-019, FR-079 |
+| D-04 | **Saved vocabulary/history deferred** to post-v1. **Reversed 2026-11-26 by Clavis Sync (S-04, S-10):** saved words with meaning, context and source, per-word chat, and export are part of Clavis Sync (implemented, behind `FEATURES.accountSync`), local first and synced only when the user signs in | Not needed to prove the core value; avoids storage, export and deletion UI in v1. | FR-019, FR-079, FR-080; [clavis-sync-decisions.md](decisions/clavis-sync-decisions.md) |
 | D-05 | **Core + lazy tabs:** Explain makes one request returning contextual meaning, definition and 2 examples. Roots, Related words and Simplify (Must) and Grammar, Translate (Should) each make one request only when their tab is opened, cached in memory for that selection | Fewer requests on free-tier rate limits, faster first answer, fewer prompts to regression-test at launch | FR-030 … FR-038; architecture §4, §6 |
 | D-06 | **PDF reader uses PDF.js viewer components** (`pdfjs-dist/web/pdf_viewer`: `PDFViewer`, `EventBus`, `PDFLinkService`, `PDFFindController`) inside a React shell | Provides virtualization, aligned text layer, zoom and find out of the box; cuts Phase 7 effort substantially | FR-051 … FR-059; architecture §8 |
 | D-07 | **Voice: `chrome.tts` only; the offscreen Web Speech fallback is not adopted** (settled 2026-10-23) | User's check on branded Chrome 154 / Linux: Settings → Voice showed 19 Chrome voices and the same 19 fallback voices (all online), so the fallback adds nothing; dropping it removes the `offscreen` permission and code | FR-020 … FR-025; architecture §7 |
@@ -376,6 +389,7 @@ The team can test **Linux only** by hand. Other platforms get automated coverage
 | D-23 | **Keep PDF.js CMaps in the package** | About 1 MB of the 2.6 MB ZIP, but without them CJK PDFs that don't embed their fonts render incorrectly; the store ZIP stays under its 3.2 MB budget | wxt.config.ts asset hook; size budgets |
 | D-24 | **Side panel ships in v1 (FR-042); the cross-selection answer cache is deferred (FR-043 → Later)** (2026-10-23) | User's Phase 8 choice. The side panel gives long answers room and needs only `sidePanel`, which shows no install warning. A cache across selections would store selected text on disk (TTL, clearing UI, privacy-policy change) for a small saving; answers stay cached per selection in memory | FR-042, FR-043; architecture §3 |
 | D-25 | **Translate tab ships in v1 (FR-037); the Grammar tab stays off (FR-036 → Later)** (2026-10-23) | User's live Groq eval, 4 runs pooled ([p5-prompt-eval.md](decisions/p5-prompt-eval.md)): Translate 96/96 valid on gpt-oss-20b and -120b, correct contextual and literal renderings for French, Japanese and Arabic. Grammar 36/40 (90%) on the default gpt-oss-20b — three failures on injection fixtures (failing safe) but one on an ordinary sentence — below the ≥ 95% gate; -120b was 40/40. Revisit Grammar with a prompt/schema change or one retry on `json_validate_failed` | FR-036, FR-037; `FEATURES` in lib/config/constants.ts |
+| S-01 … S-10 | **Clavis Sync** product decisions (2026-11-26), including reversal of the v1 "Won't" items first-party accounts and cloud sync, and S-11 (production origin). Full text in [decisions/clavis-sync-decisions.md](decisions/clavis-sync-decisions.md) | Optional Google accounts, a first-party sync server and web dashboard | §2, §6; architecture ADRs A-015 … A-018 |
 | D-16 | **Disclosure copy approved** as written in [§4.1](#approved-disclosure-copy-fr-002-fr-009-fr-071) | Defines exactly what users see before anything is sent to Groq | Onboarding, first Explain, settings |
 
 ### Still open

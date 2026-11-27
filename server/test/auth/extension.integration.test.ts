@@ -478,7 +478,8 @@ describe.skipIf(!adminUrl)('extension auth (real Postgres, mocked Google)', () =
       const p = await extSignIn(h, who());
       await tdb.handle.pool.query('DELETE FROM users WHERE id = $1', [p.user.id]);
       h.clock.advance(31_000);
-      expect((await errOf(await account(h, p))).code).toBe('SESSION_REVOKED');
+      // A deleted account is signed out (UNAUTHENTICATED), not a revoked session.
+      expect((await errOf(await account(h, p))).code).toBe('UNAUTHENTICATED');
     });
   });
 

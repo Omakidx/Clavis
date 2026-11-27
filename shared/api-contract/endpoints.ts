@@ -123,7 +123,8 @@ export const AuthCallbackQuery = z.looseObject({
 export const SessionResponse = z.strictObject({
   user: User,
   csrfToken: z.string().min(1).max(256),
-  authenticatedAt: EpochMs,
+  /** Epoch ms of the last forced Google login (re-auth); 0 when the session never re-authenticated. */
+  authenticatedAt: z.union([z.literal(0), EpochMs]),
 });
 export type SessionResponse = z.infer<typeof SessionResponse>;
 
