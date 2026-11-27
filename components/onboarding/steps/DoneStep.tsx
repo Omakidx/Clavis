@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { FEATURES } from '../../../lib/config/constants';
 import { t } from '../../../lib/i18n';
 import { api } from '../../../lib/ui-client/api';
 import type { ClientError } from '../../../lib/ui-client/errors';
@@ -77,6 +78,17 @@ export function DoneStep({ settings, keys }: StepContext) {
             tone="success"
           />
           {error ? <ErrorNotice error={error} onRetry={() => void finish()} /> : null}
+          {FEATURES.accountSync ? (
+            <p data-testid="onboarding-sync-line">
+              {t('onbSyncLine')}{' '}
+              <Button
+                variant="link"
+                onClick={() => openExtensionPage('/options.html', 'section-account')}
+              >
+                {t('onbSyncLink')}
+              </Button>
+            </p>
+          ) : null}
           {snapshot.onboarding.completed ? (
             <div className="clavis-actions">
               <Button ref={settingsButton} onClick={openSettingsPage}>

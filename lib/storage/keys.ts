@@ -24,6 +24,21 @@ export const STORAGE_KEYS = {
    * and a browser restart clears the key and its metadata together.
    */
   keyMeta: 'clavis.key-meta',
+  /**
+   * Non-secret sync state (`{ accountId, cursor, ... }`), written by the sync engine while signed
+   * in (docs/clavis-sync-design.md 4.1). Local data writers only check that it names an account.
+   */
+  syncState: 'clavis.sync-state',
+  /**
+   * The refresh token and who it belongs to (SECRET). `chrome.storage.local`. Only the background
+   * modules under lib/account/ may reference this key (design 2.4 rule R1; tests/unit/account/
+   * token-boundary.test.ts).
+   */
+  accountSession: 'clavis.account-session',
+  /** The short-lived access token (SECRET). `chrome.storage.session`; same rule as above. */
+  accountAccess: 'clavis.account-access',
+  /** Why the device was signed out without the user asking (non-secret, shown once in Settings). */
+  accountNotice: 'clavis.account-notice',
 } as const;
 
 /** The two records that describe the stored key; always read, written and removed together. */

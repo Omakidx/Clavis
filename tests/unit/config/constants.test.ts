@@ -52,6 +52,7 @@ describe('config constants', () => {
       options: '/options.html',
       reader: '/reader.html',
       sidepanel: '/sidepanel.html',
+      library: '/library.html',
     });
     for (const route of Object.values(EXTENSION_PAGES)) {
       expect(route).toMatch(/^\/[a-z]+\.html$/);

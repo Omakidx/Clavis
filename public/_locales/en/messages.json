@@ -2270,5 +2270,801 @@
         "content": "$1"
       }
     }
+  },
+  "errNotFound": {
+    "message": "That saved word no longer exists.",
+    "description": "Error shown when a saved word that an action names was deleted in the meantime."
+  },
+  "errLimitExceeded": {
+    "message": "Clavis can't save more of this. A limit on saved words or chat messages is reached.",
+    "description": "Error shown when saving a word or sending a chat message would pass a limit (5,000 saved words, 200 chat messages per word)."
+  },
+  "cardSave": {
+    "message": "Save word",
+    "description": "Button in the explanation card and the side panel: save the selected word or phrase, with its meaning, to the library on this device."
+  },
+  "cardSaved": {
+    "message": "Saved",
+    "description": "Button label after the selected word or phrase was saved to the library. Pressing it removes the word again."
+  },
+  "cardSaveAnnounce": {
+    "message": "Saved to your library.",
+    "description": "Screen-reader announcement after a word or phrase was saved."
+  },
+  "cardUnsaveAnnounce": {
+    "message": "Removed from your saved words.",
+    "description": "Screen-reader announcement after a saved word or phrase was removed."
+  },
+  "cardSaveFailed": {
+    "message": "Couldn't save this word. Try again.",
+    "description": "Screen-reader announcement and message when saving a word failed."
+  },
+  "cardSaveLimit": {
+    "message": "Your library is full. Delete a saved word first.",
+    "description": "Message when saving a word failed because the limit of 5,000 saved words is reached."
+  },
+  "readerBackToStart": {
+    "message": "Back to start",
+    "description": "Button in the PDF reader that jumps back to the first page after the reader returned to where the user stopped."
+  },
+  "readerResumed": {
+    "message": "Continued where you stopped, on page $ARG1$.",
+    "description": "Shown in the PDF reader after it returned to the place where the user stopped reading. {1} is a page number.",
+    "placeholders": {
+      "ARG1": {
+        "content": "$1"
+      }
+    }
+  },
+  "readerResumedDismiss": {
+    "message": "Dismiss",
+    "description": "Button that hides the note saying the reader continued where the user stopped."
+  },
+  "readerContinueTitle": {
+    "message": "Continue reading",
+    "description": "Heading of the list of recently read PDFs in the reader's empty state."
+  },
+  "readerContinueItem": {
+    "message": "Page $ARG1$ of $ARG2$",
+    "description": "Progress shown for a PDF in the reader's list of recently read PDFs. {1} is the page where the user stopped and {2} the number of pages.",
+    "placeholders": {
+      "ARG1": {
+        "content": "$1"
+      },
+      "ARG2": {
+        "content": "$2"
+      }
+    }
+  },
+  "readerContinuePage": {
+    "message": "Page $ARG1$",
+    "description": "Progress shown for a recently read PDF whose page count is not known. {1} is the page where the user stopped.",
+    "placeholders": {
+      "ARG1": {
+        "content": "$1"
+      }
+    }
+  },
+  "readerContinueOpen": {
+    "message": "Open the file again",
+    "description": "Button next to a recently read PDF: opens the file picker. Choosing the same file returns to where the user stopped."
+  },
+  "readerContinueOpenLabel": {
+    "message": "Open $ARG1$ again",
+    "description": "Accessible name of the button that opens the file picker for a recently read PDF. {1} is the PDF's title.",
+    "placeholders": {
+      "ARG1": {
+        "content": "$1"
+      }
+    }
+  },
+  "readerContinueHint": {
+    "message": "Clavis keeps only where you stopped, never the PDF itself. Choose the same file to continue.",
+    "description": "Explains the list of recently read PDFs in the reader's empty state."
+  },
+  "libraryDocUntitled": {
+    "message": "Untitled PDF",
+    "description": "Name shown for a PDF whose title Clavis does not know yet."
+  },
+  "libraryTitle": {
+    "message": "Library",
+    "description": "Heading and tab title of the library page, which lists saved words and the PDFs the user has read."
+  },
+  "libraryTabsLabel": {
+    "message": "Library sections",
+    "description": "Accessible name of the tab list on the library page."
+  },
+  "libraryTabWords": {
+    "message": "Saved words",
+    "description": "Tab on the library page that lists the saved words. Also the popup button that opens it."
+  },
+  "libraryTabDocuments": {
+    "message": "Documents",
+    "description": "Tab on the library page that lists the PDFs the user has read."
+  },
+  "libraryLoading": {
+    "message": "Loading your library…",
+    "description": "Shown while the library page reads the saved data on this device."
+  },
+  "libraryLoadError": {
+    "message": "Clavis couldn't open the data saved on this device. Reload this page to try again.",
+    "description": "Error shown when the library page cannot read its IndexedDB data."
+  },
+  "libraryLocalNote": {
+    "message": "Everything here is stored on this device only.",
+    "description": "Note on the library page: saved words, chats and reading progress are stored locally."
+  },
+  "libraryWordsSearchLabel": {
+    "message": "Search saved words",
+    "description": "Accessible name and label of the search box on the saved words tab."
+  },
+  "libraryWordsListLabel": {
+    "message": "Saved words",
+    "description": "Accessible name of the list of saved words."
+  },
+  "libraryWordsCount": {
+    "message": "$ARG1$ saved",
+    "description": "Count of saved words shown above the list on the library page. {1} is a number.",
+    "placeholders": {
+      "ARG1": {
+        "content": "$1"
+      }
+    }
+  },
+  "libraryWordsEmptyTitle": {
+    "message": "No saved words yet",
+    "description": "Heading shown on the saved words tab when nothing is saved."
+  },
+  "libraryWordsEmptyBody": {
+    "message": "Select a word or phrase on a web page or in a PDF, press Explain, then choose Save word.",
+    "description": "Explains how to save a word, shown on the saved words tab when nothing is saved."
+  },
+  "libraryWordsNoMatch": {
+    "message": "No saved word matches \"$ARG1$\".",
+    "description": "Shown when the search on the saved words tab finds nothing. {1} is what the user typed.",
+    "placeholders": {
+      "ARG1": {
+        "content": "$1"
+      }
+    }
+  },
+  "libraryWordsSelect": {
+    "message": "Select a saved word to see its meaning and ask about it.",
+    "description": "Shown in the detail area of the saved words tab while no word is selected."
+  },
+  "libraryExport": {
+    "message": "Export as JSON",
+    "description": "Button on the saved words tab that saves the saved words and their chats to a JSON file."
+  },
+  "libraryExportDone": {
+    "message": "Exported $ARG1$ saved words and $ARG2$ chat messages.",
+    "description": "Announcement after the saved words were exported. {1} and {2} are numbers.",
+    "placeholders": {
+      "ARG1": {
+        "content": "$1"
+      },
+      "ARG2": {
+        "content": "$2"
+      }
+    }
+  },
+  "libraryExportFailed": {
+    "message": "Couldn't create the export file.",
+    "description": "Announcement when exporting the saved words failed."
+  },
+  "libraryMeaningTitle": {
+    "message": "Meaning",
+    "description": "Heading of the saved meaning of a word in the library."
+  },
+  "libraryInContext": {
+    "message": "In this context",
+    "description": "Label of the contextual meaning of a saved word."
+  },
+  "libraryDefinition": {
+    "message": "Definition",
+    "description": "Label of the definition of a saved word."
+  },
+  "libraryExamples": {
+    "message": "Examples",
+    "description": "Label of the example sentences of a saved word."
+  },
+  "libraryCaveat": {
+    "message": "Note",
+    "description": "Label of the model's uncertainty note of a saved word."
+  },
+  "libraryContextTitle": {
+    "message": "Where you read it",
+    "description": "Heading of the text around a saved word, as it was when the word was saved."
+  },
+  "librarySourceTitle": {
+    "message": "Source",
+    "description": "Heading of the place a word was saved from."
+  },
+  "librarySourceUnknown": {
+    "message": "Page address not available",
+    "description": "Shown as the source of a word saved from a web page whose address Clavis could not read."
+  },
+  "librarySourcePdf": {
+    "message": "$ARG1$, page $ARG2$",
+    "description": "Source of a word saved from a PDF. {1} is the PDF's title and {2} the page number.",
+    "placeholders": {
+      "ARG1": {
+        "content": "$1"
+      },
+      "ARG2": {
+        "content": "$2"
+      }
+    }
+  },
+  "librarySourcePdfPage": {
+    "message": "PDF, page $ARG1$",
+    "description": "Source of a word saved from a PDF whose title is not known. {1} is the page number.",
+    "placeholders": {
+      "ARG1": {
+        "content": "$1"
+      }
+    }
+  },
+  "librarySourceOpen": {
+    "message": "Open the page",
+    "description": "Button that asks to open the web page a word was saved from."
+  },
+  "librarySavedOn": {
+    "message": "Saved $ARG1$",
+    "description": "Date a word was saved. {1} is a date.",
+    "placeholders": {
+      "ARG1": {
+        "content": "$1"
+      }
+    }
+  },
+  "libraryModel": {
+    "message": "Meaning written by $ARG1$",
+    "description": "Names the model that wrote a saved meaning. {1} is a model name.",
+    "placeholders": {
+      "ARG1": {
+        "content": "$1"
+      }
+    }
+  },
+  "libraryDeleteWord": {
+    "message": "Delete word",
+    "description": "Button that deletes the selected saved word and its chat."
+  },
+  "libraryDeleteWordTitle": {
+    "message": "Delete \"$ARG1$\"?",
+    "description": "Heading of the confirmation before a saved word is deleted. {1} is the word.",
+    "placeholders": {
+      "ARG1": {
+        "content": "$1"
+      }
+    }
+  },
+  "libraryDeleteWordBody": {
+    "message": "This removes the saved word and its chat from this device. It can't be undone.",
+    "description": "Explains what deleting a saved word does."
+  },
+  "libraryDeleteConfirm": {
+    "message": "Delete",
+    "description": "Button that confirms a deletion in the library."
+  },
+  "libraryCancel": {
+    "message": "Cancel",
+    "description": "Button that dismisses a confirmation in the library without doing anything."
+  },
+  "libraryWordDeleted": {
+    "message": "Deleted \"$ARG1$\".",
+    "description": "Announcement after a saved word was deleted. {1} is the word.",
+    "placeholders": {
+      "ARG1": {
+        "content": "$1"
+      }
+    }
+  },
+  "libraryDeleteFailed": {
+    "message": "Couldn't delete this. Try again.",
+    "description": "Announcement when deleting a saved word or document failed."
+  },
+  "libraryChatTitle": {
+    "message": "Ask about this word",
+    "description": "Heading of the chat about a saved word."
+  },
+  "libraryChatIntro": {
+    "message": "Ask a follow-up question. Answers come from Groq, using your own key, and are saved with the word.",
+    "description": "Explains the chat about a saved word when it has no messages yet."
+  },
+  "libraryChatLog": {
+    "message": "Chat about $ARG1$",
+    "description": "Accessible name of the list of chat messages. {1} is the saved word.",
+    "placeholders": {
+      "ARG1": {
+        "content": "$1"
+      }
+    }
+  },
+  "libraryChatInputLabel": {
+    "message": "Your question",
+    "description": "Label of the text box where the user types a question about a saved word."
+  },
+  "libraryChatSend": {
+    "message": "Ask",
+    "description": "Button that sends the question about a saved word."
+  },
+  "libraryChatSending": {
+    "message": "Asking…",
+    "description": "Shown while the answer to a question about a saved word is on its way."
+  },
+  "libraryChatStop": {
+    "message": "Stop",
+    "description": "Button that cancels a question that is waiting for its answer."
+  },
+  "libraryChatYou": {
+    "message": "You",
+    "description": "Name above the user's own chat messages."
+  },
+  "libraryChatClavis": {
+    "message": "Clavis",
+    "description": "Name above the answers in the chat about a saved word."
+  },
+  "libraryChatFull": {
+    "message": "This chat has reached its limit of 200 messages. Delete the word to start a new one.",
+    "description": "Shown instead of the question box when a word's chat has 200 messages."
+  },
+  "libraryChatCancelled": {
+    "message": "Stopped. Nothing was saved.",
+    "description": "Announcement after the user stopped a question."
+  },
+  "libraryChatAnswered": {
+    "message": "Answer received.",
+    "description": "Screen-reader announcement when the answer to a question arrived."
+  },
+  "libraryChatDisclosureNote": {
+    "message": "Your question, the saved word and the text around it are sent to Groq, using your own key.",
+    "description": "Extra line shown with the one-time Groq disclosure before the first chat question."
+  },
+  "libraryChatDisclosureConfirm": {
+    "message": "Send to Groq",
+    "description": "Button that confirms the one-time Groq disclosure and sends the first chat question."
+  },
+  "libraryDocsListLabel": {
+    "message": "Documents",
+    "description": "Accessible name of the list of documents."
+  },
+  "libraryDocsCount": {
+    "message": "$ARG1$ documents",
+    "description": "Count of documents shown above the list on the library page. {1} is a number.",
+    "placeholders": {
+      "ARG1": {
+        "content": "$1"
+      }
+    }
+  },
+  "libraryDocsEmptyTitle": {
+    "message": "No documents yet",
+    "description": "Heading shown on the documents tab when no PDF has been read."
+  },
+  "libraryDocsEmptyBody": {
+    "message": "PDFs you open in the Clavis reader show up here, with the page where you stopped and your highlights.",
+    "description": "Explains what the documents tab lists, shown when it is empty."
+  },
+  "libraryDocsNote": {
+    "message": "Clavis keeps where you stopped and your highlights, never the PDF itself. Choose the same file in the reader to continue.",
+    "description": "Note on the documents tab."
+  },
+  "libraryDocProgress": {
+    "message": "Page $ARG1$ of $ARG2$",
+    "description": "Reading progress of a document. {1} is the page where the user stopped and {2} the number of pages.",
+    "placeholders": {
+      "ARG1": {
+        "content": "$1"
+      },
+      "ARG2": {
+        "content": "$2"
+      }
+    }
+  },
+  "libraryDocProgressPage": {
+    "message": "Page $ARG1$",
+    "description": "Reading progress of a document whose page count is not known. {1} is a page number.",
+    "placeholders": {
+      "ARG1": {
+        "content": "$1"
+      }
+    }
+  },
+  "libraryDocNoProgress": {
+    "message": "No reading progress yet",
+    "description": "Shown for a document that has highlights but no saved reading position."
+  },
+  "libraryDocHighlights": {
+    "message": "$ARG1$ highlights",
+    "description": "Number of highlights in a document. {1} is a number.",
+    "placeholders": {
+      "ARG1": {
+        "content": "$1"
+      }
+    }
+  },
+  "libraryDocLastRead": {
+    "message": "Last read $ARG1$",
+    "description": "When a document was last read. {1} is a date.",
+    "placeholders": {
+      "ARG1": {
+        "content": "$1"
+      }
+    }
+  },
+  "libraryDocOpen": {
+    "message": "Open the reader",
+    "description": "Button on the documents tab that opens the PDF reader, where the user chooses the file again."
+  },
+  "libraryDocOpenLabel": {
+    "message": "Open the reader to continue $ARG1$",
+    "description": "Accessible name of the button that opens the reader for a document. {1} is the document's title.",
+    "placeholders": {
+      "ARG1": {
+        "content": "$1"
+      }
+    }
+  },
+  "libraryDocDelete": {
+    "message": "Remove",
+    "description": "Button that removes a document's reading progress and highlights from the library."
+  },
+  "libraryDocDeleteLabel": {
+    "message": "Remove $ARG1$ from the library",
+    "description": "Accessible name of the button that removes a document. {1} is the document's title.",
+    "placeholders": {
+      "ARG1": {
+        "content": "$1"
+      }
+    }
+  },
+  "libraryDocDeleteTitle": {
+    "message": "Remove \"$ARG1$\" from the library?",
+    "description": "Heading of the confirmation before a document is removed. {1} is the document's title.",
+    "placeholders": {
+      "ARG1": {
+        "content": "$1"
+      }
+    }
+  },
+  "libraryDocDeleteBody": {
+    "message": "This forgets where you stopped and deletes its highlights from this device. The PDF file itself is not touched.",
+    "description": "Explains what removing a document does."
+  },
+  "libraryDocDeleted": {
+    "message": "Removed \"$ARG1$\".",
+    "description": "Announcement after a document was removed. {1} is the document's title.",
+    "placeholders": {
+      "ARG1": {
+        "content": "$1"
+      }
+    }
+  },
+  "popupSavedWords": {
+    "message": "Saved words",
+    "description": "Popup button that opens the library on its saved words tab."
+  },
+  "popupLibrary": {
+    "message": "Library",
+    "description": "Popup button that opens the library page, on its documents tab."
+  },
+  "cardSaveElsewhere": {
+    "message": "Saved from another page. Manage it in the Library.",
+    "description": "Message when saving a word from a web page was refused because the same word is already saved from another page or a PDF; that copy is managed in the Library."
+  },
+  "errSignInCancelled": {
+    "message": "Sign-in was cancelled. Nothing changed.",
+    "description": "Error shown when the user closed the Google sign-in window or refused."
+  },
+  "errSignInFailed": {
+    "message": "Google sign-in did not complete. Try again.",
+    "description": "Error shown when the Google sign-in exchange failed (bad answer, refused code)."
+  },
+  "errSignInNotConfigured": {
+    "message": "Sign-in is not set up in this version of Clavis.",
+    "description": "Error shown when this build has no Google client id, so sign-in cannot start."
+  },
+  "errEmailNotVerified": {
+    "message": "Google has not verified this email address, so it can't be used to sign in.",
+    "description": "Error shown when Google reports the account's email as unverified."
+  },
+  "errNotSignedIn": {
+    "message": "You are not signed in.",
+    "description": "Error shown when an account action needs a signed-in account and there is none."
+  },
+  "accountErrNetwork": {
+    "message": "Clavis can't reach the sync service. Check your internet connection and try again.",
+    "description": "Error shown in the Account and sync section when the Clavis sync service could not be reached."
+  },
+  "accountTitle": {
+    "message": "Account & sync",
+    "description": "Heading and navigation label of the Account and sync section in Settings."
+  },
+  "accountIntro": {
+    "message": "Sign in with Google to keep your saved words, highlights and reading progress in step on every device where you use Clavis. This is optional: Clavis works the same without an account.",
+    "description": "Intro of the Account and sync section when signed out."
+  },
+  "accountMergeNotice": {
+    "message": "Signing in adds this device's saved words, highlights and reading progress to your account. Your Groq API key is never synced or sent to Clavis.",
+    "description": "Consent notice shown next to the Sign in button (Settings and popup)."
+  },
+  "accountSignIn": {
+    "message": "Sign in with Google",
+    "description": "Button that starts Google sign-in."
+  },
+  "accountSigningIn": {
+    "message": "Waiting for Google...",
+    "description": "Button label and status while the Google sign-in window is open."
+  },
+  "accountSignedInAs": {
+    "message": "Signed in as $EMAIL$",
+    "description": "Line showing the signed-in account. $EMAIL$ is the email address.",
+    "placeholders": { "EMAIL": { "content": "$1" } }
+  },
+  "accountSyncNever": {
+    "message": "Not synced yet.",
+    "description": "Sync status before the first sync finished."
+  },
+  "accountSyncDone": {
+    "message": "Synced $TIME$.",
+    "description": "Sync status after a successful sync. $TIME$ is a localized date and time.",
+    "placeholders": { "TIME": { "content": "$1" } }
+  },
+  "accountSyncing": {
+    "message": "Syncing...",
+    "description": "Sync status while a sync is running."
+  },
+  "accountSyncError": {
+    "message": "Sync failed. Clavis will try again automatically.",
+    "description": "Sync status after a failed sync other than losing the connection."
+  },
+  "accountSyncOffline": {
+    "message": "Offline. Clavis will sync when the connection is back.",
+    "description": "Sync status when the sync service can't be reached."
+  },
+  "accountPending": {
+    "message": "$COUNT$ changes are not synced yet.",
+    "description": "Number of local changes waiting to be synced. $COUNT$ is a whole number.",
+    "placeholders": { "COUNT": { "content": "$1" } }
+  },
+  "accountRejected": {
+    "message": "$COUNT$ changes were refused by the server and stay on this device only.",
+    "description": "Number of changes the sync service refused. $COUNT$ is a whole number.",
+    "placeholders": { "COUNT": { "content": "$1" } }
+  },
+  "accountSyncNow": {
+    "message": "Sync now",
+    "description": "Button that starts a sync immediately."
+  },
+  "accountManageWeb": {
+    "message": "Manage account on the web",
+    "description": "Link to the web dashboard."
+  },
+  "accountSignOut": {
+    "message": "Sign out",
+    "description": "Button that opens the sign-out confirmation."
+  },
+  "accountSignOutEverywhere": {
+    "message": "Sign out everywhere",
+    "description": "Button that ends every session of the account on every device."
+  },
+  "accountSignOutTitle": {
+    "message": "Sign out of Clavis?",
+    "description": "Heading of the sign-out dialog."
+  },
+  "accountSignOutBody": {
+    "message": "Your account and its cloud copy stay as they are. By default the saved words, highlights and reading progress on this device are removed.",
+    "description": "Body of the sign-out dialog."
+  },
+  "accountKeepCopy": {
+    "message": "Keep a copy on this device",
+    "description": "Checkbox in the sign-out dialog; unchecked by default."
+  },
+  "accountKeepCopyHint": {
+    "message": "The copy stays on this device and is added to whichever account you sign in to next.",
+    "description": "Help text of the keep-a-copy checkbox."
+  },
+  "accountSignOutConfirm": {
+    "message": "Sign out",
+    "description": "Confirm button of the sign-out dialog."
+  },
+  "accountEverywhereTitle": {
+    "message": "Sign out everywhere?",
+    "description": "Heading of the dialog for signing out on all devices."
+  },
+  "accountEverywhereBody": {
+    "message": "This ends the Clavis session on every device, including this one. The data on this device is kept.",
+    "description": "Body of the dialog for signing out on all devices."
+  },
+  "accountEverywhereConfirm": {
+    "message": "Sign out everywhere",
+    "description": "Confirm button of the dialog for signing out on all devices."
+  },
+  "accountCancel": {
+    "message": "Cancel",
+    "description": "Cancel button of the account dialogs."
+  },
+  "accountSessionEnded": {
+    "message": "You were signed out because the account session ended. The data on this device was kept. Sign in again to resume syncing.",
+    "description": "Notice shown after the server ended the session."
+  },
+  "accountSignedOutDone": {
+    "message": "Signed out.",
+    "description": "Confirmation after signing out."
+  },
+  "accountDismiss": {
+    "message": "Dismiss",
+    "description": "Button that dismisses the session-ended notice."
+  },
+  "accountPrivacyLine": {
+    "message": "When you are signed in, your saved words with their chats, highlights, reading progress and PDF titles are sent to the Clavis sync service. Your Groq API key never is.",
+    "description": "Privacy section statement of what syncs, shown only when accounts are available."
+  },
+  "popupAccountLabel": {
+    "message": "Account",
+    "description": "Popup label of the account row."
+  },
+  "popupAccountSignIn": {
+    "message": "Sign in to sync",
+    "description": "Popup button that starts sign-in when signed out."
+  },
+  "popupAccountSyncNow": {
+    "message": "Sync now",
+    "description": "Popup button that starts a sync when signed in."
+  },
+  "onbSyncLine": {
+    "message": "Sync across devices (optional)",
+    "description": "Optional line in the last onboarding step that links to Settings, Account and sync."
+  },
+  "onbSyncLink": {
+    "message": "Set up sync in Settings",
+    "description": "Link text of the optional onboarding sync line."
+  },
+  "errQuotaExceeded": {
+    "message": "Your account is out of storage. Remove a stored PDF in the library, then try again.",
+    "description": "Error shown when saving a PDF to the account fails because the 100 MB account storage is full."
+  },
+  "errFileTooLarge": {
+    "message": "This file is larger than 15 MB, the most Clavis can store in an account.",
+    "description": "Error shown when a PDF is too large to store in the account."
+  },
+  "errNotAPdf": {
+    "message": "This file is not a PDF, so it cannot be stored.",
+    "description": "Error shown when the server says the uploaded bytes are not a PDF."
+  },
+  "errFingerprintMismatch": {
+    "message": "This file does not match the saved document. Open the PDF from your computer instead.",
+    "description": "Error shown when a file stored in the account does not match the document it belongs to."
+  },
+  "errUploadInProgress": {
+    "message": "This file is already being saved. Try again in a moment.",
+    "description": "Error shown when the same PDF is already being uploaded."
+  },
+  "readerCloudSave": {
+    "message": "Save to account",
+    "description": "Toolbar button in the PDF reader: uploads the open PDF to the user's Clavis account so it opens on other devices."
+  },
+  "readerCloudSaveTitle": {
+    "message": "Keep a copy of this PDF in your account to open it on your other devices.",
+    "description": "Tooltip of the Save to account button."
+  },
+  "readerCloudSaving": {
+    "message": "Saving to account...",
+    "description": "Label of the toolbar button while the PDF is being uploaded to the account."
+  },
+  "readerCloudStored": {
+    "message": "Stored in account",
+    "description": "Toolbar label in the PDF reader shown when the open PDF is stored in the user's account."
+  },
+  "readerCloudSavedLive": {
+    "message": "Saved to your account.",
+    "description": "Screen reader announcement after a PDF was uploaded to the account."
+  },
+  "readerCloudFetching": {
+    "message": "Opening your PDF from your account...",
+    "description": "Message shown in the reader while a PDF stored in the account is downloaded."
+  },
+  "readerCloudSignInNeeded": {
+    "message": "Sign in to Clavis, then open this file from your account again.",
+    "description": "Message shown in the reader when a link opens an account PDF but the user is not signed in."
+  },
+  "readerCloudOpenFailed": {
+    "message": "Could not open this file from your account.",
+    "description": "Heading of the error shown when a PDF stored in the account cannot be opened."
+  },
+  "readerContinueStored": {
+    "message": "In your account",
+    "description": "Small label on a Continue reading card whose PDF is stored in the account."
+  },
+  "readerContinueFromAccount": {
+    "message": "Open from account",
+    "description": "Button on a Continue reading card: opens the PDF stored in the account."
+  },
+  "readerContinueFromAccountLabel": {
+    "message": "Open $ARG1$ from your account",
+    "description": "Accessible name of the button that opens a stored PDF. {1} is the title.",
+    "placeholders": {
+      "ARG1": {
+        "content": "$1"
+      }
+    }
+  },
+  "readerContinueProgressLabel": {
+    "message": "Reading progress of $ARG1$",
+    "description": "Accessible name of the progress bar on a Continue reading card. {1} is the title.",
+    "placeholders": {
+      "ARG1": {
+        "content": "$1"
+      }
+    }
+  },
+  "readerHighlightsToggle": {
+    "message": "Highlights",
+    "description": "Toolbar toggle that shows or hides the highlights panel of the PDF reader."
+  },
+  "libraryDocCloudStored": {
+    "message": "Stored in account",
+    "description": "Cloud state of a document in the library whose PDF is stored in the account."
+  },
+  "libraryDocCloudNone": {
+    "message": "Only on this device",
+    "description": "Cloud state of a document in the library whose PDF is not stored in the account."
+  },
+  "libraryDocOpenCloud": {
+    "message": "Open from account",
+    "description": "Button in the library that opens the PDF stored in the account in the reader."
+  },
+  "libraryDocRemoveFile": {
+    "message": "Remove stored file",
+    "description": "Button in the library that deletes the PDF from the account but keeps progress and highlights."
+  },
+  "libraryDocRemoveFileLabel": {
+    "message": "Remove the stored file of $ARG1$ from your account",
+    "description": "Accessible name of the remove stored file button. {1} is the title.",
+    "placeholders": {
+      "ARG1": {
+        "content": "$1"
+      }
+    }
+  },
+  "libraryDocRemoveFileTitle": {
+    "message": "Remove the stored file of $ARG1$?",
+    "description": "Title of the dialog that confirms removing a stored PDF. {1} is the title.",
+    "placeholders": {
+      "ARG1": {
+        "content": "$1"
+      }
+    }
+  },
+  "libraryDocRemoveFileBody": {
+    "message": "The PDF is deleted from your account. Your reading progress and highlights stay. You can store the file again from the reader.",
+    "description": "Body of the dialog that confirms removing a stored PDF."
+  },
+  "libraryDocFileRemoved": {
+    "message": "Removed the stored file of $ARG1$.",
+    "description": "Screen reader announcement after a stored PDF was removed. {1} is the title.",
+    "placeholders": {
+      "ARG1": {
+        "content": "$1"
+      }
+    }
+  },
+  "libraryQuotaLabel": {
+    "message": "PDF storage",
+    "description": "Label of the account storage bar in the library's Documents tab."
+  },
+  "libraryQuotaUsed": {
+    "message": "$ARG1$ of $ARG2$ used",
+    "description": "Text of the account storage bar. {1} is the used size and {2} the total, for example 12.3 MB of 100 MB.",
+    "placeholders": {
+      "ARG1": {
+        "content": "$1"
+      },
+      "ARG2": {
+        "content": "$2"
+      }
+    }
   }
 }

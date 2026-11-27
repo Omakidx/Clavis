@@ -267,7 +267,7 @@ function serializedSize(input: unknown): number | undefined {
   }
 }
 
-function parseMessage<T extends z.ZodType>(
+export function parseMessage<T extends z.ZodType>(
   schema: T,
   input: unknown,
 ): MessageParseResult<z.infer<T>> {

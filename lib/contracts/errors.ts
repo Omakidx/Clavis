@@ -23,6 +23,32 @@ export const ERROR_CODES = [
   'STORAGE_UNAVAILABLE',
   /** Unexpected failure inside the extension; carries no error text. */
   'INTERNAL_ERROR',
+  /** A saved word (or its record) the request names does not exist (any more). */
+  'NOT_FOUND',
+  /** A local data limit is reached (saved words, messages per word). */
+  'LIMIT_EXCEEDED',
+  // Clavis Sync account routes (docs/clavis-sync-design.md 7.4).
+  /** The user closed the Google window or refused (access_denied). */
+  'CANCELLED',
+  /** The sign-in exchange failed (bad state, no code, the server refused the code). */
+  'OAUTH_FAILED',
+  /** No Google client id in this build: sign-in cannot start. */
+  'NOT_CONFIGURED',
+  /** Google reported the address as unverified. */
+  'EMAIL_NOT_VERIFIED',
+  /** A sync route that needs an account was called signed out. */
+  'NOT_SIGNED_IN',
+  // PDF files in the account (docs/clavis-sync-design.md 6.6, 7.4). The server's codes of the same names.
+  /** The account's 100 MiB of stored PDFs is full. */
+  'QUOTA_EXCEEDED',
+  /** The file is over 15 MiB. */
+  'FILE_TOO_LARGE',
+  /** The bytes are not a PDF. */
+  'NOT_A_PDF',
+  /** The file's content does not match the fingerprint of the document. */
+  'FINGERPRINT_MISMATCH',
+  /** This document is already being uploaded. */
+  'UPLOAD_IN_PROGRESS',
 ] as const;
 
 export const errorCodeSchema = z.enum(ERROR_CODES);

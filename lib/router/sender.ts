@@ -22,6 +22,7 @@ export const EXTENSION_PAGE_PATHS = [
   EXTENSION_PAGES.popup,
   EXTENSION_PAGES.reader,
   EXTENSION_PAGES.sidepanel,
+  EXTENSION_PAGES.library,
   PRACTICE_PAGE_PATH,
 ] as const;
 export type ExtensionPagePath = (typeof EXTENSION_PAGE_PATHS)[number];
@@ -50,6 +51,14 @@ export interface ClassifiedSender {
   documentId?: string;
   /** The sender's own url (a frame's url, not the tab's). Internal routes use it; never echoed. */
   url?: string;
+  /**
+   * The url and title of the sender's TAB, as the browser reports them (never from a message).
+   * `SAVE_WORD` takes a saved word's webpage source from these.
+   */
+  tabUrl?: string;
+  tabTitle?: string;
+  /** The sender's tab is in an incognito window (browser-reported). */
+  tabIncognito?: boolean;
 }
 
 /** The fields of `runtime.MessageSender` that classification reads. */
@@ -59,7 +68,14 @@ export interface SenderLike {
   origin?: string | undefined;
   frameId?: number | undefined;
   documentId?: string | undefined;
-  tab?: { id?: number | undefined; url?: string | undefined } | undefined;
+  tab?:
+    | {
+        id?: number | undefined;
+        url?: string | undefined;
+        title?: string | undefined;
+        incognito?: boolean | undefined;
+      }
+    | undefined;
 }
 
 export interface SenderIdentity {
@@ -114,6 +130,9 @@ export function classifySender(sender: SenderLike, identity: SenderIdentity): Cl
       ? { documentId: sender.documentId }
       : {}),
     url: url.href,
+    ...(typeof sender.tab?.url === 'string' ? { tabUrl: sender.tab.url } : {}),
+    ...(typeof sender.tab?.title === 'string' ? { tabTitle: sender.tab.title } : {}),
+    ...(sender.tab?.incognito === true ? { tabIncognito: true } : {}),
   };
 
   if (ownsUrl(own, url)) {

@@ -23,6 +23,18 @@ const MESSAGES: Record<ErrorCode, string> = {
   INVALID_REQUEST: 'The request was not valid.',
   STORAGE_UNAVAILABLE: 'Secure storage is unavailable; the API key cannot be used.',
   INTERNAL_ERROR: 'Something went wrong inside Clavis.',
+  NOT_FOUND: 'That saved word no longer exists.',
+  LIMIT_EXCEEDED: 'A limit on saved data has been reached.',
+  CANCELLED: 'Sign-in was cancelled.',
+  OAUTH_FAILED: 'Google sign-in did not complete.',
+  NOT_CONFIGURED: 'Sign-in is not set up in this build.',
+  EMAIL_NOT_VERIFIED: 'Google has not verified this email address.',
+  NOT_SIGNED_IN: 'Sign in to sync.',
+  QUOTA_EXCEEDED: 'Your account has no room for this file.',
+  FILE_TOO_LARGE: 'The file is too large to store.',
+  NOT_A_PDF: 'The file is not a PDF.',
+  FINGERPRINT_MISMATCH: 'The file does not match this document.',
+  UPLOAD_IN_PROGRESS: 'This file is already being uploaded.',
 };
 
 /** Why an `INVALID_RESPONSE` happened. Diagnostic only; carries no model output. */

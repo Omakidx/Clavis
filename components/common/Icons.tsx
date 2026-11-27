@@ -3,7 +3,7 @@
 export function SettingsIcon({
   name,
 }: {
-  name: 'connection' | 'preferences' | 'website' | 'privacy';
+  name: 'connection' | 'preferences' | 'website' | 'privacy' | 'account';
 }) {
   return (
     <svg
@@ -48,6 +48,11 @@ export function SettingsIcon({
           <rect x="4.75" y="10.75" width="5.5" height="5.5" rx="1" ry="1" />
           <path d="M3.818,1.99L1.189,6.498c-.194,.333,.046,.752,.432,.752H6.879c.386,0,.626-.419,.432-.752L4.682,1.99c-.193-.331-.671-.331-.864,0Z" />
         </g>
+      ) : name === 'account' ? (
+        <path
+          d="M12 12a4.25 4.25 0 1 0 0-8.5 4.25 4.25 0 0 0 0 8.5Zm-8 8.25c0-3.45 3.58-5.5 8-5.5s8 2.05 8 5.5c0 .41-.34.75-.75.75H4.75a.75.75 0 0 1-.75-.75Z"
+          fill="currentColor"
+        />
       ) : name === 'website' ? (
         <g transform="scale(1.33333)">
           <path

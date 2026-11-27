@@ -2,6 +2,7 @@
 import { h, render } from 'preact';
 import { useEffect, useId, useLayoutEffect, useRef, useState } from 'preact/hooks';
 import type { ExplainMode } from '../../lib/contracts/explain';
+import type { SelectionSnapshot } from '../../lib/contracts/selection';
 import type { SidePanelHandoff } from '../../lib/contracts/sidepanel';
 import { t } from '../../lib/i18n';
 import { isTrustedEvent } from '../../lib/selection/trust';
@@ -9,7 +10,7 @@ import { selectionWithin } from '../../lib/selection/contained-range';
 import { lookupIcon } from '../tooltip/icons';
 import { TranslationSpeech } from './TranslationSpeech';
 import type { CardSurface } from '../../lib/selection/ui-api';
-import type { SettingsSection } from './backend';
+import type { SaveOutcome, SettingsSection } from './backend';
 import { truncateText as cutAtCodePoint } from '../../lib/selection/text';
 import { resultSelectionFromRange, type ResultLookupInput } from './result-selection';
 import { kindLabel, resultBlocks, tabLabel, truncateText, type Block } from './model';
@@ -18,6 +19,7 @@ import {
   type CardError,
   type Entry,
   type ExplainSession,
+  type SavedMeaningInput,
   type SessionState,
 } from './session';
 
@@ -49,8 +51,16 @@ export interface CardHost {
   now(): number;
   /** Recursive lookup is supplied only by the toolbar card controller. */
   navigation?: CardNavigation;
+  words?: CardWords;
   speak?: CardSurface['speak'];
   speakerIcon?: CardSurface['speakerIcon'];
+}
+
+/** Saving the selected word (docs/clavis-sync-design.md 7.5); absent where there is nothing to save to. */
+export interface CardWords {
+  lookup(text: string): Promise<{ saved: boolean; wordKey: string } | null>;
+  save(snapshot: SelectionSnapshot, meaning: SavedMeaningInput): Promise<SaveOutcome>;
+  remove(wordKey: string): Promise<boolean>;
 }
 
 export interface CardNavigation {
@@ -117,6 +127,12 @@ const onTrusted =
     if (isTrustedEvent(event)) handler(event);
   };
 
+const SAVE_FAILURE = {
+  limit: 'cardSaveLimit',
+  elsewhere: 'cardSaveElsewhere',
+  failed: 'cardSaveFailed',
+} as const;
+
 function ExplanationCard({ session, host }: Props) {
   const state = useSessionState(session);
   const uid = useId();
@@ -126,6 +142,8 @@ function ExplanationCard({ session, host }: Props) {
   const [focusTab, setFocusTab] = useState<ExplainMode>(state.active);
   const [armed, setArmed] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [saved, setSaved] = useState<{ wordKey: string; saved: boolean } | null>(null);
+  const [saving, setSaving] = useState(false);
   const [lookupCandidate, setLookupCandidate] = useState<{
     input: ResultLookupInput;
     selectionId: string;
@@ -168,6 +186,20 @@ function ExplanationCard({ session, host }: Props) {
     observer.observe(element);
     return () => observer.disconnect();
   }, [host]);
+
+  // Whether this word is already in the library (the Save button's state), once it can be saved.
+  const savable = host.words === undefined ? null : session.savable();
+  const savableText = savable?.snapshot.text;
+  useEffect(() => {
+    if (savableText === undefined) return;
+    let current = true;
+    void host.words?.lookup(savableText).then((found) => {
+      if (current) setSaved(found);
+    });
+    return () => {
+      current = false;
+    };
+  }, [host, savableText]);
 
   useEffect(() => {
     if (!copied) return;
@@ -302,6 +334,30 @@ function ExplanationCard({ session, host }: Props) {
     void host.copy(text).then((ok) => {
       setCopied(ok);
       session.announce(ok ? t('cardCopied') : t('cardCopyFailed'));
+    });
+  };
+
+  const toggleSave = (): void => {
+    const words = host.words;
+    if (words === undefined || savable === null || saving) return;
+    setSaving(true);
+    const done = (next: { wordKey: string; saved: boolean } | null, message: string): void => {
+      setSaving(false);
+      if (next !== null) setSaved(next);
+      session.announce(message);
+    };
+    if (saved?.saved === true) {
+      void words.remove(saved.wordKey).then((ok) => {
+        done(
+          ok ? { wordKey: saved.wordKey, saved: false } : null,
+          ok ? t('cardUnsaveAnnounce') : t('cardSaveFailed'),
+        );
+      });
+      return;
+    }
+    void words.save(savable.snapshot, savable.meaning).then((outcome) => {
+      if (outcome.ok) done({ wordKey: outcome.wordKey, saved: true }, t('cardSaveAnnounce'));
+      else done(null, t(SAVE_FAILURE[outcome.reason]));
     });
   };
 
@@ -489,6 +545,17 @@ function ExplanationCard({ session, host }: Props) {
           >
             {copied ? t('cardCopied') : t('cardCopy')}
           </button>
+          {savable === null ? null : (
+            <button
+              type="button"
+              class="ec__btn"
+              data-clavis="card-save"
+              aria-disabled={saving ? 'true' : undefined}
+              onClick={onTrusted(toggleSave)}
+            >
+              {saved?.saved === true ? t('cardSaved') : t('cardSave')}
+            </button>
+          )}
           <button
             type="button"
             class={longAnswer ? 'ec__btn ec__btn--suggest' : 'ec__btn'}

@@ -4,7 +4,7 @@ import { classifySelection } from '../../lib/selection/classify';
 import type { ExplainCardApi, RunContext } from '../../lib/selection/ui-api';
 import { newSelectionId } from '../../lib/selection/ids';
 import { normalizeText } from '../../lib/selection/text';
-import { createBackend, type ExplainBackend } from './backend';
+import { createBackend, type ExplainBackend, type PdfRef } from './backend';
 import css from './card.css?inline';
 import { copyPlainText } from './copy';
 import { mountCard, type CardHost, type CardNavigation } from './ExplanationCard';
@@ -17,6 +17,11 @@ export interface CardDeps {
   copy(doc: Document, text: string): Promise<boolean>;
   requestTimeoutMs?: number | undefined;
   features: SessionOptions['features'];
+  /**
+   * The PDF the reader is showing, read when a word is saved from it. Only the reader supplies it;
+   * a web page's source comes from the browser, in the background (SAVE_WORD).
+   */
+  pdf?: (() => PdfRef | null) | undefined;
 }
 
 /**
@@ -217,8 +222,19 @@ export function createExplainCard(overrides: Partial<CardDeps> = {}): ExplainCar
             showActive();
           },
         };
+        const words = deps.backend.words;
         const host: CardHost = {
           keyboard: surface.keyboard,
+          // A word looked up inside generated text (a nested frame) is not one the user read.
+          ...(words === undefined || frames.length > 1
+            ? {}
+            : {
+                words: {
+                  lookup: (text: string) => words.lookup(text),
+                  save: (saved, meaning) => words.save(saved, meaning, deps.pdf?.() ?? undefined),
+                  remove: (key: string) => words.remove(key),
+                },
+              }),
           reposition: () => {
             refit();
             surface.reposition();

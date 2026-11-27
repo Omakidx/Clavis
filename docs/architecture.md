@@ -2,7 +2,9 @@
 
 **Version:** 1.1-draft · **Baseline:** 2026-10-22  
 **Target:** Chrome Manifest V3 + WXT/React/TypeScript  
-**Principles:** local-first, least privilege, user-controlled AI, no first-party backend, adapter boundaries for future providers.
+**Principles:** local-first, least privilege, user-controlled AI, an optional first-party sync backend (Clavis Sync, S-01 … S-10: nothing leaves the device for it unless the user signs in), adapter boundaries for future providers.
+
+> **Clavis Sync:** the optional account, sync server and web dashboard are specified in [clavis-sync-design.md](clavis-sync-design.md) with decisions in [decisions/clavis-sync-decisions.md](decisions/clavis-sync-decisions.md). This document holds the normative permission list (§3), storage and secret-boundary rules (§9) and threats (§10) for that feature. The feature is implemented but dark behind `FEATURES.accountSync` (`lib/config/constants.ts`, currently `false`); the rows marked *Clavis Sync* apply once it is switched on.
 
 > **Read with:** [requirements.md](requirements.md) for behavior, [tech-stack.md](tech-stack.md) for dependencies, and [execution-phases.md](execution-phases.md) for implementation order.
 
@@ -12,10 +14,10 @@
 | --- | --- | --- | --- |
 | A-001 | Manifest V3 extension | Supported Chrome extension platform | Event-driven service worker; no assumption of persistent background process |
 | A-002 | WXT + React + TypeScript | Reliable packaging and isolated UI components | WXT-generated manifest/build; no handcrafted competing manifest |
-| A-003 | BYOK Groq direct from background service worker | v1 without hosting or accounts | Keys reside on user device; with `https://api.groq.com/*` in `host_permissions`, service-worker `fetch` is not subject to CORS. Spike A found Groq currently answers with `access-control-allow-origin: *`, so the permission is defence against a future CORS change rather than strictly required today |
+| A-003 | BYOK Groq direct from background service worker | v1 without hosting or accounts | Still true with Clavis Sync: AI requests are sent only from the extension, directly to Groq with the user's own key; the Clavis server never calls an AI provider and never receives the key (S-05, S-09; A-015). Keys reside on user device; with `https://api.groq.com/*` in `host_permissions`, service-worker `fetch` is not subject to CORS. Spike A found Groq currently answers with `access-control-allow-origin: *`, so the permission is defence against a future CORS change rather than strictly required today |
 | A-004 | Never place API key in content script | Webpage context is untrusted | Only privileged background/settings/reader contexts handle credentials |
 | A-005 | Shared domain action and result contracts | Web and PDF use same explain/listen workflows | Multiple UI entry points; one adapter for speech and AI |
-| A-006 | PDF.js custom extension page built on PDF.js viewer components | Native Chrome PDF viewer cannot reliably host normal content scripts; viewer components give virtualization, text layer and find for free | User explicitly opens PDF in reader; no browser-wide PDF hijack; local files only in v1 |
+| A-006 | PDF.js custom extension page built on PDF.js viewer components | Native Chrome PDF viewer cannot reliably host normal content scripts; viewer components give virtualization, text layer and find for free | User explicitly opens PDF in reader; no browser-wide PDF hijack; local files only in v1. **Amended (Clavis Sync, A-018):** the reader also opens the user's own PDFs stored in their account, fetched by the background and handed over through the `fileHandoff` store (§9); the bytes then take the same local-bytes path as a picked file, and nothing is uploaded unless the signed-in user chooses **Save to account** |
 | A-007 | `chrome.tts`, capability-detected; the offscreen Web Speech fallback was evaluated and not adopted (D-07) | No AI cost, good Chrome integration; the fallback found no extra voices | Not guaranteed Linux voices; honest voice-availability messages and online-voice disclosures in Settings |
 | A-008 | Structured responses with runtime validation | Predictable cards, failure isolation | Model feature checks and safe fallback when schema mode unavailable |
 | A-009 | Explicit user-triggered AI requests | Privacy and cost control | Selection itself has zero network transmission to Groq |
@@ -24,6 +26,10 @@
 | A-012 | Core request + lazy per-tab requests (D-05) | One request per Explain; free-tier friendly | Mode set and schemas differ from a "one mode per tab" design; per-selection in-memory result cache |
 | A-013 | Tiny always-on observer; Preact toolbar injected on first selection and card on first Lookup (D-08) | Page weight and 150 ms toolbar target | Chosen by Spike B measurement (see §5) |
 | A-014 | Extension-page CSP allows `wasm-unsafe-eval` only and blocks media, frames, form posts and `<base>` (D-17) | PDF.js wasm decoders | ZIP audit enforces the exact CSP |
+| A-015 | **Clavis API via the background only** (Clavis Sync) | Tokens must stay in one trusted context, and the reader renders untrusted PDFs | Only the background (`lib/account`, `lib/sync`, `lib/router/handlers/documents.ts`) calls the API. Reader, library and options never `fetch` it; PDF bytes cross through the IndexedDB `fileHandoff` store (§9). No message route returns a token (§9 rule R1) |
+| A-016 | **IndexedDB for user data** (Clavis Sync) | Saved words, chats, documents and highlights outgrow `chrome.storage` quotas and need indexed queries and transactions | Database `clavis-data` on the extension origin, opened by extension pages and the background; content scripts run in the page origin and cannot open it. Hand-written wrapper (`lib/data/db.ts`) to protect bundle budgets. Cleared by Clear all data. `chrome.storage` keeps only preferences, tokens and sync state |
+| A-017 | **CORS-only API access, no host permission** (Clavis Sync) | A required host permission would disable the extension for every existing user until they accept the update | The server allows exactly the `chrome-extension://<id>` origins in `ALLOWED_EXTENSION_IDS`, for Bearer routes only and without credentials mode. The ZIP audit lists the host as `allowedUrlHosts.corsNetwork` in `scripts/expected-permissions.json`. Moving to a custom domain needs an extension release, an audit allowlist change and a new OAuth redirect URI |
+| A-018 | **Stream-through PDF storage** (Clavis Sync) | The server can hash the stream and require SHA-256 = fingerprint, count bytes exactly and check magic bytes; one host for the extension to contact; no bucket CORS | Uploads and downloads go through the API, not presigned URLs. Limits: 15 MiB per file and 100 MiB per account, enforced by a race-free quota reservation. The server never parses or renders a PDF. Costs API bandwidth, bounded by those limits |
 
 ## 2. Container/context architecture
 
@@ -77,6 +83,7 @@ entrypoints/onboarding/index.html
 entrypoints/options/index.html   # user key settings, tests, preferences
 entrypoints/sidepanel/index.html # long explanation for one tab (FR-042); React, path /sidepanel.html?tab=<tabId>
 entrypoints/reader/index.html    # full-screen extension-owned PDF reader
+entrypoints/library/index.html   # saved words, per-word chat, documents (Clavis Sync); top-frame tab page /library.html
 ```
 
 Exact WXT entrypoint naming conventions should be verified against the pinned WXT template (WXT content scripts support runtime registration; confirm the option name for the pinned version). Prefer one implementation of `SelectionActionService`, called by both webpage tooltip and PDF reader.
@@ -93,10 +100,13 @@ This table is the single source of truth for permissions; the privacy policy, st
 | `activeTab` | `permissions` | Must | Current-tab injection from the context menu or toolbar icon when site access is declined |
 | `contextMenus` | `permissions` | Must | **Explain with Clavis** entry; the fallback path for users without site access (FR-018) |
 | `sidePanel` | `permissions` | Should → **shipped** (D-24, Phase 8) | The side panel for long explanations (FR-042): `sidePanel.setOptions({ tabId, path })` + `open()`, one panel per tab. Shows no install warning. The manifest has **no** `side_panel.default_path` (a shared default panel would keep one tab's explanation across tab switches); a build hook removes the key WXT derives from the entrypoint |
+| `identity` | `permissions` | Should (Clavis Sync, behind `FEATURES.accountSync`) | `chrome.identity.launchWebAuthFlow` and `getRedirectURL` for the optional Google sign-in (docs/clavis-sync-design.md 2.2). Shows no install warning (no `email` scope, no `oauth2` manifest key) |
+| `alarms` | `permissions` | Should (Clavis Sync) | The 30-minute pull and the one-shot retry backoff while the service worker sleeps (design 4.7). Shows no install warning |
 | `content_security_policy.extension_pages` | manifest | Must | Exactly `script-src 'self' 'wasm-unsafe-eval'; object-src 'self'; media-src 'none'; frame-src 'none'; form-action 'none'; base-uri 'none'` (D-17; the `none` directives added in Phase 7) |
 | `commands.explain-selection` (Alt+Shift+E) | manifest | Must | Keyboard path to the toolbar (FR-016); not a permission |
 | `minimum_chrome_version` 147 | manifest | Must | D-18 (set by PDF.js 6's use of `Math.sumPrecise`) |
 | `https://api.groq.com/*` | `host_permissions` | Must | Background Groq API calls; narrowly scoped endpoint |
+| (none) `https://clavis-api-production.up.railway.app` | not a permission | Should (Clavis Sync) | The background calls the Clavis sync API under the server's CORS allowlist (exact `chrome-extension://<id>` origins), so **no new `host_permissions` entry** is added: a required host permission would disable the extension for every existing user until they accept it. The ZIP audit lists the host as `allowedUrlHosts.corsNetwork` |
 | `http://*/*`, `https://*/*` | `optional_host_permissions` | Must | Requested at onboarding with a user gesture; enables the automatic toolbar on all websites |
 
 **Site-access flow (D-02):**
@@ -109,6 +119,25 @@ This table is the single source of truth for permissions; the privacy policy, st
 6. Without the grant, the context-menu item and the popup's **Explain on this page** button use the `activeTab` grant to `chrome.scripting.executeScript` the observer + UI into that tab once, then open the card for the current selection.
 
 Do **not** request `<all_urls>` solely for Groq, and never re-prompt for site access without a user gesture.
+
+### Clavis Sync message routes
+
+These routes are registered in `lib/router/routes.ts` (the route table is the single place that says who may send what) and validated by strict zod schemas in `lib/contracts/words.ts`, `lib/contracts/account.ts` and `lib/contracts/documents.ts`. Allowed senders below are the `*_SENDERS` rules in `routes.ts`; "content" means a website content script. The routes exist whether or not `FEATURES.accountSync` is on; with it off, the account, sync and document handlers never touch the network. Payload and reply shapes are in [clavis-sync-design.md §7.4](clavis-sync-design.md#74-new-router-routes-libcontractsmessagests--librouterroutests).
+
+| Route | Allowed senders | Purpose |
+| --- | --- | --- |
+| `SAVE_WORD`, `UNSAVE_WORD`, `GET_WORD_SAVED` | content, `/reader.html`, `/practice.html`, `/sidepanel.html` | Local saved words (work signed out). The webpage source comes only from browser-filled sender fields, reduced to origin and path; a word saved from an incognito tab keeps no URL or title. A content script can touch only words saved from its own tab's origin |
+| `WORD_CHAT_SEND`, `WORD_CHAT_CANCEL` | `/library.html` only | Per-word chat, sent from the extension to Groq with the user's key (S-05). The dashboard never sends chat |
+| `SYNC_KICK` | `/reader.html`, `/library.html`, `/options.html` | Wake the sync engine after a local write |
+| `SYNC_NOW` | `/options.html`, `/popup.html`, `/library.html` | Sync immediately |
+| `ACCOUNT_GET_STATUS` | `/options.html`, `/onboarding.html`, `/popup.html`, `/reader.html`, `/library.html` | `{ signedIn, email, displayName, sync }` only, never a token |
+| `ACCOUNT_SIGN_IN` | `/options.html`, `/popup.html` | Google sign-in with `chrome.identity.launchWebAuthFlow`, then the first-sign-in merge |
+| `ACCOUNT_SIGN_OUT`, `ACCOUNT_SIGN_OUT_EVERYWHERE` | `/options.html` | Sign out, optionally keeping a local copy; revoke every session |
+| `DOCUMENT_UPLOAD`, `DOCUMENT_FETCH` | `/reader.html` | Move a PDF to or from the account through the `fileHandoff` store |
+| `DOCUMENT_REMOVE_FILE` | `/reader.html`, `/library.html` | Remove a stored PDF from the account |
+| `ACCEPT_DISCLOSURE` (existing route) | `/options.html`, `/onboarding.html`, `/popup.html`, `/library.html` | The library is added for this one route, because it shows the first-send disclosure before its first chat message |
+
+The key routes (`KEY_SENDERS`) are unchanged: the reader and the library never get them. `CLEAR_ALL_DATA` now also signs out and deletes the IndexedDB database (§9 rule R5).
 
 ## 4. Shared domain objects and boundaries
 
@@ -482,11 +511,28 @@ For v1, rely on `window.getSelection()` in the PDF text layer while preserving p
 | Temporary selection snapshot | UI/background memory scoped to tab/request | Discard on dismissal/navigation/expiration |
 | Per-selection tab results | Content UI / reader memory | Dropped on dismissal or navigation (§4) |
 | Side panel hand-off (selection + loaded results) | **Service-worker memory only**, keyed by tab (≤ 24 tabs) | Dropped on tab close, navigation of the tab and clear-all-data; lost on a worker restart (the panel says to select again); never stored or logged |
-| PDF bytes | ArrayBuffer in reader tab memory | Do not store automatically; release on close |
+| PDF bytes | ArrayBuffer in reader tab memory | Do not store automatically; release on close. Only the `fileHandoff` store (below) may hold them, for one transfer |
+| Saved words, per-word chat, documents (title, page count, last page and position, size, cloud state) and PDF highlights (Clavis Sync) | IndexedDB `clavis-data` (`words`, `chat`, `documents`, `highlights`), extension origin (A-016) | Local until the user deletes them, clears all data or uninstalls. While signed in each record also carries sync fields and is mirrored to the Clavis server. Not readable by content scripts |
+| `fileHandoff` (Clavis Sync) | IndexedDB `clavis-data`, one entry per PDF fingerprint | Transient PDF bytes for one upload or download; see [the trust model](#filehandoff-trust-model) |
+| `clavis.reader-highlights` | `chrome.storage.local` | Legacy. Migrated into IndexedDB once at background start, then removed |
+| Account session: refresh token, user id, email, display name (`clavis.account-session`) | `chrome.storage.local`, `TRUSTED_CONTEXTS` | **Secret.** Background only (§9 rules R1–R5). Deleted at sign-out and by Clear all data |
+| Access token (`clavis.account-access`) | `chrome.storage.session`, `TRUSTED_CONTEXTS` | **Secret.** Background only; cleared by a browser restart |
+| Sync state: account id, cursor, last push and pull, device id (`clavis.sync-state`) and a one-time sign-out notice (`clavis.account-notice`) | `chrome.storage.local` | Non-secret. Deleted at sign-out and by Clear all data |
 | AI response cache across selections (FR-043, optional) | Bounded local store | Opt-in; disabled on private/sensitive pages; TTL and clearing UI |
 | Error logs | In-memory redacted diagnostics by default | Never raw content, credential, URL with tokens or PDF bytes |
 
-Saved vocabulary/history is deferred (D-04); when added it will use IndexedDB with delete/export.
+Saved vocabulary (D-04) is implemented as **local saved words** in IndexedDB (A-016), with a local JSON export in the library for signed-out users, and syncs only if the user signs in. D-04's deferral is reversed (see [requirements.md §11](requirements.md#11-product-decisions)). The Groq key is never part of any synced record (S-09).
+
+#### `fileHandoff` trust model
+
+The reader and library never call the Clavis API (rule R2), so PDF bytes move between an extension page and the background through the `fileHandoff` object store of `clavis-data` (`lib/data/handoff.ts`, `lib/router/handlers/documents.ts`). This store is reachable only from extension contexts, not from content scripts or websites.
+
+- Each entry is `{ fingerprint, blob, direction, createdAt }`, keyed by the file's SHA-256 fingerprint, and tagged `upload` (reader to background) or `download` (background to reader). A consumer takes only an entry of its own direction, and a write never replaces an entry of the other direction, so an upload and a download of the same file cannot overwrite each other.
+- The consumer reads and deletes the entry in one transaction. The background deletes an upload entry in every outcome, success or failure.
+- Entries older than 10 minutes are deleted when the service worker starts and before each document transfer.
+- Tokens never leave the background: the page sees only a short reply (`ok` or an error code, and the storage state), never a token, a URL or bytes.
+- Clear all data and sign-out without a local copy delete the database, and so any entry in it.
+- Trust consequence: a compromised extension page could place bytes in the store, but the background only streams them to the signed-in user's own account under the fingerprint they claim. The server then rejects any body whose SHA-256 differs from that fingerprint (`FINGERPRINT_MISMATCH`), is not a PDF, or exceeds 15 MiB or the account quota.
 
 ### Secret boundary (normative)
 
@@ -502,14 +548,24 @@ These rules are the single source of truth for key handling; other documents lin
 8. Extension pages have privileged access, so they must avoid DOM-based XSS (no `innerHTML` with untrusted data).
 9. AI requests are limited per tab (or per extension page): one in flight — a new `AI_EXPLAIN` aborts the previous one — and a token bucket of 20 per minute (D-21; shared by the core answer and the lazy tabs) (`RATE_LIMITED` with `retryAfterMs`). `AI_EXPLAIN` requires a key and the acknowledged disclosure.
 
+**Clavis Sync rules (R1–R5).** They extend the rules above to the account tokens (design §2.4):
+
+10. **R1: tokens are background-only.** Only background modules under `lib/account/` read or write `STORAGE_KEYS.accountSession` or `accountAccess`. No message route returns a token; `ACCOUNT_GET_STATUS` returns `{ signedIn, email, displayName, sync }` only. A unit test enforces the reference rule (`tests/unit/account/token-boundary.test.ts`).
+11. **R2: only the background calls the Clavis API.** Extension pages never `fetch` it. PDF bytes cross through the `fileHandoff` store.
+12. **R3: lockdown first.** Token reads `await whenStorageLockedDown()` like the Groq key and fail with `STORAGE_UNAVAILABLE` if it resolved `false` (`lib/account/tokens.ts`). Deleting tokens is always allowed.
+13. **R4: separate credentials, fixed destination.** Tokens and the Groq key are never in the same request. The key is never sent to the Clavis API, and Clavis tokens are never sent to Groq. Requests go only to the configured API origin, over `https:`; endpoint overrides work only in the `wxt` dev server and in `CLAVIS_FORCE_FEATURES=1` test builds, which the ZIP audit refuses.
+14. **R5: clear-all signs out first.** `CLEAR_ALL_DATA` signs out first (best effort, no local copy kept, capped at 15 s so the network cannot block it), then clears both storage areas and deletes the `clavis-data` database.
+
 ### Data flow declaration for privacy policy
 
 - **Selection detection:** entirely on user device, local and passive.
 - **Listen:** selected text given to selected local speech engine; operating system/browser voice implementation may have its own handling, so avoid promising universal offline execution without testing.
 - **Explain:** selected text + limited context + chosen mode/target language -> Groq API with user's own key. Groq's privacy/retention policies apply; disclose a provider policy link.
 - **Site access:** optional; when granted, a small script runs on websites to notice text selections locally. Nothing is sent anywhere until the user clicks Explain.
-- **Read PDF:** local files only in v1; PDF bytes parsed/rendered locally. Only selected text/context goes to Groq after explicit action.
-- **No developer backend:** the extension developer does not collect content via a proprietary API in v1; if analytics/telemetry is later added, revisit this statement and obtain required consent/disclosures.
+- **Read PDF:** PDF bytes are parsed and rendered locally, whether the file was picked from disk or opened from the user's own account. Only selected text/context goes to Groq after explicit action.
+- **Signed out (the default):** the Clavis server is never contacted. Saved words, chats, highlights and reading progress stay in IndexedDB on the device. This is the S-01 regression boundary.
+- **Clavis Sync (optional, user signs in with Google):** the background sends the Google authorization code to the Clavis API (Railway) and then syncs saved words (text, meaning, context, source page URL reduced to origin and path, and title), per-word chats, document titles, reading progress and highlight positions. PDFs are uploaded only when the user chooses **Save to account** (≤ 15 MiB each, ≤ 100 MiB per account). The server stores them in Railway Postgres and a Railway Bucket and never calls an AI provider. The Groq key is never sent, and the server makes no AI requests. Explain results are not synced as such: only the subset the user saves with a word (its meaning) and the per-word chat history travel to the server, as stored data.
+- **Telemetry:** none. The server keeps no analytics and its logs hold no PII (design §8.6). If analytics/telemetry is later added, revisit these statements and obtain required consent/disclosures.
 
 ## 10. Security threat model and safeguards
 
@@ -525,6 +581,22 @@ These rules are the single source of truth for key handling; other documents lin
 | Malicious PDF / code | Parser / annotation | Pin and patch PDF.js, disable embedded scripts, test malformed documents |
 | Replay or duplicate costs | UI / worker | requestId, abort, deduping, bounded retry and per-action rate limiting |
 | Browser/voice unavailable | Linux/unsupported site | Capability detection and visible alternatives |
+| *Clavis Sync:* refresh or access token theft from the device | Extension storage, message routes | Background-only (R1), `TRUSTED_CONTEXTS` storage, 15-minute access tokens, refresh rotation with reuse detection that revokes the family, Sign out everywhere. Tests: no route returns tokens; content scripts cannot read either area |
+| *Clavis Sync:* token theft in transit or in logs | Network, server logs | HTTPS only; tokens never in URLs; server logs never include headers, bodies, query strings, emails or IP addresses (design §8.6) |
+| *Clavis Sync:* authorization-code interception | OAuth redirect | PKCE S256, `state`, `nonce`, exact redirect allowlist derived from `ALLOWED_EXTENSION_IDS`, client secret only on the server |
+| *Clavis Sync:* IDOR | Every `/v1` resource | `user_id` comes only from authentication; composite primary keys `(user_id, …)`; every query scoped. Test matrix: user B cannot read, delete or download user A's resources (404, not 403) |
+| *Clavis Sync:* CSRF on the dashboard | Cookie-authenticated requests | `SameSite=Lax`, exact `Origin` check, per-session CSRF token and a JSON content type. Sync and upload routes accept Bearer tokens only |
+| *Clavis Sync:* open redirect | OAuth callback | The callback always redirects to `/`; no user-supplied redirect target exists |
+| *Clavis Sync:* forged saves from a hostile page | `SAVE_WORD` from a content script | Trusted click only; strict schemas; source URL and title taken from browser-filled sender fields, never the message; saved text rendered as text only; a content script reaches only words from its own origin. Impact is limited to the user's own data |
+| *Clavis Sync:* prompt injection via saved context or chat | Per-word chat | Same delimiting as Explain, no tools, plain-text output |
+| *Clavis Sync:* malicious PDF upload | `PUT /v1/documents/:fp/file` | Never parsed server-side; magic bytes and SHA-256 must match; served as an attachment with a `sandbox` CSP and `nosniff`; the reader keeps its PDF.js hardening |
+| *Clavis Sync:* quota abuse or storage exhaustion | PDF storage | Database CHECK constraints plus conditional reservation; per-user upload rate and daily byte caps; log alert when bucket usage passes a configured threshold |
+| *Clavis Sync:* account spam | Sign-in | Google accounts only; per-IP auth rate limits |
+| *Clavis Sync:* incomplete account deletion | `DELETE /v1/account` | Requires a forced Google sign-in to the same Google account within the last 10 minutes (an ordinary sign-in does not count; a different account is refused). One transaction with foreign-key cascades from `users` (which also removes replay and upload records), plus a durable bucket prefix-delete job. Test: after deletion every table has zero rows for the id and the bucket holds no keys under the prefix. Backups are disclosed in the privacy policy |
+| *Clavis Sync:* over-retention of deleted content | Tombstones | Content is stripped when a record is deleted; tombstones are purged after 90 days |
+| *Clavis Sync:* cross-origin data reads | CORS | Exact-origin allowlist, no credentials mode; the dashboard sends no CORS headers |
+| *Clavis Sync:* PDF bytes left in the handoff store | `fileHandoff` | Direction-tagged entries, deleted on consumption and on failure, swept after 10 minutes, deleted with the database (see [the trust model](#filehandoff-trust-model)) |
+| *Clavis Sync:* supply chain (server and dashboard) | Dependencies | Pinned versions with lockfiles; `npm audit` in server CI; minimal dependencies |
 
 ## 11. Testing strategy by boundary
 
@@ -532,7 +604,7 @@ These rules are the single source of truth for key handling; other documents lin
 2. **Integration:** webpage content -> worker -> mocked Groq; reader -> worker; no key exposure; storage access levels; retry/cancel; different voice responses; permission grant/revoke -> content-script (un)registration.
 3. **Chrome E2E:** `chrome://extensions` load unpacked; varied DOM fixtures; keyboard/viewport/scroll; site access granted vs. declined (context menu path); 1-page and 100-page PDFs; viewer text selection; first-run and key removal.
 4. **Contract:** fixture JSON from chosen Groq models checked against response schemas; test strict JSON output capability and fallback.
-5. **Privacy inspection:** request interception verifies zero Groq calls on highlight; only selected + bounded context on Explain; no complete document bytes.
+5. **Privacy inspection:** request interception verifies zero Groq calls on highlight; only selected + bounded context on Explain; no complete document bytes; and, signed out, zero requests to the Clavis API (design §12).
 6. **Release ZIP audit:** no external scripts/inline eval, unneeded permissions, secret fixtures, or missing PDF worker files.
 
 ## 12. Observability and failure recovery

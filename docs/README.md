@@ -2,7 +2,7 @@
 
 > **Product name:** Clavis (decided — D-01). Logo, publisher name and support channel are still TBD.  
 > **Platform:** Google Chrome, Manifest V3.  
-> **Release target:** v1.0 — bring-your-own-Groq-API-key, no proprietary backend.  
+> **Release target:** v1.0 — bring-your-own-Groq-API-key, no proprietary backend. **Clavis Sync** (optional Google accounts, sync and a web dashboard) is built on top of v1 and is off until `FEATURES.accountSync` is switched on; see [clavis-sync-design.md](clavis-sync-design.md).  
 > **Documentation baseline:** 22 October 2026. Recheck vendor APIs and store policies at release time.
 
 Clavis is a Chrome extension that helps readers understand **highlighted words, phrases, sentences, and short passages** on ordinary webpages and in a **custom PDF reader**. When the reader selects text, a compact floating toolbar appears. The user can **listen immediately** (without an AI call), or choose an explanation action such as **meaning, contextual meaning, usage scenarios, etymology, synonyms/antonyms, translation, grammar breakdown, or simplification**.
@@ -21,7 +21,8 @@ Installing the extension? Start with the **[Chrome setup guide](setup.md)** or t
 | **[tech-stack.md](tech-stack.md)** | Approved libraries and APIs, installation commands, dependencies, trade-offs, pinning strategy |
 | **[execution-phases.md](execution-phases.md)** | Ordered implementation milestones, task lists, tests, deliverables, dependencies and launch checklist |
 | **[backlog.md](backlog.md)** | Progress tracker: delivery order, requirement checklist with status, risk register |
-| **[privacy-policy.md](privacy-policy.md)** | Draft public privacy policy (to be published on GitHub Pages) |
+| **[privacy-policy.md](privacy-policy.md)** | Draft public privacy policy (to be published on GitHub Pages), covering users with and without an account |
+| **[clavis-sync-design.md](clavis-sync-design.md)** · **[decisions/clavis-sync-decisions.md](decisions/clavis-sync-decisions.md)** | Optional accounts and sync: technical design and product decisions S-01 … S-10. Server setup and environment variables: [../server/README.md](../server/README.md) |
 
 **Authority order if documents conflict:** `requirements.md` defines behavior and launch scope; `architecture.md` defines interfaces and boundaries; `tech-stack.md` defines implementation choices; `execution-phases.md` defines delivery order. Update all affected files whenever a decision changes.
 
@@ -46,7 +47,7 @@ Installing the extension? Start with the **[Chrome setup guide](setup.md)** or t
 - **Meaning in context:** capture only a small amount of surrounding text needed to disambiguate the selection (e.g., *bank* beside a river vs. a financial institution).
 - **Hear it aloud:** one-tap playback for a selected word **or full sentence**; normal/slow speed; voices and language preferences where installed voices permit them.
 - **Go deeper:** definitions, lexical usage, synonyms/antonyms, etymology and roots, examples, grammar, translation and plain-language rewrites.
-- **Read PDFs privately:** open a local PDF file in an extension-owned PDF.js reader. Files are rendered in the browser and never uploaded. Opening remote PDF URLs is planned for after v1 (D-03).
+- **Read PDFs privately:** open a local PDF file in an extension-owned PDF.js reader. Files are rendered in the browser and are not uploaded unless a signed-in user chooses to save one to their account (optional, Clavis Sync). Opening remote PDF URLs is planned for after v1 (D-03).
 - **User-controlled AI cost:** each user supplies a GroqCloud API key; Groq's own usage limits and terms apply. There is no guarantee of unlimited free usage.
 - **Explicit AI requests:** selection alone never sends page or document contents to Groq.
 
@@ -80,7 +81,7 @@ Installing the extension? Start with the **[Chrome setup guide](setup.md)** or t
 1. User opens **Open PDF** and selects a local file or drags a PDF into the reader.
 2. The extension launches its own **extension-origin reader tab**, built on the bundled PDF.js viewer components (D-06), with page rendering, navigation, zoom, find-in-document and a selectable text layer.
 3. Highlighting works on the rendered text layer and invokes **the same analysis and pronunciation actions** as webpages.
-4. Only the selected text and bounded context are sent to Groq after an AI action; the PDF itself is never uploaded.
+4. Only the selected text and bounded context are sent to Groq after an AI action; the PDF itself is not sent to Groq. It is uploaded to the Clavis server only if the user is signed in and chooses to save it to their account (Clavis Sync).
 5. PDF.js errors, encrypted PDFs, scanned pages without text and malformed documents are communicated clearly.
 
 **Why a custom PDF reader?** Chrome's built-in PDF viewer is not a normal HTML page that content scripts can reliably decorate. v1 **does not promise** a tooltip inside Chrome's native PDF viewer; the document must be opened in Clavis's reader. No browser-wide PDF hijacking in v1.
@@ -101,12 +102,13 @@ Installing the extension? Start with the **[Chrome setup guide](setup.md)** or t
 | Local PDF.js reader, selection, zoom, virtualized pages | Yes | |
 | PDF find-in-document | Should | |
 | Remote PDF URLs / "Open in Clavis" on PDF links | | Yes (D-03) |
-| Local saved vocabulary/history with delete/export | | Yes (D-04) |
+| Local saved words, per-word chat, library, delete/export (D-04, reversed by Clavis Sync) | Behind the Clavis Sync flag | |
 | Saved IPA / recorded dictionary audio | Optional | Rich phonetics |
 | OCR for image-only scans | | Yes |
 | OpenRouter, Gemini, Cerebras, etc. | | Yes |
 | Automatic interception of every browser PDF | | Evaluate later |
-| User accounts, billing, backend sync, team features | | Only if justified |
+| Optional Google accounts, sync and web dashboard (Clavis Sync, S-01 … S-10) | Behind `FEATURES.accountSync` | |
+| Billing, team features | | Only if justified |
 
 v1 must not advertise features that are unsupported on particular sites or voice configurations. See the precise **Must/Should/Could** classification in `requirements.md`.
 

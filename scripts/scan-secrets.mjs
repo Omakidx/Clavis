@@ -22,7 +22,15 @@ if (probe.error || probe.status !== 0) {
 }
 console.log(`gitleaks ${probe.stdout.trim()}`);
 
-const common = ['--config', '.gitleaks.toml', '--redact', '--no-banner', '--exit-code', '1'];
+const common = [
+  '--config',
+  '.gitleaks.toml',
+  '--redact',
+  '--verbose',
+  '--no-banner',
+  '--exit-code',
+  '1',
+];
 const hasCommits =
   spawnSync('git', ['rev-parse', '--verify', '--quiet', 'HEAD'], { cwd: root }).status === 0;
 const scans = [

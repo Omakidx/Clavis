@@ -1,0 +1,209 @@
+import { useEffect, useState } from 'react';
+import { Link, useParams } from 'wouter';
+import type { ChatView, WordView } from '@shared/api-contract/endpoints';
+import { ApiFailure, isAbort } from '../api/client';
+import { api } from '../api/endpoints';
+import { formatDate, safeHttpUrl } from '../format';
+import { Modal } from '../ui/modal';
+import { ErrorState, Loading, usePage } from '../ui/page';
+
+type Load =
+  | { status: 'loading' }
+  | { status: 'error'; failure: unknown }
+  | { status: 'ready'; word: WordView; messages: ChatView[] };
+
+function Source({ word }: { word: WordView }) {
+  const [confirming, setConfirming] = useState(false);
+  const s = word.source;
+  if (s.kind === 'pdf') {
+    return (
+      <p>
+        PDF{s.title ? `: ${s.title}` : ''}, page {s.page}
+      </p>
+    );
+  }
+  const url = safeHttpUrl(s.url);
+  return (
+    <>
+      {s.title ? <p>{s.title}</p> : null}
+      {s.url ? <p className="url">{s.url}</p> : <p className="muted">No page address was saved.</p>}
+      {url ? (
+        <button type="button" className="btn btn--quiet" onClick={() => setConfirming(true)}>
+          Open source page…
+        </button>
+      ) : null}
+      {confirming && url ? (
+        <Modal
+          title="Open this website?"
+          onClose={() => setConfirming(false)}
+          actions={
+            <>
+              <button
+                type="button"
+                className="btn btn--quiet"
+                data-initial-focus
+                onClick={() => setConfirming(false)}
+              >
+                Cancel
+              </button>
+              <a
+                className="btn"
+                href={url.href}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={() => setConfirming(false)}
+              >
+                Open in a new tab
+              </a>
+            </>
+          }
+        >
+          <p>
+            This leaves Clavis and opens a website you saved from. Only continue if you trust it.
+          </p>
+          <p className="url">{url.href}</p>
+        </Modal>
+      ) : null}
+    </>
+  );
+}
+
+export function WordDetail() {
+  const { key = '' } = useParams<{ key: string }>();
+  const [tick, setTick] = useState(0);
+  return (
+    <WordDetailLoaded key={`${key}|${tick}`} wordKey={key} onRetry={() => setTick((n) => n + 1)} />
+  );
+}
+
+function WordDetailLoaded({ wordKey, onRetry }: { wordKey: string; onRetry(): void }) {
+  const [load, setLoad] = useState<Load>({ status: 'loading' });
+  const heading = usePage(
+    load.status === 'ready' ? load.word.text : 'Saved word',
+    load.status !== 'loading',
+  );
+
+  useEffect(() => {
+    const ctl = new AbortController();
+    api
+      .word(wordKey, ctl.signal)
+      .then((r) => setLoad({ status: 'ready', word: r.word, messages: r.messages }))
+      .catch((e: unknown) => {
+        if (!isAbort(e)) setLoad({ status: 'error', failure: e });
+      });
+    return () => ctl.abort();
+  }, [wordKey]);
+
+  const back = (
+    <p>
+      <Link href="/words">← All saved words</Link>
+    </p>
+  );
+
+  if (load.status === 'loading') {
+    return (
+      <section>
+        {back}
+        <Loading label="Loading saved word…" />
+      </section>
+    );
+  }
+  if (load.status === 'error') {
+    const notFound = load.failure instanceof ApiFailure && load.failure.kind === 'not-found';
+    return (
+      <section>
+        {back}
+        <h1 ref={heading} tabIndex={-1}>
+          {notFound ? 'Saved word not found' : 'Saved word'}
+        </h1>
+        <ErrorState failure={load.failure} {...(notFound ? {} : { onRetry })} />
+      </section>
+    );
+  }
+
+  const { word, messages } = load;
+  const m = word.meaning;
+  return (
+    <article className="detail">
+      {back}
+      <h1 ref={heading} tabIndex={-1} className="break">
+        {word.text}
+      </h1>
+      <p className="meta">
+        {word.language ? <span>Language: {word.language}</span> : null}
+        <span>Saved {formatDate(word.createdAt)}</span>
+      </p>
+
+      <section aria-labelledby="meaning-h">
+        <h2 id="meaning-h">Meaning</h2>
+        <p className="strong">{m.title}</p>
+        <p>{m.summary}</p>
+        {m.contextualMeaning ? (
+          <>
+            <h3>In this context</h3>
+            <p>{m.contextualMeaning}</p>
+          </>
+        ) : null}
+        {m.definition ? (
+          <>
+            <h3>Definition</h3>
+            <p>{m.definition}</p>
+          </>
+        ) : null}
+        {m.examples && m.examples.length > 0 ? (
+          <>
+            <h3>Examples</h3>
+            <ul>
+              {m.examples.map((ex, i) => (
+                <li key={i}>
+                  {ex.sentence}
+                  {ex.note ? <span className="muted"> ({ex.note})</span> : null}
+                </li>
+              ))}
+            </ul>
+          </>
+        ) : null}
+        {m.caveat ? <p className="notice notice--warning">{m.caveat}</p> : null}
+        <p className="muted">Generated by {m.model}</p>
+      </section>
+
+      {word.contextBefore || word.contextAfter ? (
+        <section aria-labelledby="context-h">
+          <h2 id="context-h">Context</h2>
+          <blockquote className="context">
+            {word.contextBefore}
+            <mark>{word.text}</mark>
+            {word.contextAfter}
+          </blockquote>
+        </section>
+      ) : null}
+
+      <section aria-labelledby="source-h">
+        <h2 id="source-h">Source</h2>
+        <Source word={word} />
+      </section>
+
+      <section aria-labelledby="chat-h">
+        <h2 id="chat-h">Chat</h2>
+        {messages.length === 0 ? (
+          <p className="muted">No chat messages for this word yet.</p>
+        ) : (
+          <ol className="messages" aria-label="Chat messages">
+            {messages.map((msg) => (
+              <li key={msg.id} className={`message message--${msg.role}`}>
+                <p className="message__who">
+                  {msg.role === 'user' ? 'You' : 'Clavis'}
+                  <span className="muted"> · {formatDate(msg.createdAt)}</span>
+                </p>
+                <p className="message__text">{msg.content}</p>
+              </li>
+            ))}
+          </ol>
+        )}
+        <p className="notice notice--info" data-testid="chat-note">
+          Continue this chat in the Clavis extension.
+        </p>
+      </section>
+    </article>
+  );
+}

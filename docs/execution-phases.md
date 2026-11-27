@@ -413,8 +413,31 @@ Remote PDF URLs and thumbnails are not part of v1 (D-03; thumbnails are a Could)
 - [ ] Track provider model deprecations/free-tier changes and surface compatibility alerts through UI on connection test.
 - [ ] Patch PDF.js/extension dependencies routinely; release updates through same store review process.
 - [ ] Keep privacy policy, listing and permissions in sync with any functionality changes.
-- [ ] Prioritize next release with evidence. Planned "Later" items: remote PDF URLs and "Open in Clavis" on PDF links (D-03), saved vocabulary with export (D-04), grammar/translate if not shipped, more UI languages; then IPA recordings, OCR and eventually additional model providers.
+- [ ] Prioritize next release with evidence. Planned "Later" items: remote PDF URLs and "Open in Clavis" on PDF links (D-03), grammar/translate if not shipped (saved vocabulary with export, D-04, moved into Clavis Sync, see the next section), more UI languages; then IPA recordings, OCR and eventually additional model providers.
 - [ ] Never silently add telemetry, an external provider, background browsing collection, or new permissions without corresponding disclosure and policy review.
+
+## Clavis Sync (optional accounts, sync and web dashboard)
+
+**Goal:** optional Google accounts that sync saved words, chats, bookmarks/highlights, reading progress and PDFs to a first-party server on Railway, plus a web dashboard (decisions S-01 … S-10; design in [clavis-sync-design.md](clavis-sync-design.md) §10, which defines phases P0 to P4). Branch `clavis-sync`. The feature is built but off: `FEATURES.accountSync` is `false` in `lib/config/constants.ts`.
+
+**Status as of 2026-11-27:**
+
+| Phase | Scope | Status |
+| --- | --- | --- |
+| P0 Foundations | `server/`, `dashboard/`, `shared/api-contract` scaffolds, CI wiring, auth and bucket spikes | Done |
+| P1 Data and local features | Schema and migrations, auth, account and health endpoints; IndexedDB layer, highlight migration, reading progress, local saved words, library page, local chat | Done |
+| P2 Sync | Push and pull, words and documents REST; `lib/account` and `lib/sync`, account UI, first-sign-in merge, sign-out | Done |
+| P3 Storage, dashboard and reader | PDF upload, download, quota and jobs; reader save to account and open from cloud, redesign; dashboard pages | Done |
+| P4 Account lifecycle and release | Export (ZIP) and account deletion with Google re-authentication on the dashboard Account page; docs lockstep (design §7.1, §14) and privacy policy rewrite; security review of the whole delta | **In progress** |
+
+**Remaining before `FEATURES.accountSync` can be flipped** (design §10, gate of P4):
+
+- [ ] Real Google OAuth Web client created, its client ID set in the extension build and its secret in the Railway variables, with both extension IDs (dev unpacked and Web Store) in `ALLOWED_EXTENSION_IDS` and in Google's authorized redirect URIs.
+- [ ] Railway Bucket created and its `S3_*` variables set on the `clavis-api` service (the file routes answer `503 UNAVAILABLE` without them; bucket lifecycle rule for incomplete multipart uploads per [server/README.md](../server/README.md)).
+- [ ] Confirm on the first Railway deploy which client-IP header Railway sends (`TRUSTED_PROXY_HOPS`, `CLIENT_IP_HEADER` in server/README.md).
+- [ ] Owner confirmations marked `[[OWNER: …]]` in [privacy-policy.md](privacy-policy.md) (Railway backup retention and log-retention plan) and the open questions in [design §16](clavis-sync-design.md#16-open-questions-for-the-product-owner).
+- [ ] Privacy policy published and its URL set consistently (`CLAVIS_PRIVACY_POLICY_URL`, `PRIVACY_URL` in the dashboard, Web Store field); store data-usage answers switched to the Clavis Sync release answers in [store/permission-justifications.md](store/permission-justifications.md); the first-send disclosure line "Clavis has no server of its own" in [requirements.md §4.1](requirements.md#approved-disclosure-copy-fr-002-fr-009-fr-071) and its i18n string reviewed.
+- [ ] Security review of the whole delta with no open high or critical findings; deletion completeness and export round-trip tests; full `npm run ci`, server CI and a manual Linux pass.
 
 ## Release-day smoke test (minimum)
 

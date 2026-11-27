@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { expect, type BrowserContext, type Page } from '@playwright/test';
+import { forgetReadingProgress } from '../p10-support/progress';
 
 const fixtureDir = fileURLToPath(new URL('../../fixtures/pdf/', import.meta.url));
 
@@ -100,6 +101,8 @@ export async function openReader(
   const problems: string[] = [];
   const dialogs: string[] = [];
   context.on('request', (request) => requests.push(request.url()));
+  // A fresh open starts on page 1 (the reader now restores the saved place of a file it knows).
+  await forgetReadingProgress(context);
   const page = await context.newPage();
   await page.setViewportSize(viewport);
   await page.addInitScript(RECORD_MESSAGES);

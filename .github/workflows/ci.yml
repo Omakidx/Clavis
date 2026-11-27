@@ -232,6 +232,93 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
 
+  # Clavis Sync end to end: the built extension against the real local API (server/), Postgres, MinIO and the
+  # fake Google, plus the web dashboard's Playwright suite. The browser shards above skip these specs because
+  # they have no services; CLAVIS_E2E_STACK=1 makes them run here. The service credentials match the dev
+  # defaults in server/docker-compose.dev.yml, which the specs use; development values only.
+  sync-e2e:
+    name: Sync e2e (extension and dashboard, Linux)
+    needs: checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: clavis
+          POSTGRES_PASSWORD: clavis-dev-only
+          POSTGRES_DB: clavis
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd "pg_isready -U clavis -d clavis"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      minio:
+        image: bitnamilegacy/minio:2025.7.23-debian-12-r5
+        env:
+          MINIO_ROOT_USER: clavis-dev
+          MINIO_ROOT_PASSWORD: clavis-dev-only
+          MINIO_DEFAULT_BUCKETS: clavis-dev
+        ports:
+          - 9000:9000
+        options: >-
+          --health-cmd "curl -fs http://localhost:9000/minio/health/live"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      CLAVIS_E2E_STACK: '1'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            server/package-lock.json
+            dashboard/package-lock.json
+
+      - name: Install dependencies (root, server, dashboard)
+        run: npm ci && npm ci --prefix server && npm ci --prefix dashboard
+
+      - name: Install Playwright Chromium
+        run: npm run e2e:install -- --with-deps
+
+      # Each spec starts its own stack on ports 8787/8788, so they run as separate invocations.
+      - name: Extension sync e2e
+        run: npx playwright test tests/e2e/p11-sync.spec.ts
+
+      - name: Extension reader-cloud e2e
+        run: npx playwright test tests/e2e/p12-reader-cloud.spec.ts
+
+      - name: Build dashboard
+        run: npm run build --prefix dashboard
+
+      - name: Dashboard e2e
+        working-directory: dashboard
+        run: npx playwright test
+
+      - name: Upload Playwright reports
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: playwright-report-sync-e2e
+          path: |
+            playwright-report/
+            test-results/
+            dashboard/playwright-report/
+            dashboard/test-results/
+          if-no-files-found: ignore
+          retention-days: 7
+
   # The release candidate: runs every deterministic gate once more on a clean checkout of the
   # exact commit (npm run release:check = check, build, size, zip, audit:zip --strict, selftest,
   # gitleaks, plus a second independent build that must give a byte-identical ZIP), then keeps the
@@ -239,7 +326,7 @@ jobs:
   # E2E suites passed. Uploading to the Chrome Web Store stays a manual Phase 10 step.
   release-candidate:
     name: Release candidate ZIP
-    needs: [checks, e2e]
+    needs: [checks, e2e, sync-e2e]
     if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -300,3 +387,78 @@ jobs:
           include-hidden-files: true
           if-no-files-found: error
           retention-days: 90
+
+  # Clavis Sync backend (docs/clavis-sync-design.md §9). Independent of the extension jobs above:
+  # server/ and dashboard/ are separate npm packages, so nothing here touches the root install.
+  server:
+    name: Server (typecheck, lint, test, build)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: clavis
+          POSTGRES_PASSWORD: clavis-ci-only
+          POSTGRES_DB: clavis_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U clavis -d clavis_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      # S3 for the PDF storage tests (docs/clavis-sync-design.md §6). Same frozen image as server/docker-compose.dev.yml:
+      # MinIO no longer publishes images on Docker Hub, and this is the last Bitnami build. CI credentials only.
+      minio:
+        image: bitnamilegacy/minio:2025.7.23-debian-12-r5
+        env:
+          MINIO_ROOT_USER: clavis-ci
+          MINIO_ROOT_PASSWORD: clavis-ci-only
+          MINIO_DEFAULT_BUCKETS: clavis-test
+        ports:
+          - 9000:9000
+        options: >-
+          --health-cmd "curl -fs http://localhost:9000/minio/health/live"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      TEST_DATABASE_URL: postgres://clavis:clavis-ci-only@localhost:5432/clavis_test
+      TEST_S3_ENDPOINT: http://localhost:9000
+      TEST_S3_BUCKET: clavis-test
+      TEST_S3_ACCESS_KEY_ID: clavis-ci
+      TEST_S3_SECRET_ACCESS_KEY: clavis-ci-only
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            server/package-lock.json
+            dashboard/package-lock.json
+
+      - name: Install server and dashboard dependencies
+        run: npm ci --prefix server && npm ci --prefix dashboard
+
+      - name: Check zod versions match across root, server and dashboard
+        run: node scripts/check-zod-version.mjs
+
+      - name: Audit production dependencies (server and dashboard)
+        run: npm audit --omit=dev --audit-level=high --prefix server && npm audit --omit=dev --audit-level=high --prefix dashboard
+
+      - name: Build dashboard
+        run: npm run build --prefix dashboard
+
+      - name: Lint dashboard
+        run: npm run lint --prefix dashboard
+
+      - name: Typecheck, lint, test and build server
+        run: npm run ci --prefix server

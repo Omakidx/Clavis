@@ -1,16 +1,32 @@
 import { browser } from 'wxt/browser';
+import { createApiClient } from '../account/api';
+import { buildAccountConfig } from '../account/config';
+import { createAccountService } from '../account/service';
+import { createTokenClient, createTokenStore } from '../account/tokens';
+import { FEATURES } from '../config/constants';
+import { createSyncEngine } from '../sync/engine';
+import { createSyncStateStore } from '../sync/state';
 import { createCapabilityCache } from '../ai/capability-cache';
 import { GroqProvider } from '../ai/groq';
+import { notifyAccountStatusChanged } from '../data/channel';
+import { sweepStaleHandoffs } from '../data/handoff';
+import { migrateLegacyHighlights } from '../data/migrate';
+import { logger } from '../security/logger';
 import { whenStorageLockedDown } from '../security/storage-lockdown';
 import { registerSiteAccess } from '../site-access/background';
 import { createSpeech } from '../speech/background';
 import { createApiKeyStore, createSettingsStore } from '../storage';
+import { createAccountHandlers } from './handlers/account';
 import { createAiHandlers } from './handlers/ai';
 import { createCardHandlers } from './handlers/card';
+import { createChatHandlers } from './handlers/chat';
+import { createDocumentHandlers } from './handlers/documents';
 import { createKeyService } from './handlers/key';
 import { createNavigationHandlers } from './handlers/navigation';
 import { createSidePanelHandlers } from './handlers/sidepanel';
 import { createSettingsHandlers } from './handlers/settings';
+import { createSyncHandlers } from './handlers/sync';
+import { createWordHandlers } from './handlers/words';
 import { abortTabRequests, createAiGuard, panelKey, senderKey } from './limiter';
 import { createMessageListener } from './router';
 import { buildRoutes } from './routes';
@@ -66,6 +82,44 @@ export function registerBackground(): void {
     notify: (message) => browser.runtime.sendMessage(message) as Promise<unknown>,
   });
 
+  // Accounts and sync (docs/clavis-sync-design.md). Built always, but inert unless
+  // FEATURES.accountSync: no listener below is registered, no request is ever made.
+  const accountEnabled = FEATURES.accountSync;
+  const syncState = createSyncStateStore(browser.storage.local);
+  const accountApi = createApiClient({ origin: buildAccountConfig().apiOrigin });
+  const tokenStore = createTokenStore({
+    local: browser.storage.local,
+    session: browser.storage.session,
+    lockedDown: whenStorageLockedDown,
+  });
+  // eslint-disable-next-line prefer-const -- the token client needs the service, the service the client
+  let account: ReturnType<typeof createAccountService>;
+  const tokenClient = createTokenClient({
+    store: tokenStore,
+    api: accountApi,
+    onSessionLost: () => account.sessionLost(),
+    generation: () => account.generation(),
+  });
+  const engine = createSyncEngine({
+    tokens: tokenClient,
+    state: syncState,
+    alarms: browser.alarms,
+    enabled: accountEnabled,
+    onSessionLost: () => account.sessionLost(),
+  });
+  account = createAccountService({
+    config: buildAccountConfig(),
+    api: accountApi,
+    tokens: tokenClient,
+    store: tokenStore,
+    state: syncState,
+    engine,
+    local: browser.storage.local,
+    identity: browser.identity,
+    enabled: accountEnabled,
+  });
+  const kickEngine = (pull = false): void => void engine.kick(pull);
+
   const routes = buildRoutes({
     ai: createAiHandlers({
       settings: settingsStore,
@@ -91,9 +145,34 @@ export function registerBackground(): void {
       areas: [browser.storage.local, browser.storage.session],
       onModelContextChanged: () => void capabilityCache.invalidate(),
       onDataCleared: () => sidePanel.clear(),
+      invalidateAccount: () => account.invalidate(),
+      signOutFirst: async () => {
+        if (accountEnabled) await account.signOut(false);
+      },
     }),
     speech: createSpeech({ preferences: () => settingsStore.getPreferences() }),
     injection,
+    words: createWordHandlers({ tabs: browser.tabs, onLocalChange: kickEngine }),
+    chat: createChatHandlers({
+      settings: settingsStore,
+      keys: keyStore,
+      keyService,
+      provider,
+      guard,
+      lockedDown: whenStorageLockedDown,
+      onLocalChange: kickEngine,
+    }),
+    sync: createSyncHandlers({ onKick: kickEngine }),
+    account: createAccountHandlers({ account, engine, enabled: accountEnabled }),
+    documents: createDocumentHandlers({
+      tokens: tokenClient,
+      enabled: accountEnabled,
+      onLocalChange: () => kickEngine(true),
+      onStorageChanged: () => {
+        account.invalidateUsage();
+        notifyAccountStatusChanged();
+      },
+    }),
   });
 
   const listener = createMessageListener({
@@ -104,6 +183,25 @@ export function registerBackground(): void {
     routes,
   });
   browser.runtime.onMessage.addListener(listener);
+
+  // Highlights used to live in chrome.storage.local; move them into IndexedDB once (design 7.3).
+  // Idempotent and cheap when there is nothing to move, so it simply runs at every worker start.
+  void migrateLegacyHighlights().then(
+    (written) => {
+      if (written > 0) kickEngine();
+    },
+    () => logger.warn('highlight_migration_failed'),
+  );
+
+  // A PDF left in the handoff store by a page that died mid-transfer must not stay (design 6.6).
+  void sweepStaleHandoffs().catch(() => logger.warn('handoff_sweep_failed'));
+
+  if (accountEnabled) {
+    // Listeners are registered synchronously (MV3). The engine only acts while signed in.
+    browser.runtime.onStartup.addListener(() => void engine.onStartup());
+    browser.alarms.onAlarm.addListener((alarm) => void engine.onAlarm(alarm.name));
+    void engine.ensureAlarm();
+  }
 
   // A closed tab can no longer receive a result: stop paying for its request.
   browser.tabs.onRemoved.addListener((tabId) => {

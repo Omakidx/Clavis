@@ -80,6 +80,22 @@ export interface SessionOptions {
 
 type Listener = (state: SessionState) => void;
 
+/** The meaning a saved word keeps: the core result's fields, never anything else the model sent. */
+export interface SavedMeaningInput {
+  title: string;
+  summary: string;
+  contextualMeaning?: string;
+  definition?: string;
+  examples?: { sentence: string; note?: string }[];
+  caveat?: string;
+  model: string;
+}
+
+export interface SavableWord {
+  snapshot: SelectionSnapshot;
+  meaning: SavedMeaningInput;
+}
+
 const FORBIDDEN_MESSAGE = {
   model_permission_org: 'keyHttpModelOrg',
   model_permission_project: 'keyHttpModelProject',
@@ -341,6 +357,43 @@ export class ExplainSession {
         ? { targetLanguage: this.language }
         : {}),
     };
+  }
+
+  /**
+   * What the Save button saves (docs/clavis-sync-design.md 7.5): the selection exactly as it was
+   * sent, and the core answer's fields the library keeps. Null unless the selection is a word or a
+   * phrase of at most 200 characters and its core tab has loaded.
+   */
+  savable(): SavableWord | null {
+    const { kind, text } = this.snapshot;
+    const result = this.entry('core')?.result;
+    if (
+      (kind !== 'word' && kind !== 'phrase') ||
+      text.length > 200 ||
+      this.entry('core')?.status !== 'ready' ||
+      result === null ||
+      result === undefined
+    ) {
+      return null;
+    }
+    // Only the fields the shared record keeps: nothing else the model sent is ever saved.
+    const meaning: Record<string, unknown> = {};
+    for (const key of [
+      'title',
+      'summary',
+      'contextualMeaning',
+      'definition',
+      'caveat',
+      'model',
+    ] as const) {
+      if (result[key] !== undefined) meaning[key] = result[key];
+    }
+    if (result.examples !== undefined) {
+      meaning['examples'] = result.examples.map(({ sentence, note }) =>
+        note === undefined ? { sentence } : { sentence, note },
+      );
+    }
+    return { snapshot: this.snapshot, meaning: meaning as unknown as SavedMeaningInput };
   }
 
   /** Text for the polite live region (copy feedback, retry becoming available). */

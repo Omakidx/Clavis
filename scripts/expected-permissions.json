@@ -1,5 +1,5 @@
 {
-  "$comment": "Allowlist for the release ZIP audit (scripts/audit-zip.mjs). Mirrors docs/architecture.md section 3 and wxt.config.ts. Change docs first, then wxt.config.ts, then this file, and update the privacy policy. Permission order is ignored; any addition or removal fails. Manifest top-level keys outside allowedManifestKeys fail. Risky keys (web_accessible_resources, externally_connectable, sandbox, oauth2, key, update_url, chrome_url_overrides) fail unless a matching expected value is added to this file; web_accessible_resources must also set use_dynamic_url: true on every entry. commands, minimum_chrome_version and content_security_policy must equal the values here. allowedFilePatterns (regular expressions over ZIP paths) lists every file the package may contain; any other file fails. allowedUrlHosts lists every host a literal http(s)/ws(s) URL in shipped text may name (suffix match, so w3.org covers www.w3.org): network = contacted by the code (must also be a host_permissions entry), links = opened only after a user click, inert = XML namespaces, documentation and error-message text inside bundled libraries. A new host fails the audit until it is reviewed and added here.",
+  "$comment": "Allowlist for the release ZIP audit (scripts/audit-zip.mjs). Mirrors docs/architecture.md section 3 and wxt.config.ts. Change docs first, then wxt.config.ts, then this file, and update the privacy policy. Permission order is ignored; any addition or removal fails. Manifest top-level keys outside allowedManifestKeys fail. Risky keys (web_accessible_resources, externally_connectable, sandbox, oauth2, key, update_url, chrome_url_overrides) fail unless a matching expected value is added to this file; web_accessible_resources must also set use_dynamic_url: true on every entry. commands, minimum_chrome_version and content_security_policy must equal the values here. allowedFilePatterns (regular expressions over ZIP paths) lists every file the package may contain; any other file fails. allowedUrlHosts lists every host a literal http(s)/ws(s) URL in shipped text may name (suffix match, so w3.org covers www.w3.org): network = contacted by the code (must also be a host_permissions entry), corsNetwork = contacted by the background under the Clavis API server's CORS allowlist, without a host permission (docs/clavis-sync-design.md 7.1), links = opened only after a user click, inert = XML namespaces, documentation and error-message text inside bundled libraries. A new host fails the audit until it is reviewed and added here.",
   "allowedManifestKeys": [
     "manifest_version",
     "name",
@@ -19,7 +19,16 @@
     "options_ui"
   ],
   "minimum_chrome_version": "147",
-  "permissions": ["storage", "tts", "scripting", "activeTab", "contextMenus", "sidePanel"],
+  "permissions": [
+    "storage",
+    "tts",
+    "scripting",
+    "activeTab",
+    "contextMenus",
+    "sidePanel",
+    "identity",
+    "alarms"
+  ],
   "optional_permissions": [],
   "host_permissions": ["https://api.groq.com/*"],
   "optional_host_permissions": ["http://*/*", "https://*/*"],
@@ -47,8 +56,10 @@
   ],
   "allowedUrlHosts": {
     "network": ["api.groq.com"],
+    "corsNetwork": ["clavis-api-production.up.railway.app"],
     "links": [
       "console.groq.com",
+      "accounts.google.com",
       "groq.com",
       "omakidx.github.io",
       "chromewebstore.google.com",

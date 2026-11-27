@@ -24,12 +24,13 @@ Use Node.js **24** (see [.nvmrc](.nvmrc)). In `chrome://extensions`, enable **De
 - Select words inside an answer to look them up too; **Back** restores the previous result.
 - Use **Speak** to hear selected text, or the speaker beside a translation to hear that translation.
 - Open local PDFs in the Clavis reader and work with their selectable text.
+- Optionally, sign in with Google to keep saved words, highlights, reading progress and PDFs in sync across devices and in a web dashboard. **Clavis Sync is built but not yet switched on** (`FEATURES.accountSync` in `lib/config/constants.ts`). Accounts are never required: signed out, Clavis stays local.
 
 ## Privacy
 
 Selecting text alone does not send an AI request. Lookup sends your selection and a limited amount of surrounding context to Groq. Speech uses available Chrome voices: Automatic tries a matching local voice first, then an online voice when needed. Online voices send the text to their provider. Your Groq key stays in Chrome extension storage on your device or in session storage, according to your choice; Clavis does not encrypt it.
 
-See the [privacy policy draft](docs/privacy-policy.md) for details.
+With an account, saved words, chats, reading data and any PDFs you choose to save are also stored on a server run by the publisher; your Groq key is never sent there. See the [privacy policy draft](docs/privacy-policy.md) for details.
 
 ## Development
 
@@ -40,7 +41,7 @@ npm run build      # Production unpacked extension
 npm run zip        # Production ZIP in .output/
 ```
 
-The [technical documentation](docs/README.md) covers architecture, requirements, and release checks. The [design preview](dev/preview/README.md) is for UI development; it uses simulated data and cannot validate a real Groq key.
+The [technical documentation](docs/README.md) covers architecture, requirements, and release checks. The optional sync server in [`server/`](server/README.md) and the web dashboard in `dashboard/` have their own setup; [server/README.md](server/README.md) lists how to run the server and its environment (see also [docs/clavis-sync-design.md](docs/clavis-sync-design.md)). The [design preview](dev/preview/README.md) is for UI development; it uses simulated data and cannot validate a real Groq key.
 
 ## License
 

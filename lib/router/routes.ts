@@ -8,13 +8,26 @@ import {
   type PublicMessage,
   type SidePanelMessage,
 } from '../contracts';
+import {
+  parseLibraryMessage,
+  parseWordMessage,
+  type LibraryMessage,
+  type WordMessage,
+} from '../contracts/words';
+import { parseAccountMessage, type AccountMessage } from '../contracts/account';
+import { parseDocumentMessage, type DocumentMessage } from '../contracts/documents';
 import { injectTabForPopup, type InjectionDeps } from '../site-access/injection';
 import { isInjectTabMessage, type InjectTabMessage } from '../site-access/messages';
 import { rejectedSpeakReply, type SpeechHandlers } from '../speech/background';
 import type { createAiHandlers } from './handlers/ai';
 import type { CardHandlers } from './handlers/card';
 import type { NavigationHandlers } from './handlers/navigation';
+import type { ChatHandlers } from './handlers/chat';
 import type { SidePanelHandlers } from './handlers/sidepanel';
+import type { AccountHandlers } from './handlers/account';
+import type { DocumentHandlers } from './handlers/documents';
+import type { SyncHandlers } from './handlers/sync';
+import type { WordHandlers } from './handlers/words';
 import type { KeyService } from './handlers/key';
 import type { SettingsHandlers } from './handlers/settings';
 import {
@@ -32,7 +45,7 @@ import { panelTabOf, PRACTICE_PAGE_PATH } from './sender';
 // Allowed senders
 // ---------------------------------------------------------------------------
 
-const { options, onboarding, popup, reader, sidepanel } = EXTENSION_PAGES;
+const { options, onboarding, popup, reader, sidepanel, library } = EXTENSION_PAGES;
 
 /**
  * Public routes: content scripts, the reader, the practice page and the other extension
@@ -106,6 +119,49 @@ export const OPEN_SETTINGS_SENDERS: SenderRule = {
 
 /** Other privileged routes: settings and status. Adds the popup. */
 export const SETTINGS_SENDERS: SenderRule = { pages: [options, onboarding, popup] };
+
+/**
+ * ACCEPT_DISCLOSURE: the settings senders plus the library, for that one route only. The library
+ * shows the one-time "Send this to Groq?" copy before its first chat message (S-05); it gets no
+ * other settings route.
+ */
+export const ACCEPT_DISCLOSURE_SENDERS: SenderRule = {
+  pages: [options, onboarding, popup, library],
+};
+
+/**
+ * SAVE_WORD, UNSAVE_WORD and GET_WORD_SAVED: the contexts that host the card (web page content
+ * scripts, the reader and the practice page) and the side panel. Untrusted callers: the source of
+ * a saved word is taken from the browser's sender fields, never from the message (handler).
+ */
+export const WORD_SENDERS: SenderRule = {
+  content: true,
+  pages: [reader, PRACTICE_PAGE_PATH, sidepanel],
+};
+
+/** WORD_CHAT_SEND and WORD_CHAT_CANCEL: the library only (S-05: new messages come from the extension). */
+export const LIBRARY_SENDERS: SenderRule = { pages: [library] };
+
+/** SYNC_KICK: the pages that write local data. */
+export const SYNC_KICK_SENDERS: SenderRule = { pages: [reader, library, options] };
+
+/** Account routes (docs/clavis-sync-design.md 7.4). Extension pages only, never a content script. */
+export const ACCOUNT_STATUS_SENDERS: SenderRule = {
+  pages: [options, onboarding, popup, reader, library],
+};
+export const ACCOUNT_SIGN_IN_SENDERS: SenderRule = { pages: [options, popup] };
+export const ACCOUNT_SIGN_OUT_SENDERS: SenderRule = { pages: [options] };
+export const ACCOUNT_SIGN_OUT_EVERYWHERE_SENDERS: SenderRule = { pages: [options] };
+export const SYNC_NOW_SENDERS: SenderRule = { pages: [options, popup, library] };
+
+/**
+ * PDF files in the account (design 7.4). Upload and fetch are the reader's (it holds the file and
+ * opens it); removing a stored file also belongs to the library's Documents tab. Never a content
+ * script, the popup or the side panel.
+ */
+export const DOCUMENT_UPLOAD_SENDERS: SenderRule = { pages: [reader] };
+export const DOCUMENT_FETCH_SENDERS: SenderRule = { pages: [reader] };
+export const DOCUMENT_REMOVE_FILE_SENDERS: SenderRule = { pages: [reader, library] };
 
 // ---------------------------------------------------------------------------
 // Parsers
@@ -183,6 +239,61 @@ function sidePanelRoute<K extends SidePanelMessage['type']>(
   });
 }
 
+/** A word route (SAVE_WORD, UNSAVE_WORD, GET_WORD_SAVED): validated by `parseWordMessage`. */
+function wordRoute<K extends WordMessage['type']>(
+  type: K,
+  handle: (message: Extract<WordMessage, { type: K }>, context: RouteContext) => unknown,
+): Route {
+  return defineRoute<Extract<WordMessage, { type: K }>>({
+    type,
+    allow: WORD_SENDERS,
+    parse: contract<WordMessage, K>(parseWordMessage, type),
+    handle,
+  });
+}
+
+/** A route of the library family (chat, sync nudge): validated by `parseLibraryMessage`. */
+function libraryRoute<K extends LibraryMessage['type']>(
+  type: K,
+  allow: SenderRule,
+  handle: (message: Extract<LibraryMessage, { type: K }>, context: RouteContext) => unknown,
+): Route {
+  return defineRoute<Extract<LibraryMessage, { type: K }>>({
+    type,
+    allow,
+    parse: contract<LibraryMessage, K>(parseLibraryMessage, type),
+    handle,
+  });
+}
+
+/** A route of the account family (ACCOUNT_*, SYNC_NOW): validated by `parseAccountMessage`. */
+function accountRoute<K extends AccountMessage['type']>(
+  type: K,
+  allow: SenderRule,
+  handle: (message: Extract<AccountMessage, { type: K }>, context: RouteContext) => unknown,
+): Route {
+  return defineRoute<Extract<AccountMessage, { type: K }>>({
+    type,
+    allow,
+    parse: contract<AccountMessage, K>(parseAccountMessage, type),
+    handle,
+  });
+}
+
+/** A route of the document family (DOCUMENT_*): validated by `parseDocumentMessage`. */
+function documentRoute<K extends DocumentMessage['type']>(
+  type: K,
+  allow: SenderRule,
+  handle: (message: Extract<DocumentMessage, { type: K }>, context: RouteContext) => unknown,
+): Route {
+  return defineRoute<Extract<DocumentMessage, { type: K }>>({
+    type,
+    allow,
+    parse: contract<DocumentMessage, K>(parseDocumentMessage, type),
+    handle,
+  });
+}
+
 /** The Spike B replies are `{ ok: false, reason }`, not envelopes; keep that shape. */
 const injectRejected = (): unknown => ({ ok: false, reason: 'failed' });
 
@@ -195,6 +306,11 @@ export interface RouteServices {
   settings: SettingsHandlers;
   speech: SpeechHandlers;
   injection: InjectionDeps;
+  words: WordHandlers;
+  chat: ChatHandlers;
+  sync: SyncHandlers;
+  account: AccountHandlers;
+  documents: DocumentHandlers;
 }
 
 /**
@@ -202,7 +318,21 @@ export interface RouteServices {
  * Anything not listed is not answered.
  */
 export function buildRoutes(services: RouteServices): Route[] {
-  const { ai, card, navigation, sidePanel, keys, settings, speech, injection } = services;
+  const {
+    ai,
+    card,
+    navigation,
+    sidePanel,
+    keys,
+    settings,
+    speech,
+    injection,
+    words,
+    chat,
+    sync,
+    account,
+    documents,
+  } = services;
 
   return [
     // ---- public ---------------------------------------------------------
@@ -270,6 +400,38 @@ export function buildRoutes(services: RouteServices): Route[] {
         : invalidRequest(message),
     ),
 
+    // ---- saved words (docs/clavis-sync-design.md 7.4) ---------------------------------
+    wordRoute('SAVE_WORD', (message, context) => words.save(message, context)),
+    wordRoute('UNSAVE_WORD', (message, context) => words.unsave(message.wordKey, context)),
+    wordRoute('GET_WORD_SAVED', (message, context) => words.isSaved(message.text, context)),
+
+    // ---- the library: chat about a saved word, and the sync nudge ----------------------
+    libraryRoute('WORD_CHAT_SEND', LIBRARY_SENDERS, (message) => chat.send(message)),
+    libraryRoute('WORD_CHAT_CANCEL', LIBRARY_SENDERS, (message) => chat.cancel(message.requestId)),
+    libraryRoute('SYNC_KICK', SYNC_KICK_SENDERS, (message) => sync.kick(message.pull === true)),
+
+    // ---- account and sync (docs/clavis-sync-design.md 7.4) ---------------------------
+    accountRoute('ACCOUNT_GET_STATUS', ACCOUNT_STATUS_SENDERS, () => account.getStatus()),
+    accountRoute('ACCOUNT_SIGN_IN', ACCOUNT_SIGN_IN_SENDERS, () => account.signIn()),
+    accountRoute('ACCOUNT_SIGN_OUT', ACCOUNT_SIGN_OUT_SENDERS, (message) =>
+      account.signOut(message.keepLocalCopy),
+    ),
+    accountRoute('ACCOUNT_SIGN_OUT_EVERYWHERE', ACCOUNT_SIGN_OUT_EVERYWHERE_SENDERS, () =>
+      account.signOutEverywhere(),
+    ),
+    accountRoute('SYNC_NOW', SYNC_NOW_SENDERS, () => account.syncNow()),
+
+    // ---- PDF files in the account (docs/clavis-sync-design.md 6.6, 7.4) ---------------
+    documentRoute('DOCUMENT_UPLOAD', DOCUMENT_UPLOAD_SENDERS, (message) =>
+      documents.upload(message),
+    ),
+    documentRoute('DOCUMENT_FETCH', DOCUMENT_FETCH_SENDERS, (message) =>
+      documents.fetchFile(message),
+    ),
+    documentRoute('DOCUMENT_REMOVE_FILE', DOCUMENT_REMOVE_FILE_SENDERS, (message) =>
+      documents.removeFile(message),
+    ),
+
     // ---- privileged: the key --------------------------------------------
     privilegedRoute('SET_API_KEY', KEY_SENDERS, (message) =>
       keys.set(message.apiKey, message.storage),
@@ -285,7 +447,9 @@ export function buildRoutes(services: RouteServices): Route[] {
       settings.updatePreferences(message.patch),
     ),
     privilegedRoute('RESET_PREFERENCES', SETTINGS_SENDERS, () => settings.resetPreferences()),
-    privilegedRoute('ACCEPT_DISCLOSURE', SETTINGS_SENDERS, () => settings.acceptDisclosure()),
+    privilegedRoute('ACCEPT_DISCLOSURE', ACCEPT_DISCLOSURE_SENDERS, () =>
+      settings.acceptDisclosure(),
+    ),
     privilegedRoute('UPDATE_ONBOARDING', SETTINGS_SENDERS, (message) =>
       settings.updateOnboarding({
         completed: message.completed,

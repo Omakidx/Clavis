@@ -8,6 +8,12 @@ import {
   type AiProvider,
 } from '../../../lib/router/handlers/ai';
 import { createCardHandlers } from '../../../lib/router/handlers/card';
+import { createChatHandlers } from '../../../lib/router/handlers/chat';
+import { createAccountHandlers } from '../../../lib/router/handlers/account';
+import { createDocumentHandlers } from '../../../lib/router/handlers/documents';
+import { createSyncHandlers } from '../../../lib/router/handlers/sync';
+import { createWordHandlers } from '../../../lib/router/handlers/words';
+import type { ChatProvider } from '../../../lib/router/handlers/chat';
 import { createKeyService } from '../../../lib/router/handlers/key';
 import { createNavigationHandlers } from '../../../lib/router/handlers/navigation';
 import { createSidePanelHandlers } from '../../../lib/router/handlers/sidepanel';
@@ -133,6 +139,24 @@ export const SETTINGS_MESSAGES: Record<string, unknown> = {
   GET_VOICES: { v: 1, type: 'GET_VOICES' },
 };
 
+/** Account and sync routes (design 7.4). */
+export const ACCOUNT_MESSAGES: Record<string, unknown> = {
+  ACCOUNT_GET_STATUS: { v: 1, type: 'ACCOUNT_GET_STATUS' },
+  ACCOUNT_SIGN_IN: { v: 1, type: 'ACCOUNT_SIGN_IN' },
+  ACCOUNT_SIGN_OUT: { v: 1, type: 'ACCOUNT_SIGN_OUT', keepLocalCopy: false },
+  ACCOUNT_SIGN_OUT_EVERYWHERE: { v: 1, type: 'ACCOUNT_SIGN_OUT_EVERYWHERE' },
+  SYNC_NOW: { v: 1, type: 'SYNC_NOW' },
+};
+
+export const FP = 'a'.repeat(64);
+
+/** PDF file routes (design 6.6, 7.4). */
+export const DOCUMENT_MESSAGES: Record<string, unknown> = {
+  DOCUMENT_UPLOAD: { v: 1, type: 'DOCUMENT_UPLOAD', fingerprint: FP, title: 'Paper' },
+  DOCUMENT_FETCH: { v: 1, type: 'DOCUMENT_FETCH', fingerprint: FP },
+  DOCUMENT_REMOVE_FILE: { v: 1, type: 'DOCUMENT_REMOVE_FILE', fingerprint: FP },
+};
+
 export const PRIVILEGED_MESSAGES = { ...KEY_MESSAGES, ...SETTINGS_MESSAGES };
 
 // ---- the assembled background -----------------------------------------------
@@ -159,6 +183,12 @@ export interface HarnessOptions {
   now?: () => number;
   features?: AiHandlerDeps['features'];
   onModelContextChanged?: () => void;
+  /** Words and chat writers wake the sync engine through this. */
+  onLocalChange?: () => void;
+  /** CLEAR_ALL_DATA signs out first through this. */
+  signOutFirst?: () => Promise<void>;
+  signOutTimeoutMs?: number;
+  invalidateAccount?: () => void;
 }
 
 /** The real router, handlers, stores and guard over in-memory storage and a scripted provider. */
@@ -212,6 +242,13 @@ export function createHarness(options: HarnessOptions = {}) {
     siteAccess,
     guard,
     areas: [local, session],
+    ...(options.signOutFirst === undefined ? {} : { signOutFirst: options.signOutFirst }),
+    ...(options.signOutTimeoutMs === undefined
+      ? {}
+      : { signOutTimeoutMs: options.signOutTimeoutMs }),
+    ...(options.invalidateAccount === undefined
+      ? {}
+      : { invalidateAccount: options.invalidateAccount }),
     ...(options.onModelContextChanged === undefined
       ? {}
       : { onModelContextChanged: options.onModelContextChanged }),
@@ -242,6 +279,78 @@ export function createHarness(options: HarnessOptions = {}) {
     now,
   });
 
+  const tabsGet = vi.fn((_tabId: number) =>
+    Promise.resolve({ url: 'https://news.example/story?id=7#top', title: 'The story' } as {
+      url?: string;
+      title?: string;
+    }),
+  );
+  const words = createWordHandlers({
+    tabs: { get: tabsGet },
+    now,
+    ...(options.onLocalChange === undefined ? {} : { onLocalChange: options.onLocalChange }),
+  });
+  const chatProvider = {
+    chat: vi.fn<ChatProvider['chat']>(() =>
+      Promise.resolve({ text: 'An answer.', model: MODELS[0]!.id }),
+    ),
+  };
+  const chat = createChatHandlers({
+    settings: settingsStore,
+    keys: keyStore,
+    keyService,
+    provider: chatProvider,
+    guard,
+    lockedDown,
+    now,
+    nonce: 'feedface00000000',
+    ...(options.onLocalChange === undefined ? {} : { onLocalChange: options.onLocalChange }),
+  });
+  const sync = createSyncHandlers();
+  const accountService = {
+    signIn: vi.fn(() => Promise.resolve({ ok: true as const })),
+    signOut: vi.fn((_keep: boolean) => Promise.resolve({ ok: true as const, unsyncedDropped: 0 })),
+    signOutEverywhere: vi.fn(() => Promise.resolve({ ok: true as const })),
+    getStatus: vi.fn(() =>
+      Promise.resolve({
+        enabled: true,
+        signedIn: false,
+        sync: { state: 'idle' as const, pending: 0, rejected: 0 },
+      }),
+    ),
+  };
+  const syncEngine = { syncNow: vi.fn(() => Promise.resolve({ status: 'ok' as const })) };
+  const account = createAccountHandlers({
+    account: accountService,
+    engine: syncEngine,
+    enabled: true,
+  });
+
+  // PDF files: the token client and the handoff store are scripted, no network, no IndexedDB.
+  const documentTokens = {
+    request: vi.fn((_spec: unknown) => Promise.resolve(undefined as never)),
+    requestBlob: vi.fn((_spec: unknown) => Promise.resolve(new Blob(['%PDF-1.7']))),
+  };
+  const handoff = {
+    take: vi.fn((_fingerprint: string, _direction: string) =>
+      Promise.resolve(new Blob(['%PDF-1.7']) as Blob | null),
+    ),
+    put: vi.fn((_fingerprint: string, _blob: Blob, _direction: string) => Promise.resolve(true)),
+    drop: vi.fn((_fingerprint: string, _direction: string) => Promise.resolve()),
+    sweep: vi.fn(() => Promise.resolve(0)),
+    markStorage: vi.fn((_fingerprint: string, _state: string) => Promise.resolve(true)),
+  };
+  const documents = createDocumentHandlers({
+    tokens: documentTokens as never,
+    enabled: true,
+    signedIn: () => Promise.resolve(true),
+    take: handoff.take as never,
+    put: handoff.put as never,
+    drop: handoff.drop as never,
+    sweep: handoff.sweep as never,
+    markStorage: handoff.markStorage as never,
+  });
+
   const routes: Route[] = buildRoutes({
     ai,
     card,
@@ -251,6 +360,11 @@ export function createHarness(options: HarnessOptions = {}) {
     settings,
     speech,
     injection: injection as never,
+    words,
+    chat,
+    sync,
+    account,
+    documents,
   });
   const listener = createMessageListener({
     identity: { runtimeId: RUNTIME_ID, extensionOrigin: ORIGIN },
@@ -281,6 +395,8 @@ export function createHarness(options: HarnessOptions = {}) {
   return {
     local,
     session,
+    accountService,
+    syncEngine,
     state,
     settingsStore,
     keyStore,
@@ -298,6 +414,10 @@ export function createHarness(options: HarnessOptions = {}) {
     routes,
     send,
     call,
+    tabsGet,
+    chatProvider,
+    documentTokens,
+    handoff,
   };
 }
 

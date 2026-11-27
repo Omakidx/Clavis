@@ -182,8 +182,9 @@ describe('code and HTML sinks (FR-041, FR-075, D-10)', () => {
       const source = code(file);
       for (const c of calls(source, /(?<![.\w])fetch/)) {
         const where = rel(file);
-        // The Groq adapter is the one place; PDF.js and the speech/UI code never call fetch directly.
-        if (where !== 'lib/ai/groq.ts') problems.push(`${where}: fetch(${c.args.slice(0, 50)})`);
+        // The Groq adapter and the Clavis API client are the only places; PDF.js and the speech/UI code never call fetch directly.
+        if (where !== 'lib/ai/groq.ts' && where !== 'lib/account/api.ts')
+          problems.push(`${where}: fetch(${c.args.slice(0, 50)})`);
       }
       for (const pattern of [
         /new\s+XMLHttpRequest/,
@@ -201,6 +202,10 @@ describe('code and HTML sinks (FR-041, FR-075, D-10)', () => {
     const known = [
       /^https:\/\/api\.groq\.com\//,
       /^https:\/\/console\.groq\.com\//,
+      // Clavis Sync (design 7.1): the sync API (background only, under the server's CORS allowlist) and
+      // Google's authorize URL (opened by launchWebAuthFlow after a click). Both only in lib/config/constants.ts.
+      /^https:\/\/clavis-api-production\.up\.railway\.app$/,
+      /^https:\/\/accounts\.google\.com\/o\/oauth2\/v2\/auth$/,
       /^https:\/\/groq\.com\//,
       /^https:\/\/omakidx\.github\.io\/clavis\//,
       /^https?:\/\/\*\//,

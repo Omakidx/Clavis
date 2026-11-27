@@ -89,6 +89,8 @@ export const EXTENSION_PAGES = {
   reader: '/reader.html',
   /** The side panel (FR-042). One panel per tab: the tab id is a query parameter of its path. */
   sidepanel: '/sidepanel.html',
+  /** Saved words, per-word chat and the documents read in the reader (Clavis Sync, P1). */
+  library: '/library.html',
 } as const;
 
 /** Network timeouts in milliseconds. Every external call must be bounded. */
@@ -121,6 +123,40 @@ export const AI_RATE_LIMIT = {
 export const FEATURES = {
   grammarTab: false,
   translateTab: true,
+  /**
+   * Optional Google account and sync (docs/clavis-sync-design.md). Stays false until the whole
+   * sync release passes (design phase 4): no account UI is shown and nothing contacts the Clavis API.
+   * The local features (saved words, library, reading progress) do not depend on it.
+   */
+  accountSync: false,
+} as const;
+
+/**
+ * Clavis Sync endpoints (docs/clavis-sync-design.md 7.1). The store build contains exactly these
+ * two hosts. Overrides (a local API and a fake Google on localhost) exist only where
+ * `ENDPOINT_OVERRIDES` is true (CLAVIS_FORCE_FEATURES test builds, which audit-zip refuses to
+ * package) or in a `wxt` dev-server build (`import.meta.env.DEV`, read in lib/account/config.ts). In every other build the override env vars are ignored.
+ */
+export const CLAVIS_API_ORIGIN_DEFAULT = 'https://clavis-api-production.up.railway.app';
+export const GOOGLE_AUTHORIZE_URL = 'https://accounts.google.com/o/oauth2/v2/auth';
+export const ENDPOINT_OVERRIDES: boolean = false;
+
+/** Sync engine timing (design 4.7). */
+export const SYNC = {
+  /** Push waits this long after the first SYNC_KICK so edits (reading progress) coalesce. */
+  pushDebounceMs: 5_000,
+  /** Periodic pull while signed in. */
+  alarmPeriodMinutes: 30,
+  /** Backoff after a failed run: 1, 2, 4 ... 60 minutes. */
+  backoffBaseMs: 60_000,
+  backoffMaxMs: 3_600_000,
+  /** Final push at sign-out may take this long. */
+  signOutPushBudgetMs: 10_000,
+  /** A page-open pull (SYNC_KICK {pull}) is skipped if the last pull was this recent. */
+  pullKickMinGapMs: 15_000,
+  alarmName: 'clavis-sync',
+  retryAlarmName: 'clavis-sync-retry',
+  lockName: 'clavis-sync',
 } as const;
 
 /** Feature flag per explain mode that is not part of the Must set (see `FEATURES`). */

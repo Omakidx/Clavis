@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, useState } from 'react';
+import { FEATURES } from '../../lib/config/constants';
 import { t } from '../../lib/i18n';
 import { api } from '../../lib/ui-client/api';
 import type { ClientError } from '../../lib/ui-client/errors';
@@ -56,6 +57,9 @@ export function PrivacySection({ onCleared }: PrivacySectionProps) {
       </h2>
       <p>{t('privacyIntro')}</p>
       <DisclosureList />
+      {FEATURES.accountSync ? (
+        <p data-testid="privacy-sync-line">{t('accountPrivacyLine')}</p>
+      ) : null}
       <Notice tone="warning">
         <p>{t('keyNotEncrypted')}</p>
       </Notice>

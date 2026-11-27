@@ -302,11 +302,38 @@ test('FR-043 is absent: explaining the same text again asks Groq again, and noth
     ).toEqual([]);
   }
   const { page } = await openExtensionPage(world.ext.context, world.ext.extensionId, 'options');
-  const stores = await page.evaluate(async () => ({
-    databases: (await indexedDB.databases()).map((d) => d.name),
-    caches: await caches.keys(),
-    local: localStorage.length,
-  }));
-  expect(stores).toEqual({ databases: [], caches: [], local: 0 });
+  // The only database is clavis-data (saved words, documents; created empty when a card checks
+  // whether the word is saved), and it holds nothing about this selection or its answer.
+  const stores = await page.evaluate(async () => {
+    const names = (await indexedDB.databases()).map((d) => d.name);
+    const records: Record<string, unknown[]> = {};
+    if (names.includes('clavis-data')) {
+      const db = await new Promise<IDBDatabase>((resolve, reject) => {
+        const open = indexedDB.open('clavis-data', 1);
+        open.onsuccess = () => resolve(open.result);
+        open.onerror = () => reject(open.error);
+      });
+      for (const name of Array.from(db.objectStoreNames)) {
+        records[name] = await new Promise<unknown[]>((resolve, reject) => {
+          const request = db.transaction(name).objectStore(name).getAll();
+          request.onsuccess = () => resolve(request.result);
+          request.onerror = () => reject(request.error);
+        });
+      }
+      db.close();
+    }
+    return {
+      databases: names.filter((n) => n !== 'clavis-data'),
+      records,
+      caches: await caches.keys(),
+      local: localStorage.length,
+    };
+  });
+  expect(stores.databases).toEqual([]);
+  expect(stores.caches).toEqual([]);
+  expect(stores.local).toBe(0);
+  for (const [name, rows] of Object.entries(stores.records)) {
+    expect(rows, `clavis-data ${name}`).toEqual([]);
+  }
   await page.close();
 });

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { PdfReaderController, toSafeExternalUrl } from '../../../lib/pdf/controller';
+import { PdfReaderController, pageOffsetOf, toSafeExternalUrl } from '../../../lib/pdf/controller';
 import { MAX_CANVAS_PIXELS, MAX_IMAGE_PIXELS } from '../../../lib/pdf/limits';
 import type { PdfJs } from '../../../lib/pdf/pdfjs';
 import type { ReaderState } from '../../../lib/pdf/state';
@@ -35,6 +35,8 @@ function fakePdfJs(options: {
       update: () => void;
     }>,
     findDispatches: [] as Record<string, unknown>[],
+    /** The page elements the viewer reports (`getPageView(i).div`). */
+    pageDivs: [] as HTMLElement[],
   };
   const releaseLoad: Array<() => void> = [];
 
@@ -98,6 +100,9 @@ function fakePdfJs(options: {
     }
     cleanup() {}
     update() {}
+    getPageView(index: number) {
+      return { div: calls.pageDivs[index] };
+    }
     nextPage() {
       return true;
     }
@@ -171,9 +176,10 @@ function setup(
 ) {
   const fake = fakePdfJs(options);
   const loadPdfJs = vi.fn(async () => fake.pdf);
+  const container = document.createElement('div');
   const controller = new PdfReaderController({
     elements: {
-      container: document.createElement('div'),
+      container,
       viewerElement: document.createElement('div'),
     },
     confirmExternalLink: async () => false,
@@ -183,13 +189,11 @@ function setup(
   });
   const states: ReaderState[] = [];
   controller.subscribe(() => states.push(controller.getSnapshot().state));
-  return { controller, loadPdfJs, states, ...fake };
+  return { controller, container, loadPdfJs, states, ...fake };
 }
 
 const pdfFile = (name = 'doc.pdf', body = '%PDF-1.7\n%%EOF') =>
   new File([body], name, { type: 'application/pdf' });
-
-const settle = () => new Promise((r) => setTimeout(r, 0));
 
 describe('PdfReaderController.openFile', () => {
   it('rejects an oversize file as TOO_LARGE without loading PDF.js', async () => {
@@ -331,14 +335,12 @@ describe('PdfReaderController.openFile', () => {
   it('a newer open supersedes a slow earlier load and destroys the stale document', async () => {
     const slow = setup({ holdLoad: true });
     const first = slow.controller.openFile(pdfFile('first.pdf'));
-    await settle();
-    await settle();
-    expect(slow.releaseLoad).toHaveLength(1);
+    // Wait for the condition itself (the first load is held), not for a fixed number of ticks:
+    // how many macrotasks the open needs depends on module loading and varies under load.
+    await vi.waitFor(() => expect(slow.releaseLoad).toHaveLength(1));
     // Second open (new file) while the first load is still pending.
     const second = slow.controller.openFile(pdfFile('second.pdf'));
-    await settle();
-    await settle();
-    expect(slow.releaseLoad).toHaveLength(2);
+    await vi.waitFor(() => expect(slow.releaseLoad).toHaveLength(2));
     slow.releaseLoad[0]!(); // the stale load finishes late
     slow.releaseLoad[1]!();
     await Promise.all([first, second]);
@@ -752,5 +754,83 @@ describe('PdfReaderController ignores stale find events (O5)', () => {
     const { controller, calls } = await ready();
     controller.find('\u2F47');
     expect(calls.findDispatches.at(-1)).toMatchObject({ query: '\u65E5' });
+  });
+});
+
+/** A page element with the layout numbers PDF.js would report (jsdom has no layout). */
+function pageDiv(offsetTop: number, offsetHeight: number, clientTop = 0): HTMLElement {
+  const div = document.createElement('div');
+  Object.defineProperty(div, 'offsetTop', { value: offsetTop });
+  Object.defineProperty(div, 'offsetHeight', { value: offsetHeight });
+  Object.defineProperty(div, 'clientTop', { value: clientTop });
+  return div;
+}
+
+describe('pageOffsetOf', () => {
+  it('is the fraction of the page above the top of the container, clamped to 0..1', () => {
+    expect(pageOffsetOf(1000, 1000, 800)).toBe(0);
+    expect(pageOffsetOf(1400, 1000, 800)).toBe(0.5);
+    expect(pageOffsetOf(1800, 1000, 800)).toBe(1);
+    expect(pageOffsetOf(2600, 1000, 800)).toBe(1); // already on the next page
+    expect(pageOffsetOf(500, 1000, 800)).toBe(0); // above the page
+  });
+
+  it('is 0 for a page with no height or a non-finite measure', () => {
+    expect(pageOffsetOf(100, 0, 0)).toBe(0);
+    expect(pageOffsetOf(Number.NaN, 0, 100)).toBe(0);
+    expect(pageOffsetOf(100, 0, Number.NaN)).toBe(0);
+  });
+});
+
+describe('PdfReaderController reading position', () => {
+  async function opened(numPages = 5) {
+    const ctx = setup({ numPages });
+    ctx.calls.pageDivs.push(
+      ...Array.from({ length: numPages }, (_, i) => pageDiv(i * 1000 + 10, 990, 1)),
+    );
+    await ctx.controller.openFile(pdfFile('Paper.pdf', '%PDF-1.7 0123456789'));
+    await vi.waitFor(() => expect(ctx.controller.getSnapshot().state.phase).toBe('ready'));
+    return ctx;
+  }
+
+  it('has no position and no size while nothing is open', () => {
+    const { controller } = setup();
+    expect(controller.getPosition()).toBeNull();
+    expect(controller.restorePosition({ page: 2, pageOffset: 0.5 })).toBe(false);
+    expect(controller.fileBytes).toBe(0);
+  });
+
+  it('knows the size of the open file, and forgets it on close', async () => {
+    const { controller } = await opened();
+    expect(controller.fileBytes).toBe('%PDF-1.7 0123456789'.length);
+    await controller.close();
+    expect(controller.fileBytes).toBe(0);
+  });
+
+  it('reports the current page and how far down it the container is scrolled', async () => {
+    const { controller, container, calls } = await opened();
+    calls.viewers[0]!.currentPageNumber = 3;
+    container.scrollTop = 2 * 1000 + 10 + 1 + 0.25 * 990;
+    expect(controller.getPosition()).toEqual({ page: 3, pageOffset: 0.25 });
+    container.scrollTop = 0; // above the page: clamped
+    expect(controller.getPosition()).toEqual({ page: 3, pageOffset: 0 });
+  });
+
+  it('restores a page and then scrolls pageOffset of the page height further', async () => {
+    const { controller, container, calls } = await opened();
+    expect(controller.restorePosition({ page: 4, pageOffset: 0.5 })).toBe(true);
+    expect(calls.viewers[0]!.currentPageNumber).toBe(4);
+    expect(container.scrollTop).toBe(3 * 1000 + 10 + 1 + 0.5 * 990);
+    // The round trip lands where it started.
+    expect(controller.getPosition()).toEqual({ page: 4, pageOffset: 0.5 });
+  });
+
+  it('clamps a page past the end and a nonsense offset', async () => {
+    const { controller, container, calls } = await opened(3);
+    controller.restorePosition({ page: 99, pageOffset: 7 });
+    expect(calls.viewers[0]!.currentPageNumber).toBe(3);
+    expect(container.scrollTop).toBe(2 * 1000 + 10 + 1 + 990);
+    controller.restorePosition({ page: 0, pageOffset: Number.NaN });
+    expect(calls.viewers[0]!.currentPageNumber).toBe(1);
   });
 });

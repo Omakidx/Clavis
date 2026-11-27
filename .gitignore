@@ -17,6 +17,12 @@ blob-report
 .env
 .env.*
 !.env.example
+server/.env*
+!server/.env.example
+dashboard/.env*
+!dashboard/.env.example
+server/dist
+dashboard/dist
 *.pem
 *.key
 
