@@ -3,7 +3,14 @@ import type { Page } from '@playwright/test';
 import { expect, test } from '@playwright/test';
 import { fixturePath } from './p7-reader-support/helpers';
 import { startProfile, type Profile } from './p11-support/profile';
-import { buildExtension, leftoverDatabases, startStack, type Stack } from './p11-support/stack';
+import {
+  buildExtension,
+  leftoverDatabases,
+  STACK_SKIP_REASON,
+  STACK_UNAVAILABLE,
+  startStack,
+  type Stack,
+} from './p11-support/stack';
 
 // Reader: the S-08 redesign, "Save to account" and opening a stored PDF on a second profile
 // (docs/clavis-sync-design.md 6.6, 7.7). Same local stack as p11: the real API, Postgres, the fake
@@ -49,6 +56,8 @@ async function shot(page: Page, name: string, theme: 'light' | 'dark'): Promise<
   await page.screenshot({ path: `${SHOTS}/${name}-${theme}.png` });
   await page.evaluate(() => delete document.documentElement.dataset['previewTheme']);
 }
+
+test.skip(STACK_UNAVAILABLE, STACK_SKIP_REASON);
 
 test.beforeAll(async () => {
   test.setTimeout(240_000);

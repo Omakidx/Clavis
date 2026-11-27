@@ -28,6 +28,16 @@ interface PgModule {
 const loadPg = (): PgModule =>
   createRequire(path.join(serverDir, 'package.json'))('pg') as PgModule;
 
+/**
+ * The stack needs server/node_modules, Postgres and MinIO. The cross-platform CI browser shards have none of
+ * them, so there these specs skip; the "Sync e2e" CI job provides the services and sets CLAVIS_E2E_STACK=1,
+ * which makes them run. Locally (no CI variable) they always run.
+ */
+export const STACK_UNAVAILABLE =
+  Boolean(process.env['CI']) && process.env['CLAVIS_E2E_STACK'] !== '1';
+export const STACK_SKIP_REASON =
+  'Needs the local Clavis Sync stack (Postgres, MinIO, server deps); runs in the "Sync e2e" CI job';
+
 export const API_ORIGIN = 'http://localhost:8787';
 export const GOOGLE_ORIGIN = 'http://127.0.0.1:8788';
 const ADMIN_URL =

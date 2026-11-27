@@ -1,7 +1,14 @@
 import type { Page } from '@playwright/test';
 import { expect, test } from '@playwright/test';
 import { dumpDb, startProfile, type Profile } from './p11-support/profile';
-import { buildExtension, leftoverDatabases, startStack, type Stack } from './p11-support/stack';
+import {
+  buildExtension,
+  leftoverDatabases,
+  STACK_SKIP_REASON,
+  STACK_UNAVAILABLE,
+  startStack,
+  type Stack,
+} from './p11-support/stack';
 
 // Clavis Sync, end to end: the BUILT extension (Chromium, real chrome.identity.launchWebAuthFlow)
 // signs in through the local fake Google, syncs with the real local API and Postgres, and
@@ -105,6 +112,8 @@ async function attachEvidence(testInfo: import('@playwright/test').TestInfo): Pr
 test.afterEach(async ({}, testInfo) => {
   if (testInfo.status !== testInfo.expectedStatus) await attachEvidence(testInfo);
 });
+
+test.skip(STACK_UNAVAILABLE, STACK_SKIP_REASON);
 
 test.beforeAll(async () => {
   test.setTimeout(240_000);
