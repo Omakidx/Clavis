@@ -124,11 +124,11 @@ export const FEATURES = {
   grammarTab: false,
   translateTab: true,
   /**
-   * Optional Google account and sync (docs/clavis-sync-design.md). Stays false until the whole
-   * sync release passes (design phase 4): no account UI is shown and nothing contacts the Clavis API.
-   * The local features (saved words, library, reading progress) do not depend on it.
+   * Optional Google account and sync (docs/clavis-sync-design.md). On since 1.1.0. Set it
+   * false to hide all account UI and stop every request to the Clavis API. The local features
+   * (saved words, library, reading progress) do not depend on it.
    */
-  accountSync: false,
+  accountSync: true,
 } as const;
 
 /**

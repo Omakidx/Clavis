@@ -49,7 +49,7 @@ describe('AI_EXPLAIN modes', () => {
   );
 
   it('ships Translate and keeps Grammar off: the production flags (FR-037 on, FR-036 off)', async () => {
-    expect(FEATURES).toEqual({ grammarTab: false, translateTab: true, accountSync: false });
+    expect(FEATURES).toEqual({ grammarTab: false, translateTab: true, accountSync: true });
     expect(MODE_FEATURE_FLAGS).toEqual({ grammar: 'grammarTab', translate: 'translateTab' });
     // Grammar is refused before any provider work.
     expect(await h.call(explainMessage(REQ_A, { mode: 'grammar' }), contentSender())).toMatchObject(

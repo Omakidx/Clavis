@@ -48,12 +48,12 @@
     "description": "Link text placed after the Explain disclosure bullet; points to Groq's privacy policy."
   },
   "disclosurePdf": {
-    "message": "PDFs you open are read inside your browser and never uploaded. Selected text can be sent when you ask for an explanation or use an online voice.",
+    "message": "PDFs you open are read inside your browser and are uploaded only if you choose to save one to your Clavis account. Selected text can be sent when you ask for an explanation or use an online voice.",
     "description": "Disclosure bullet explaining how PDFs are handled locally. Approved copy."
   },
   "disclosureNoServer": {
-    "message": "Clavis has no server of its own and collects no data about you.",
-    "description": "Disclosure bullet stating there is no developer backend and no data collection. Approved copy."
+    "message": "Without an account, nothing is sent to Clavis's server. With the optional account, the saved words, chats, reading data and PDFs you choose to save are stored on the Clavis server.",
+    "description": "Disclosure bullet: nothing goes to the Clavis server without an account; with the optional account, saved data is stored there."
   },
   "disclosureAccept": {
     "message": "I understand",

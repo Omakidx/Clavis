@@ -1,8 +1,15 @@
 # Set up Clavis in Chrome
 
-This guide installs Clavis as an unpacked extension in **desktop Google Chrome 147 or newer**, then walks through the first setup. The minimum version comes from the extension's [manifest configuration](../wxt.config.ts).
+This guide installs Clavis as an unpacked extension in **desktop Google Chrome 147 or newer**, then walks through the first setup. Version 1.1.0 is distributed as a ZIP on GitHub, not through the Chrome Web Store. The minimum version comes from the extension's [manifest configuration](../wxt.config.ts).
 
 ## 1. Get the extension files
+
+### Download the release ZIP (recommended)
+
+1. Download `clavis-1.1.0-chrome.zip` from the [latest GitHub release](https://github.com/Omakidx/Clavis/releases/latest).
+2. Extract it into a permanent folder. Select the folder containing `manifest.json` in step 2. No Node.js or build commands are needed.
+
+The release ZIP keeps a fixed extension ID, which Google sign-in requires. See [If you already have Clavis installed](#if-you-already-have-clavis-installed) before loading it over an older copy.
 
 ### Build from this repository
 
@@ -19,11 +26,17 @@ The extension is now in **`.output/chrome-mv3`** inside the `Clavis` folder. Tha
 
 If you prefer GitHub's **Code → Download ZIP**, extract the source ZIP, open a terminal in its extracted folder, and run `npm ci` followed by `npm run build` there.
 
-### If you already have a built extension ZIP
+GitHub's **Download ZIP** (**Code → Download ZIP**) is a source archive and still needs building, unlike the release ZIP. Keep the extracted extension folder in place after loading it; Chrome continues to use its files. A build from source works for local use, but Google sign-in is only guaranteed with the release ZIP's extension ID.
 
-If the maintainer supplied a built package such as `clavis-1.0.10-chrome.zip` or `Clavis-extension.zip`, extract it into a permanent folder. Select the folder containing `manifest.json` directly. A built package does not need Node.js or the build commands above.
+### If you already have Clavis installed
 
-GitHub's **Download ZIP** is a source archive and still needs building. Keep the extracted extension folder in place after loading it; Chrome continues to use its files.
+An older GitHub ZIP, or a build loaded from a different folder, has a different extension ID that Chrome derived from its folder path. The 1.1.0 release ZIP has a fixed ID, so it installs as a **new, separate extension** and does not take over the old one. Your old local data (Groq key, settings, saved items, reading progress) does not carry over automatically.
+
+1. Load 1.1.0 as described below and finish setup, including your Groq key.
+2. Check that it works. If you want the old saved items, export them first from the old copy's library (signed out, the library can export saved words and chats as a JSON file).
+3. Remove the old copy at `chrome://extensions` (**Remove**). Removing an extension deletes its stored data.
+
+Two copies of Clavis on the same page can both show a toolbar, so turn the old one off until you remove it.
 
 ## 2. Load it in Chrome
 
@@ -98,14 +111,20 @@ Highlights are stored only in this Chrome profile and reappear when you reopen t
 
 PDF reading order comes from the file's text layer. Complex columns or unusual layouts may not read in the intended order. Online voices send the spoken text to their voice service; local voices keep it on your device. Neither PDF narration nor color highlighting requires a Groq key.
 
-## Optional: sign in to sync (not yet available)
+## Optional: sign in to sync
 
-Clavis Sync, an optional Google sign-in that keeps saved words, chats, highlights, reading progress and PDFs you choose to save in step across your devices and in a web dashboard, is built but switched off in current builds. When it is switched on you will find it under **Settings → Account & sync**. Clavis works the same without an account, and nothing is sent to the Clavis server unless you sign in. Running your own sync server is a developer task: see [server/README.md](../server/README.md) for the server's environment variables, and [clavis-sync-design.md](clavis-sync-design.md) for the design.
+Clavis Sync is an optional Google sign-in that keeps saved words (with meaning, context and chat), highlights, reading progress and PDFs you choose to save in step across your devices and in a web dashboard. Clavis works the same without an account, and nothing is sent to the Clavis server unless you sign in.
+
+1. Open **Settings → Account & sync** and choose **Sign in with Google**. Google asks only for your email, name and account identifier.
+2. Read the sign-in notice: saved words, highlights and reading progress already on this device are added to your account. Cancel if you do not want that.
+3. Open the dashboard at <https://clavis-api-production.up.railway.app> and sign in with the same Google account to browse, export or delete your data, or delete your account.
+
+Your Groq key and settings are never synced. Sign-in works with the 1.1.0 release ZIP, whose extension ID is fixed. The [privacy policy](https://clavis-api-production.up.railway.app/privacy) covers what is stored and how to delete it. Running your own sync server is a developer task: see [server/README.md](../server/README.md) and [clavis-sync-design.md](clavis-sync-design.md).
 
 ## Update an unpacked installation
 
 1. Get the updated extension files. If you built from source, run `git pull --ff-only`, `npm ci`, and `npm run build` in the same repository folder.
-2. Keep using the same loaded extension folder. For a supplied built ZIP, replace that folder's contents with the new extracted files.
+2. Keep using the same loaded extension folder. For a release ZIP, replace that folder's contents with the new extracted files. The ID stays the same, so your data and sign-in remain.
 3. Go to `chrome://extensions` and click **Reload** on Clavis.
 4. Refresh webpages where you use Clavis, then reopen any Clavis settings or reader pages.
 
@@ -115,7 +134,7 @@ Reloading the same installation keeps its saved settings. Removing the extension
 
 | Problem                                              | What to check                                                                                                                                                                                                                                         |
 | ---------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Chrome cannot find a manifest                        | Select the folder that directly contains `manifest.json`. Build a source download first; extract a built ZIP before loading it.                                                                                                                       |
+| Chrome cannot find a manifest                        | Select the folder that directly contains `manifest.json`. Build a source download first; extract the release ZIP before loading it.                                                                                                                       |
 | Chrome says the version is unsupported               | Update Chrome to at least the minimum version shown above.                                                                                                                                                                                            |
 | No toolbar appears                                   | Refresh the webpage, check **Settings → Website access**, and confirm automatic display is enabled in Preferences. Try the practice page or the popup's **Explain on this page** action.                                                              |
 | A key is saved but not verified, or HTTP 403 appears | Retry **Test connection**. Check the Groq account/project and model access. If the key works elsewhere, try Clavis in a fresh Chrome profile to check whether the issue is specific to the existing profile. A 403 alone does not identify its cause. |

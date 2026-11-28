@@ -50,7 +50,7 @@ const DEVELOPER_TEXT = new RegExp(
 );
 
 /** Hosts a shipped link may point at: Groq's own key and privacy pages. */
-const VERIFIED_HOSTS = ['console.groq.com', 'groq.com'];
+const VERIFIED_HOSTS = ['console.groq.com', 'groq.com', 'clavis-api-production.up.railway.app'];
 
 function findZip(): string | undefined {
   const given = process.env['CLAVIS_EXTENSION_ZIP'];
@@ -239,9 +239,7 @@ test('every screen reads like a product, and every link on it resolves', async (
       .filter(([href]) => !VERIFIED_HOSTS.includes(new URL(href).hostname))
       .map(([href, where]) => `${href}  (${where})`);
     // Reported separately (DEFECT P3) so the rest of this sweep stays a clean pass/fail.
-    expect(
-      unverified.filter((u) => !u.startsWith('https://omakidx.github.io/clavis/privacy/')),
-    ).toEqual([]);
+    expect(unverified).toEqual([]);
     expect([...external.keys()]).toEqual(
       expect.arrayContaining(['https://console.groq.com/keys', 'https://groq.com/privacy-policy/']),
     );
@@ -250,11 +248,9 @@ test('every screen reads like a product, and every link on it resolves', async (
   }
 });
 
-// DEFECT P3: Settings > Privacy and data > "Clavis privacy policy" links to
-// https://omakidx.github.io/clavis/privacy/, a URL that is not published yet (lib/ui-client/links.ts:
-// "PLACEHOLDER (D-15) ... Replace with the real URL in Phase 10"). Repro: open Settings, press the link.
-// FR-074 asks for a public, accurate policy; until it is published the shipped link leads nowhere.
-test.fail('the privacy-policy link does not point at a placeholder address', async () => {
+// Settings > Privacy and data > "Clavis privacy policy" links to the policy page served by the
+// Clavis API (lib/ui-client/links.ts), not to a placeholder address.
+test('the privacy-policy link does not point at a placeholder address', async () => {
   const world = await startWorld({ granted: false });
   try {
     await world.onboarding.close();

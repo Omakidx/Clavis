@@ -1,11 +1,12 @@
 import { fileURLToPath } from 'node:url';
 import react from '@vitejs/plugin-react';
 import { defineConfig } from 'vite';
+import { privacyPage } from './build/privacy-page.ts';
 
 const here = (p: string) => fileURLToPath(new URL(p, import.meta.url));
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), privacyPage({ source: here('../docs/privacy-policy.md') })],
   resolve: {
     alias: [
       // shared/ is outside this package: force its `zod` import to this package's copy (design §9).

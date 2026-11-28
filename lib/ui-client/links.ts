@@ -2,8 +2,5 @@
 export const GROQ_KEYS_URL = 'https://console.groq.com/keys';
 export const GROQ_PRIVACY_URL = 'https://groq.com/privacy-policy/';
 
-/**
- * PLACEHOLDER (D-15): the Clavis privacy policy is published on GitHub Pages in Phase 10.
- * Replace with the real URL then; confirm it with the privacy-policy draft in docs/.
- */
-export const CLAVIS_PRIVACY_POLICY_URL = 'https://omakidx.github.io/clavis/privacy/';
+/** The Clavis privacy policy, served by the Clavis API server. */
+export const CLAVIS_PRIVACY_POLICY_URL = 'https://clavis-api-production.up.railway.app/privacy';

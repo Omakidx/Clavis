@@ -65,13 +65,21 @@ export function dashboardStatic(root: string, https: boolean): MiddlewareHandler
     }
     if (decoded.includes('\0')) return next();
 
-    const rel = decoded === '/' ? 'index.html' : decoded.replace(/^\/+/, '');
+    // /privacy is a static page generated at build time (dashboard/build/privacy-page.ts), not an SPA route.
+    const isPrivacy = decoded === '/privacy' || decoded === '/privacy/';
+    const rel =
+      decoded === '/'
+        ? 'index.html'
+        : isPrivacy
+          ? 'privacy/index.html'
+          : decoded.replace(/^\/+/, '');
     const candidate = path.resolve(absRoot, rel);
     if (candidate !== absRoot && !candidate.startsWith(absRoot + path.sep)) return next();
 
     let file = candidate;
     let body = await readFileIfFile(file);
-    if (!body && path.extname(rel) === '') {
+    // A missing privacy page is a 404, never the SPA shell.
+    if (!body && !isPrivacy && path.extname(rel) === '') {
       file = path.join(absRoot, 'index.html');
       body = await readFileIfFile(file);
     }
@@ -85,8 +93,9 @@ export function dashboardStatic(root: string, https: boolean): MiddlewareHandler
         'Content-Type': TYPES[ext] ?? 'application/octet-stream',
         'Content-Length': String(body.length),
         // Vite emits content-hashed names under /assets; everything else (index.html) must revalidate.
-        'Cache-Control':
-          !isIndex && reqPath.startsWith('/assets/')
+        'Cache-Control': isPrivacy
+          ? 'public, max-age=300'
+          : !isIndex && reqPath.startsWith('/assets/')
             ? 'public, max-age=31536000, immutable'
             : 'no-cache',
       },

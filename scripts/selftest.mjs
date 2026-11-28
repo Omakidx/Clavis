@@ -288,7 +288,8 @@ const zipCases = [
     `risky manifest key ${key}`,
     withManifest((m) => (m[key] = value)),
     1,
-    `risky manifest key "${key}"`,
+    // `key` is expected (the fixed release ID), so a different value is reported as a difference.
+    key === 'key' ? '"key" differs from expected-permissions.json' : `risky manifest key "${key}"`,
   ]),
   ['commands removed', withManifest((m) => delete m.commands), 1, '"commands" is missing'],
   [

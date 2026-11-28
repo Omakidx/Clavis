@@ -110,7 +110,7 @@ Severity follows the Phase 7 and 8 reports (Blocking: breaks a core flow or leak
 
 | ID | Sev. | What | Status |
 | --- | --- | --- | --- |
-| P3 (Phase 8) / I9 (Phase 9 audit) | Medium for release, known | Settings > Privacy policy link points at an unpublished placeholder (`omakidx.github.io/clavis/privacy/`, `lib/ui-client/links.ts`); FR-074 needs a public policy | **Open until Phase 10 (D-15).** Tracked by `p8-accept-placeholders.spec.ts` (`test.fail`). Blocks submission, not the candidate. |
+| P3 (Phase 8) / I9 (Phase 9 audit) | Medium for release, known | Settings > Privacy policy link points at an unpublished placeholder (`clavis-api-production.up.railway.app/privacy`, `lib/ui-client/links.ts`); FR-074 needs a public policy | **Open until Phase 10 (D-15).** Tracked by `p8-accept-placeholders.spec.ts` (`test.fail`). Blocks submission, not the candidate. |
 | D1, D3, D4, D5 (Phase 7) | Medium, Low, Low, Low | Fit width after a window resize; zero-page PDF stuck on "Opening"; unreadable file shows the wrong message; Kangxi radicals from Chrome-printed CJK PDFs | **Fixed before the Phase 7 commit**: their `test.fail` lines are gone and the four regression tests (`p7-accept-open` "fit width FOLLOWS a window resize", `p7-accept-states` "ZERO pages" and "permissions removed", `p7-accept-actions` "Kangxi radicals") pass in this run. The header of [p7-reader-acceptance.md](p7-reader-acceptance.md) still says four are open: stale |
 
 ### Observations (no failing test; for the manager's judgement)

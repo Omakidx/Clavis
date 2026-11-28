@@ -205,6 +205,8 @@ describe('code and HTML sinks (FR-041, FR-075, D-10)', () => {
       // Clavis Sync (design 7.1): the sync API (background only, under the server's CORS allowlist) and
       // Google's authorize URL (opened by launchWebAuthFlow after a click). Both only in lib/config/constants.ts.
       /^https:\/\/clavis-api-production\.up\.railway\.app$/,
+      // The privacy policy page the Settings link opens after a click (lib/ui-client/links.ts).
+      /^https:\/\/clavis-api-production\.up\.railway\.app\/privacy$/,
       /^https:\/\/accounts\.google\.com\/o\/oauth2\/v2\/auth$/,
       /^https:\/\/groq\.com\//,
       /^https:\/\/omakidx\.github\.io\/clavis\//,
