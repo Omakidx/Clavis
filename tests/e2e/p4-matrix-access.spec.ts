@@ -355,7 +355,18 @@ test.describe('site access granted', () => {
         ),
       );
       expect(carrying, 'a message carrying selected text').toEqual([]);
-      const loading = messages.filter((m) => m.fromTab);
+      // With Clavis Sync on, the reader page asks whether the user is signed in. That request is a
+      // bare signal (no text, no target, no data), may repeat as focus changes, and is the only
+      // other tab message allowed.
+      const fromTab = messages.filter((m) => m.fromTab);
+      const accountStatus = fromTab.filter((m) => m.type === 'ACCOUNT_GET_STATUS');
+      for (const message of accountStatus) {
+        expect(JSON.parse(message.json), 'account status carries nothing').toEqual({
+          v: 1,
+          type: 'ACCOUNT_GET_STATUS',
+        });
+      }
+      const loading = fromTab.filter((m) => m.type !== 'ACCOUNT_GET_STATUS');
       expect(loading, 'one packaged-UI load per document').toHaveLength(3);
       for (const message of loading) {
         expect(JSON.parse(message.json), 'UI loading carries no selected text or target').toEqual({
