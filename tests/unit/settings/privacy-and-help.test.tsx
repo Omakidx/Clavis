@@ -127,7 +127,7 @@ describe('help section (FR-008)', () => {
     installCatalog();
     render(<HelpSection />);
     const help = screen.getByTestId('pdf-help');
-    expect(help).toHaveTextContent(/never uploaded/);
+    expect(help).toHaveTextContent(/uploaded only if you choose to save one/);
     expect(help).toHaveTextContent(/no text recognition \(OCR\)/);
     expect(help).toHaveTextContent(/ask for their password/);
     expect(help).toHaveTextContent(/XFA/);

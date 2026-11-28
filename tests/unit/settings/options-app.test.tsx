@@ -29,7 +29,7 @@ function renderSettings(hash = '', options: FakeBackendOptions = {}) {
 }
 
 describe('settings page', () => {
-  it('has four navigation groups and shows only Connection by default', async () => {
+  it('has five navigation groups (incl. Account & sync) and shows only Connection by default', async () => {
     renderSettings();
     expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
     const nav = screen.getByRole('navigation', { name: 'Settings sections' });
@@ -37,7 +37,7 @@ describe('settings page', () => {
       within(nav)
         .getAllByRole('link')
         .map((link) => link.textContent),
-    ).toEqual(['Connection', 'Preferences', 'Website access', 'Privacy & help']);
+    ).toEqual(['Connection', 'Preferences', 'Website access', 'Account & sync', 'Privacy & help']);
     expect(within(nav).getByRole('link', { name: 'Connection' })).toHaveAttribute(
       'aria-current',
       'page',

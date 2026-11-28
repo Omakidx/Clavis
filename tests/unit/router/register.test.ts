@@ -76,7 +76,8 @@ describe('registerBackground', () => {
       'onTabRemoved',
       'onTabUpdated',
     ] as const) {
-      expect(events[name].addListener, name).toHaveBeenCalledTimes(1);
+      // onStartup has a second listener: the sync engine's (FEATURES.accountSync).
+      expect(events[name].addListener, name).toHaveBeenCalledTimes(name === 'onStartup' ? 2 : 1);
     }
   });
 

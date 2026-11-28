@@ -43,6 +43,11 @@ describe('dashboard static serving', () => {
   mkdirSync(path.join(dir, 'assets'));
   writeFileSync(path.join(dir, 'index.html'), '<!doctype html><title>Clavis</title>');
   writeFileSync(path.join(dir, 'assets', 'app-abc.js'), 'console.log(1)');
+  mkdirSync(path.join(dir, 'privacy'));
+  writeFileSync(
+    path.join(dir, 'privacy', 'index.html'),
+    '<!doctype html><title>Clavis privacy policy</title>',
+  );
   const app = createApp({ config, logger, dashboardDir: dir });
 
   it('serves index.html at / with security headers', async () => {
@@ -64,6 +69,38 @@ describe('dashboard static serving', () => {
     const res = await app.request('/words/abc');
     expect(res.status).toBe(200);
     expect(await res.text()).toContain('<title>Clavis</title>');
+  });
+
+  it('serves the static privacy page at /privacy and /privacy/, not the SPA shell', async () => {
+    for (const p of ['/privacy', '/privacy/']) {
+      const res = await app.request(p);
+      expect(res.status).toBe(200);
+      expect(res.headers.get('content-type')).toBe('text/html; charset=utf-8');
+      expect(await res.text()).toContain('<title>Clavis privacy policy</title>');
+      expect(res.headers.get('cache-control')).toBe('public, max-age=300');
+      expect(res.headers.get('content-security-policy')).toContain("style-src 'self'");
+      expect(res.headers.get('x-content-type-options')).toBe('nosniff');
+      expect(res.headers.get('referrer-policy')).toBe('no-referrer');
+    }
+    const head = await app.request('/privacy', { method: 'HEAD' });
+    expect(head.status).toBe(200);
+    expect(await head.text()).toBe('');
+    expect((await app.request('/privacy', { method: 'POST' })).status).toBe(404);
+  });
+
+  it('keeps the SPA fallback for other unknown paths, including look-alikes of /privacy', async () => {
+    for (const p of ['/privacy-policy', '/privacyx', '/privacy/other']) {
+      const res = await app.request(p);
+      expect(res.status).toBe(200);
+      expect(await res.text()).toContain('<title>Clavis</title>');
+    }
+  });
+
+  it('404s /privacy (no SPA shell) when the page was not built', async () => {
+    const empty = mkdtempSync(path.join(tmpdir(), 'clavis-dash-'));
+    writeFileSync(path.join(empty, 'index.html'), '<!doctype html><title>Clavis</title>');
+    const res = await createApp({ config, logger, dashboardDir: empty }).request('/privacy');
+    expect(res.status).toBe(404);
   });
 
   it('404s a missing file that has an extension', async () => {

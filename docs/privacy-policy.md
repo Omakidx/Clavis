@@ -1,21 +1,13 @@
-# Clavis privacy policy — DRAFT
+# Clavis privacy policy
 
-> **Status:** draft, rewritten on 2026-11-27 for **Clavis Sync** (optional Google accounts, sync and the web dashboard). Not yet published. It will be hosted on GitHub Pages (D-15) and must be re-checked against the shipped code, the permission list in [architecture.md §3](architecture.md#3-extension-entry-points-and-message-routes), the data flows in [architecture.md §9](architecture.md#9-persistence-privacy-and-telemetry) and [clavis-sync-design.md](clavis-sync-design.md) before store submission. The Chrome Web Store answers that go with this policy are in [store/permission-justifications.md](store/permission-justifications.md).
->
-> **Effective with account sync.** The account, sync and dashboard parts of this policy (the sections marked "with an account") describe behavior that is off in the extension until `FEATURES.accountSync` is switched on. Publish this policy with the release that switches it on, not before. Everything else describes the extension as it already works.
->
-> Placeholders: `[PUBLISHER]`, `[SUPPORT_EMAIL]`, `[EFFECTIVE_DATE]`, `[POLICY_URL]`, and the owner confirmations written as `[[OWNER: …]]`, which must all be resolved before publishing.
->
-> `[POLICY_URL]` must be exactly the address the extension links to: `CLAVIS_PRIVACY_POLICY_URL` in `lib/ui-client/links.ts`, currently `https://omakidx.github.io/clavis/privacy/`. That value is a placeholder until the page is published (D-15). The web dashboard links to this file on GitHub instead (`PRIVACY_URL` in `dashboard/src/config.ts`: `https://github.com/Omakidx/Clavis/blob/main/docs/privacy-policy.md`). Change the code constants, this policy and the Chrome Web Store "Privacy policy" field together so that all of them name the same published page.
-
-**Effective date:** [EFFECTIVE_DATE]  
-**Publisher:** [PUBLISHER] · **Contact:** [SUPPORT_EMAIL]
+**Effective date:** 2026-11-28  
+**Publisher:** Omakidx · **Contact:** awwalm513@gmail.com
 
 Clavis is a Chrome extension that helps you understand and pronounce text you select on websites and in PDFs you open in Clavis. It can also keep a library of words you save. This policy explains what data Clavis handles, where it goes, and how to delete it. It covers the Clavis extension and the Clavis web dashboard at `https://clavis-api-production.up.railway.app`.
 
 ## The short version
 
-- **You do not need an account.** If you never sign in, Clavis has **no server of its own that it talks to**: the publisher does not receive, store or sell your data, and everything Clavis saves stays in your Chrome profile.
+- **You do not need an account.** If you never sign in, Clavis **does not contact any server of the publisher's**: the publisher does not receive, store or sell your data, and everything Clavis saves stays in your Chrome profile.
 - **An account is optional.** If you sign in with Google, Clavis stores your saved words, chats, reading progress, highlight positions and any PDFs you choose to save on a server run by the publisher, so they follow you across devices and appear in the web dashboard.
 - When you ask for an explanation, or send a chat message about a saved word, the text involved goes to **Groq**, the AI provider, using **your own** Groq API key. Selecting text alone sends nothing. **Your Groq key is never sent to Clavis's server.**
 - The Clavis server **never calls an AI provider**, does not sell your data, and shows no ads.
@@ -125,15 +117,15 @@ When you first sign in, saved words, highlights and reading progress already on 
 - **Live data** (saved words, chats, reading data and stored PDFs) is kept until you delete it or delete your account.
 - **Deleted items.** When you delete a saved word or a document, its content (text, meaning, context, page address, title) is removed from the saved-word or document record immediately. Two kinds of short-lived technical record can still hold a copy for a short time: the record the server keeps of a sync request so that a repeated request gets the same answer (its response can include a word's data) is deleted after 24 hours, and the record of a finished PDF upload (which includes the PDF's hash) is deleted after 7 days. Deleting your account removes both immediately. A small marker that says only "this record was deleted" (its identifier, such as a word's hash or a PDF's hash, and timestamps) is kept for up to 90 days so that your other devices learn about the deletion, and is then permanently removed. A deleted highlight's marker also still carries the mark's page, text offsets and color during that time, but no text. Deleting a word deletes its chat. Deleting a document removes its highlights and its stored file.
 - **Sessions.** Sign-in records are deleted after they expire or are revoked, with a short grace period of about seven days; they are all deleted when you delete your account.
-- **Server logs** are kept by Railway for a period that depends on the publisher's Railway plan. Railway's documentation gives 7 days on its Hobby plan and 30 days on its Pro plan ([docs.railway.com/observability/logs](https://docs.railway.com/observability/logs), checked 2026-11-27). [[OWNER: confirm Railway plan for log retention]]
-- **Database backups** are kept by Railway on fixed schedules. Railway's documentation gives daily backups kept 6 days, weekly backups kept 27 days and monthly backups kept 89 days ([docs.railway.com/volumes/backups](https://docs.railway.com/volumes/backups), checked 2026-11-27), so data you delete, or delete along with your account, can remain in a backup for at most 89 days after deletion, and for less if shorter schedules are used. [[OWNER: confirm Railway backup retention]]
+- **Server logs** (described under [Where account data is stored](#where-account-data-is-stored-and-who-can-access-it-with-an-account)) are kept by Railway for 30 days and then deleted.
+- **Database backups.** No scheduled backups of the Clavis database are kept, so data you delete, or delete along with your account, is not kept in a backup. If backups are turned on later, this policy will be updated first to say how long they are kept.
 
 ## Export and deleting your account (with an account)
 
 Both are in the dashboard, on the **Account** page.
 
 - **Export your data.** Downloads a ZIP file with your account details, saved words with their chats, documents with reading progress and highlights, and your stored PDFs. You can export up to three times a day and one export at a time, and the download can be requested only from the dashboard itself, not from another website. A download is cancelled only if it stalls.
-- **Delete your account.** Permanently deletes your account and everything stored in it on the Clavis server: your email, name and identifier, saved words, chats, documents, highlights, sign-in sessions and stored PDFs. To confirm, you type `DELETE`, and you must first have signed in again with Google, to the same Google account, within the last 10 minutes (an ordinary sign-in does not count, and signing in to a different Google account is refused). Deleting your account cannot be undone. The stored PDFs are removed by a background process that retries until each file is gone. Copies in database backups expire as described under [How long data is kept](#how-long-data-is-kept).
+- **Delete your account.** Permanently deletes your account and everything stored in it on the Clavis server: your email, name and identifier, saved words, chats, documents, highlights, sign-in sessions and stored PDFs. To confirm, you type `DELETE`, and you must first have signed in again with Google, to the same Google account, within the last 10 minutes (an ordinary sign-in does not count, and signing in to a different Google account is refused). Deleting your account cannot be undone. The stored PDFs are removed by a background process that retries until each file is gone.
 - **Copies on your devices stay.** Deleting your account does not erase the saved words, highlights and reading data already on your devices. To remove them, use Clavis Settings → Privacy and data → **Clear all data** on each device. A device whose session ended because the account was deleted is signed out and keeps its local copy.
 - **Delete a single item.** In the Clavis library or the dashboard, delete a saved word or a document, or remove only a stored PDF file.
 - **Sign out.** In the extension you choose whether to remove the synced data from this device or keep a copy there. Your cloud copy is kept either way. **Sign out everywhere** ends every session on every device.
@@ -209,8 +201,8 @@ Clavis is not directed at children under 13 and does not knowingly collect their
 
 ## Changes
 
-If Clavis ever adds a new data recipient, telemetry or new permissions, or changes what is stored on the server or for how long, this policy will be updated first and the change will be shown in the extension's release notes. The current version is always at [POLICY_URL].
+If Clavis ever adds a new data recipient, telemetry or new permissions, or changes what is stored on the server or for how long, this policy will be updated first and the change will be shown in the extension's release notes. The current version is always at <https://clavis-api-production.up.railway.app/privacy>.
 
 ## Contact
 
-Questions, or a request about your data: [SUPPORT_EMAIL]. Please never send your API key or your Google password.
+Questions, or a request about your data: awwalm513@gmail.com. Please never send your API key or your Google password.

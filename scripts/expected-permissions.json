@@ -18,6 +18,7 @@
     "background",
     "options_ui"
   ],
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA8ZPxbrxFmeU0tk88IcgJXRaQvXxwPLsAEWn4UCVcMURdHtuu33TsqduTOkb+XGMLl7DIENWTpmZj9Xn+61zuwyFG5tyZi9O/L0vCki9CyQiRROBx6apcZ00aMwmqggYbfyI283JKs7c5ftXXHn/TWXqlW9adfFLzrra5QGnFtaU+Ok9yTAP9OG1p9Go6yBYpG1Lz16lQ3cR8JpaJbmkkAzqt0ErQdHNi3sAgwpT2I85OLvp9/lJ9vwqRqTQW8FfIzMfU7grpkup71rp6Dqt8qqm8tgseA02YHADZ+mGfDusqCmxm/rxC7xJgbpLFdkGBAYtoGaNNN/8iK6tZ80j88QIDAQAB",
   "minimum_chrome_version": "147",
   "permissions": [
     "storage",
@@ -61,7 +62,6 @@
       "console.groq.com",
       "accounts.google.com",
       "groq.com",
-      "omakidx.github.io",
       "chromewebstore.google.com",
       "chrome.google.com"
     ],

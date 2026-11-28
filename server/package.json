@@ -8,7 +8,7 @@
     "node": ">=24"
   },
   "scripts": {
-    "dev": "tsx watch --env-file-if-exists=.env src/index.ts",
+    "dev": "tsx watch --env-file-if-exists=.env --env-file-if-exists=../.env.local src/index.ts",
     "fake-google": "node scripts/fake-google.mjs",
     "e2e:up": "node scripts/e2e-up.mjs",
     "build": "node scripts/build.mjs",

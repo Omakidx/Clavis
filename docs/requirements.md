@@ -50,7 +50,7 @@ A user with a valid Groq key can highlight selectable text in a supported webpag
 | **Later (post-v1, planned)** | Remote PDF URLs and "Open in Clavis" on PDF links (D-03), additional UI languages. *Saved vocabulary (D-04) was reversed and is part of Clavis Sync; see below* |
 | **Won't (v1)** | Automatic overlay in Chrome's native PDF viewer, globally intercept all PDFs, OCR/scanned-document recognition, authenticated/DRM PDF bypass, billing, automatic whole-page or whole-PDF analysis, background surveillance, other AI providers |
 
-**Clavis Sync (post-v1 scope, decisions S-01 … S-10 in [decisions/clavis-sync-decisions.md](decisions/clavis-sync-decisions.md); design in [clavis-sync-design.md](clavis-sync-design.md)).** The v1 "Won't" items **first-party accounts** and **cloud sync** are reversed, and so is the "Later" item saved vocabulary (D-04). Scope: optional Google sign-in (the only method); local saved words and per-word chat that work signed out; sync of saved words, chats, reading progress, highlights and, when the user chooses, PDFs (15 MB each, 100 MB per account) to a first-party server on Railway; a web dashboard (saved chats read-only); account export and deletion. Still excluded: billing, team features, passwords, any AI call from the server, and syncing the Groq key. The feature is implemented but off behind `FEATURES.accountSync` until release gates pass; until then every statement in this document about the shipped extension (including the approved disclosure copy in §4.1, "Clavis has no server of its own") stays true.
+**Clavis Sync (post-v1 scope, decisions S-01 … S-10 in [decisions/clavis-sync-decisions.md](decisions/clavis-sync-decisions.md); design in [clavis-sync-design.md](clavis-sync-design.md)).** The v1 "Won't" items **first-party accounts** and **cloud sync** are reversed, and so is the "Later" item saved vocabulary (D-04). Scope: optional Google sign-in (the only method); local saved words and per-word chat that work signed out; sync of saved words, chats, reading progress, highlights and, when the user chooses, PDFs (15 MB each, 100 MB per account) to a first-party server on Railway; a web dashboard (saved chats read-only); account export and deletion. Still excluded: billing, team features, passwords, any AI call from the server, and syncing the Groq key. The feature ships switched on (`FEATURES.accountSync`) from release 1.1.0; the approved disclosure copy in §4.1 was revised for it (`disclosurePdf`, `disclosureNoServer`). Other statements in this document about v1 describe the extension without an account.
 
 ## 3. User journeys
 
@@ -111,8 +111,8 @@ This is the approved user-facing wording. Implementation may adjust layout and f
 > - Selecting text does nothing by itself. Clavis notices the selection on your device and shows its toolbar. `[disclosureSelect]`
 > - **Listen** tries a matching on-device voice first, then an online voice if needed. Online voices send the selected text to their provider. Nothing is sent to Groq. `[disclosureListen]`
 > - **Explain** sends the text you selected, up to 1,000 characters of the text around it, and your chosen language to **Groq**, using your own API key. Groq handles it under its own terms and privacy policy. `[disclosureExplain]` *(link: Groq privacy policy)*
-> - PDFs you open are read inside your browser and never uploaded. Selected text can be sent when you ask for an explanation or use an online voice. `[disclosurePdf]`
-> - Clavis has no server of its own and collects no data about you. `[disclosureNoServer]`
+> - PDFs you open are read inside your browser and are uploaded only if you choose to save one to your Clavis account. Selected text can be sent when you ask for an explanation or use an online voice. `[disclosurePdf]`
+> - Without an account, nothing is sent to Clavis's server. With the optional account, the saved words, chats, reading data and PDFs you choose to save are stored on the Clavis server. `[disclosureNoServer]`
 >
 > Button: **I understand** `[disclosureAccept]`
 
@@ -396,9 +396,9 @@ The team can test **Linux only** by hand. Other platforms get automated coverage
 
 | Item | When needed | Notes |
 | --- | --- | --- |
-| Publisher display name and support email | Phase 10 (store submission) | Placeholders until then; the privacy policy draft uses `[PUBLISHER]` / `[SUPPORT_EMAIL]` |
+| Publisher display name and support email | Resolved 2026-11-28 | Publisher Omakidx; data-request contact awwalm513@gmail.com (in the privacy policy) |
 | Logo and store artwork | Phase 10 | Placeholder icons are fine through Phase 9 |
-| GitHub repository + Pages URL for the privacy policy | Before Phase 10 | No remote exists yet (D-15) |
+| Privacy policy URL | Resolved 2026-11-28 | `https://clavis-api-production.up.railway.app/privacy`, rendered by the Clavis server from `docs/privacy-policy.md`; replaces the GitHub Pages plan (D-15) |
 | Voice fallback adoption per OS | Settled 2026-10-23 (D-07) | The user's Chrome on Linux listed the same 19 online voices in both engines, so the offscreen fallback and the `offscreen` permission were removed in Phase 7 ([spike-d-voices.md](decisions/spike-d-voices.md)) |
 | Explanation card technology and budget | Phase 5 | A React card cannot fit the 60 KB lazy-UI budget: author it in Preact or load React only on the first Explain via background injection, and set its own budget |
 | Windows/macOS manual tester | Before public listing | D-14 |

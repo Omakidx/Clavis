@@ -6,6 +6,7 @@
 .wxt
 tests
 docs
+!docs/privacy-policy.md
 coverage
 playwright-report
 test-results

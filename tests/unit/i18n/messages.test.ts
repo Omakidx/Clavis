@@ -60,8 +60,9 @@ describe('messages.json catalog', () => {
       disclosureExplain:
         'Explain sends the text you selected, up to 1,000 characters of the text around it, and your chosen language to Groq, using your own API key. Groq handles it under its own terms and privacy policy.',
       disclosurePdf:
-        'PDFs you open are read inside your browser and never uploaded. Selected text can be sent when you ask for an explanation or use an online voice.',
-      disclosureNoServer: 'Clavis has no server of its own and collects no data about you.',
+        'PDFs you open are read inside your browser and are uploaded only if you choose to save one to your Clavis account. Selected text can be sent when you ask for an explanation or use an online voice.',
+      disclosureNoServer:
+        "Without an account, nothing is sent to Clavis's server. With the optional account, the saved words, chats, reading data and PDFs you choose to save are stored on the Clavis server.",
       disclosureAccept: 'I understand',
       firstSendBody:
         "Send this to Groq? Clavis will send the selected text and a little of the text around it to Groq to explain it. You'll only be asked once.",

@@ -1,0 +1,146 @@
+/* Standalone styles for /privacy (CSP: style-src 'self', so no inline styles). Tokens mirror src/styles.css. */
+:root {
+  color-scheme: light dark;
+  --bg: #f6f7eb;
+  --fg: #252820;
+  --muted: #5d6255;
+  --border: #dce0cf;
+  --surface: #eeefdf;
+  --focus: #805000;
+  --link: #805000;
+  --font:
+    system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans', sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #20221b;
+    --fg: #f6f7eb;
+    --muted: #b9beac;
+    --border: #414536;
+    --surface: #303329;
+    --focus: #ffc66b;
+    --link: #ffc66b;
+  }
+}
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+html {
+  -webkit-text-size-adjust: 100%;
+  scroll-padding-top: 1rem;
+}
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font);
+  font-size: 1rem;
+  line-height: 1.6;
+}
+a {
+  color: var(--link);
+}
+:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+.skip-link {
+  position: absolute;
+  inset-inline-start: 12px;
+  top: -4rem;
+  padding: 8px 16px;
+  background: var(--fg);
+  color: var(--bg);
+  border-radius: 12px;
+}
+.skip-link:focus {
+  top: 12px;
+}
+.site-header {
+  max-width: 46rem;
+  margin: 0 auto;
+  padding: 16px 16px 0;
+}
+.home {
+  display: inline-block;
+  padding: 8px 0;
+  min-height: 40px;
+  font-weight: 600;
+}
+.policy {
+  max-width: 46rem;
+  margin: 0 auto;
+  padding: 0 16px 48px;
+  overflow-wrap: anywhere;
+}
+h1,
+h2,
+h3 {
+  line-height: 1.25;
+  margin: 2rem 0 0.75rem;
+}
+h1 {
+  font-size: 1.75rem;
+  margin-top: 1rem;
+}
+h2 {
+  font-size: 1.3rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--border);
+}
+h3 {
+  font-size: 1.05rem;
+}
+p,
+ul,
+ol,
+blockquote,
+table {
+  margin: 0 0 0.9rem;
+}
+ul,
+ol {
+  padding-inline-start: 1.4rem;
+}
+li {
+  margin-bottom: 0.3rem;
+}
+blockquote {
+  padding: 0.5rem 1rem;
+  background: var(--surface);
+  border-inline-start: 4px solid var(--border);
+  border-radius: 8px;
+}
+blockquote p:last-child {
+  margin-bottom: 0;
+}
+code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.9em;
+  background: var(--surface);
+  padding: 0.1em 0.35em;
+  border-radius: 4px;
+}
+hr {
+  border: 0;
+  border-top: 1px solid var(--border);
+  margin: 1.5rem 0;
+}
+table {
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
+  border-collapse: collapse;
+}
+th,
+td {
+  border: 1px solid var(--border);
+  padding: 6px 10px;
+  text-align: start;
+  vertical-align: top;
+}
+th {
+  background: var(--surface);
+}
